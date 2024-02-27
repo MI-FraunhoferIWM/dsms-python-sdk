@@ -298,7 +298,7 @@ def _search(
 
     payload = {
         "search_term": query or "",
-        "kitem_types": [ktype.value for ktype in ktypes],
+        "ktypes": [ktype.value for ktype in ktypes],
         "kitem_annotations": annotations,
         "limit": limit,
     }
