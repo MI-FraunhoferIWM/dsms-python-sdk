@@ -3,6 +3,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, List, Optional, Union
+from urllib.parse import urljoin
 from uuid import UUID, uuid4
 
 from rdflib import Graph
@@ -33,6 +34,8 @@ from dsms.knowledge.properties import (  # isort:skip
     ExternalLink,
     ExternalLinksProperty,
     KProperty,
+    # HDF5Container,
+    Column,
     LinkedKItem,
     LinkedKItemsProperty,
     Summary,
@@ -121,6 +124,8 @@ class KItem(BaseModel):
     ktype: Optional[KType] = Field(
         None, description="KType of the KItem", exclude=True
     )
+
+    hdf5: Optional[Column] = Field(None, description="")
 
     model_config = ConfigDict(
         extra="forbid",
@@ -416,6 +421,8 @@ class KItem(BaseModel):
         return Context
 
     @property
-    def url(cls) -> Optional[str]:
+    def url(cls) -> str:
         """URL of the KItem"""
-        # Build url with base url, ktype and slug
+        return urljoin(
+            cls.context.dsms.config.host_url, f"{cls.ktype_id}/{cls.slug}"
+        )

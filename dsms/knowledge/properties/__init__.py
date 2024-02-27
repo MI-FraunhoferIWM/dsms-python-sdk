@@ -13,6 +13,7 @@ from dsms.knowledge.properties.authors import Author, AuthorsProperty
 from dsms.knowledge.properties.base import KProperty, KPropertyItem
 from dsms.knowledge.properties.contacts import ContactInfo, ContactsProperty
 from dsms.knowledge.properties.custom_properties import CustomProperties
+from dsms.knowledge.properties.hdf5 import Column, HDF5Container
 from dsms.knowledge.properties.summary import Summary
 from dsms.knowledge.properties.user_groups import UserGroup, UserGroupsProperty
 
@@ -20,6 +21,8 @@ from dsms.knowledge.properties.attachments import (  # isort:skip
     Attachment,
     AttachmentsProperty,
 )
+
+
 from dsms.knowledge.properties.linked_kitems import (  # isort:skip
     LinkedKItem,
     LinkedKItemsProperty,
@@ -54,4 +57,6 @@ __all__ = [
     "Summary",
     "KProperty",
     "KPropertyItem",
+    "HDF5Container",
+    "Column",
 ]

@@ -334,3 +334,30 @@ def _slug_is_available(ktype_id: Union[str, UUID], value: str) -> bool:
         f"api/knowledge/kitems/{ktype_id}/{value}", "head"
     )
     return response.status_code == 404
+
+
+def _get_hdf5_column(kitem_id: str, column_id: int) -> List[Any]:
+    """Download the column of a hdf5 container of a certain kitem"""
+    response = _perform_request(
+        f"api/knowledge/data_api/{kitem_id}/column-{column_id}", "get"
+    )
+    if not response.ok:
+        message = f"""Something went wrong fetch column id `{column_id}`
+        for kitem `{kitem_id}`: {response.text}"""
+        raise ValueError(message)
+    return response.json().get("array")
+
+
+def _inspect_hdf5(kitem_id: str) -> List[Dict[str, Any]]:
+    """Get column info for the hdf5 container of a certain kitem"""
+    response = _perform_request(f"api/knowledge/data_api/{kitem_id}", "get")
+    if not response.ok and response.status_code == 404:
+        message = (
+            f"""KItem with id `{kitem_id}` does not own any data frame."""
+        )
+        raise ValueError(message)
+    if not response.ok:
+        message = f"""Something went wrong fetching intospection
+        for kitem `{kitem_id}`: {response.text}"""
+        raise ValueError(message)
+    return response.json().get("array")
