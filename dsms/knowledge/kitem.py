@@ -34,7 +34,7 @@ from dsms.knowledge.properties import (  # isort:skip
     ExternalLink,
     ExternalLinksProperty,
     KProperty,
-    # HDF5Container,
+    HDF5Container,
     Column,
     LinkedKItem,
     LinkedKItemsProperty,
@@ -49,6 +49,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _kitem_exists,
     _slug_is_available,
     _slugify,
+    _inspect_hdf5,
 )
 
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
@@ -384,6 +385,22 @@ class KItem(BaseModel):
         if isinstance(value, str):
             value = Summary(kitem=cls, text=value)
         return value
+
+    @field_validator("hdf5")
+    @classmethod
+    def validate_hdf5(
+        cls,
+        value: List[Column],  # pylint: disable=unused-argument
+        info: ValidationInfo,
+    ) -> HDF5Container:
+        """Get HDF5 container if it exists."""
+        kitem_id = info.data.get("id")
+        columns = _inspect_hdf5(kitem_id)
+        if columns:
+            hdf5 = HDF5Container([Column(**column) for column in columns])
+        else:
+            hdf5 = None
+        return hdf5
 
     def _set_kitem_for_properties(self) -> None:
         """Set kitem for CustomProperties and KProperties in order to

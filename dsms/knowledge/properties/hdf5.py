@@ -21,7 +21,7 @@ class Column(KPropertyItem):
 
     def get(self) -> "List[Any]":
         """Download the data for the column in a time series"""
-        return _get_hdf5_column(self.id, self.name)
+        return _get_hdf5_column(self.id, self.column_id)
 
 
 class HDF5Container(KProperty):
@@ -33,25 +33,18 @@ class HDF5Container(KProperty):
         return Column
 
     # OVERRIDE
-    def _add(self, item: Column) -> None:
+    def _add(self, item: Column) -> Column:
         """Side effect when an Column is added to the KProperty"""
-        raise NotImplementedError(
-            "Adding columns to an HDF5 container is not supported yet"
-        )
+        return item
 
     # OVERRIDE
-    def _update(self, item: Column) -> None:
+    def _update(self, item: Column) -> Column:
         """Side effect when an Column is updated at the KProperty"""
-        raise NotImplementedError(
-            "Updating columns to an HDF5 container is not supported yet"
-        )
+        return item
 
     # OVERRIDE
     def _delete(self, item: Column) -> None:
         """Side effect when deleting the Column of a KItem"""
-        raise NotImplementedError(
-            "Deleting columns to an HDF5 container is not supported yet"
-        )
 
     # OVERRIDE
     def _get(self, item: Column) -> Column:
