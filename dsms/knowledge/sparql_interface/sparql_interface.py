@@ -9,7 +9,7 @@ from dsms.knowledge.sparql_interface.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict
+    from typing import Any, Dict, TextIO, Union
 
     from dsms.core.dsms import DSMS
 
@@ -28,10 +28,20 @@ class SparqlInterface:
         """Perform Sparql Query"""
         return _sparql_query(query, repository)
 
-    def update(self, filepath: str, repository: str = "knowledge") -> None:
+    def update(
+        self,
+        file_or_pathlike: "Union[str, TextIO]",
+        repository: str = "knowledge",
+    ) -> None:
         """Perform update query from local file"""
-        _sparql_update(filepath, self._dsms.config.encoding, repository)
+        _sparql_update(
+            file_or_pathlike, self._dsms.config.encoding, repository
+        )
 
-    def add_rdf(self, filepath: str, repository: str = "knowledge") -> None:
+    def add_rdf(
+        self,
+        file_or_pathlike: "Union[str, TextIO]",
+        repository: str = "knowledge",
+    ) -> None:
         """Upload RDF to triplestore from local file"""
-        _add_rdf(filepath, self._dsms.config.encoding, repository)
+        _add_rdf(file_or_pathlike, self._dsms.config.encoding, repository)

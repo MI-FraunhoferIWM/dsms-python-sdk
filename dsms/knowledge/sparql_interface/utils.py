@@ -7,7 +7,7 @@ from rdflib import Graph
 from dsms.core.utils import _kitem_id2uri, _perform_request
 
 if TYPE_CHECKING:
-    from typing import Any, Dict
+    from typing import Any, Dict, TextIO, Union
 
 
 def _sparql_query(query: str, repository: str) -> "Dict[str, Any]":
@@ -32,33 +32,48 @@ def _sparql_query(query: str, repository: str) -> "Dict[str, Any]":
 
 
 def _sparql_update(
-    filepath: str,
+    file_or_pathlike: "Union[str, TextIO]",
     encoding: str,
     repository: str,
 ) -> None:
     """Submit plain SPARQL-query to the DSMS instance."""
-
-    with open(filepath, mode="r+", encoding=encoding) as file:
-        response = _perform_request(
-            "api/knowledge/update-query",
-            "post",
-            files={"file": file},
-            params={"repository": repository},
-        )
+    response = _perform_request(
+        "api/knowledge/update-query",
+        "post",
+        files=_get_file_or_pathlike(file_or_pathlike, encoding),
+        params={"repository": repository},
+    )
     if not response.ok:
         raise RuntimeError(f"Sparql was not successful: {response.text}")
 
 
-def _add_rdf(filepath: str, encoding: str, repository: str) -> None:
-    """Create the subgraph in the remote backend"""
+def _get_file_or_pathlike(
+    file_or_pathlike: "Union[str, TextIO]", encoding: str
+) -> "TextIO":
+    if isinstance(file_or_pathlike, str):
+        with open(file_or_pathlike, mode="r+", encoding=encoding) as file:
+            files = {"file", file}
+    else:
+        if "read" not in dir(file_or_pathlike):
+            raise TypeError(
+                f"{file_or_pathlike} is neither a path"
+                f"or a file-like object."
+            )
+        files = {"file": file_or_pathlike}
+    print(files)
+    return files
 
-    with open(filepath, mode="r+", encoding=encoding) as file:
-        response = _perform_request(
-            "api/knowledge/add-rdf",
-            "post",
-            files={"file": file},
-            params={"repository": repository},
-        )
+
+def _add_rdf(
+    file_or_pathlike: "Union[str, TextIO]", encoding: str, repository: str
+) -> None:
+    """Create the subgraph in the remote backend"""
+    response = _perform_request(
+        "api/knowledge/add-rdf",
+        "post",
+        files=_get_file_or_pathlike(file_or_pathlike, encoding),
+        params={"repository": repository},
+    )
     if not response.ok:
         raise RuntimeError(
             f"Not able to create subgraph in backend: {response.text}"
