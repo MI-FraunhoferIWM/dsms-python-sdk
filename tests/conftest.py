@@ -32,6 +32,15 @@ class MockDB:
         },
     }
 
+    hdf5 = {
+        "698acdc5-dd97-4217-906e-2c0b44248c17": [
+            {
+                "column_id": 0,
+                "name": "bar123column",
+            },
+        ]
+    }
+
 
 @pytest.fixture(scope="function")
 def custom_address(request) -> str:
@@ -84,9 +93,21 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
         # Your logic to generate a dynamic response based on 'item_id'
         # This is just a placeholder; you should replace it with your actual logic
         if item_id not in MockDB.kitems:
-            return 404, "KItem does not exist"
+            return 404, {}, "KItem does not exist"
         else:
             return 200, {}, json.dumps(MockDB.kitems[item_id])
+
+    def return_hdf5(request):
+        # Extract 'id' parameter from the URL
+        url_parts = request.url.split("/")
+        item_id = url_parts[-1]
+
+        # Your logic to generate a dynamic response based on 'item_id'
+        # This is just a placeholder; you should replace it with your actual logic
+        if item_id not in MockDB.hdf5:
+            return 404, {}, "KItem does not exist"
+        else:
+            return 200, {}, json.dumps(MockDB.hdf5[item_id])
 
     def _get_kitems() -> "Dict[str, Any]":
         return {
@@ -96,6 +117,20 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
                     "returns": {
                         "content_type": "application/json",
                         "callback": return_kitems,
+                    },
+                }
+            ]
+            for uid in MockDB.kitems
+        }
+
+    def _get_hdf5() -> "Dict[str, Any]":
+        return {
+            urljoin(custom_address, f"api/knowledge/data_api/{uid}"): [
+                {
+                    "method": responses.GET,
+                    "returns": {
+                        "content_type": "application/json",
+                        "callback": return_hdf5,
                     },
                 }
             ]
@@ -113,6 +148,7 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
             }
         ],
         **_get_kitems(),
+        **_get_hdf5(),
     }
 
 
