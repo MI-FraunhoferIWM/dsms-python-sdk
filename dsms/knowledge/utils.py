@@ -291,19 +291,23 @@ def _search(
     query: Optional[str] = None,
     ktypes: "Optional[List[KType]]" = [],
     annotations: "Optional[List[str]]" = [],
-    limit: int = 10,
+    limit: "Optional[int]" = 10,
+    allow_fuzzy: "Optional[bool]" = True,
 ) -> "List[KItem]":
     """Search for KItems in the remote backend"""
     from dsms import KItem  # isort:skip
 
     payload = {
         "search_term": query or "",
-        "kitem_types": [ktype.value for ktype in ktypes],
+        "ktypes": [ktype.value for ktype in ktypes],
         "kitem_annotations": annotations,
         "limit": limit,
     }
     response = _perform_request(
-        "api/knowledge/kitems/search", "post", json=payload
+        "api/knowledge/kitems/search",
+        "post",
+        json=payload,
+        params={"allow_fuzzy": allow_fuzzy},
     )
     if not response.ok:
         raise RuntimeError(

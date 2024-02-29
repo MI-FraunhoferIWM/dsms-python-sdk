@@ -84,9 +84,10 @@ class DSMS:
         ktypes: "Optional[List[KType]]" = [],
         annotations: "Optional[List[str]]" = [],
         limit: int = 10,
+        allow_fuzzy: "Optional[bool]" = True,
     ) -> "List[KItem]":
         """Search for KItems in the remote backend."""
-        return _search(query, ktypes, annotations, limit)
+        return _search(query, ktypes, annotations, limit, allow_fuzzy)
 
     @property
     def sparql_interface(cls) -> SparqlInterface:
