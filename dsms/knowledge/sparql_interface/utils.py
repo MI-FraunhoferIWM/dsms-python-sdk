@@ -28,7 +28,7 @@ def _sparql_query(query: str, repository: str) -> "Dict[str, Any]":
             \n
             `{query}`"""
         ) from excep
-    return response["results"]["bindings"]
+    return response
 
 
 def _sparql_update(
@@ -60,7 +60,6 @@ def _get_file_or_pathlike(
                 f"or a file-like object."
             )
         files = {"file": file_or_pathlike}
-    print(files)
     return files
 
 
@@ -86,7 +85,7 @@ def _add_rdf(
         )
 
 
-def _delete_subgraph(identifier: str, encoding: str, repository: str) -> None:
+def _delete_subgraph(identifier: str, repository: str) -> None:
     """Get subgraph related to a certain dataset id."""
     query = f"""
     DELETE {{
@@ -100,7 +99,11 @@ def _delete_subgraph(identifier: str, encoding: str, repository: str) -> None:
             GRAPH ?g {{ ?s ?p ?o . }}
         }}
     }}"""
-    _sparql_update(query, encoding, repository)
+    response = _sparql_query(query, repository)
+    if not response.get("boolean"):
+        raise RuntimeError(
+            f"Deleteing subgraph was not successful: {response}"
+        )
 
 
 def _create_subgraph(graph: Graph, encoding: str, respository: str) -> None:
@@ -113,7 +116,7 @@ def _create_subgraph(graph: Graph, encoding: str, respository: str) -> None:
 
 def _update_subgraph(graph: Graph, encoding: str, repository: str) -> None:
     """Update the subgraph in the remote backend"""
-    _delete_subgraph(graph.identifier, encoding, repository)
+    _delete_subgraph(graph.identifier, repository)
     _create_subgraph(graph, encoding, repository)
 
 
@@ -134,7 +137,7 @@ def _get_subgraph(
             GRAPH ?g {{ ?s ?p ?o . }}
         }}
     }}"""
-    data = _sparql_query(query, repository)
+    data = _sparql_query(query, repository)["results"]["bindings"]
 
     buffer = io.StringIO()
     buffer.writelines(

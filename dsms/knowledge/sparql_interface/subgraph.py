@@ -32,13 +32,13 @@ class Subgraph:
 
     def delete(self, identifier: str, repository: str = "knowledge") -> None:
         """Delete a subgraph in the DSMS"""
-        _delete_subgraph(identifier, self._dsms.config.encoding, repository)
+        _delete_subgraph(identifier, repository)
 
     def get(
         self,
         identifier: str,
         repository: str = "knowledge",
         is_kitem_id: bool = False,
-    ) -> None:
+    ) -> "Graph":
         """Get a subgraph from the DSMS"""
-        _get_subgraph(identifier, repository, is_kitem_id)
+        return _get_subgraph(identifier, repository, is_kitem_id)
