@@ -40,5 +40,5 @@ class Subgraph:
         repository: str = "knowledge",
         is_kitem_id: bool = False,
     ) -> None:
-        """Get a subgraph in the DSMS"""
+        """Get a subgraph from the DSMS"""
         _get_subgraph(identifier, repository, is_kitem_id)
