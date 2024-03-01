@@ -7,7 +7,7 @@ from rdflib import Graph
 from dsms.core.utils import _kitem_id2uri, _perform_request
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, TextIO, Union
+    from typing import Any, Dict, Optional, TextIO, Union
 
 
 def _sparql_query(query: str, repository: str) -> "Dict[str, Any]":
@@ -65,14 +65,20 @@ def _get_file_or_pathlike(
 
 
 def _add_rdf(
-    file_or_pathlike: "Union[str, TextIO]", encoding: str, repository: str
+    file_or_pathlike: "Union[str, TextIO]",
+    encoding: str,
+    repository: str,
+    context: "Optional[str]" = None,
 ) -> None:
     """Create the subgraph in the remote backend"""
+    params = {"repository": repository}
+    if context:
+        params["context"] = context
     response = _perform_request(
         "api/knowledge/add-rdf",
         "post",
         files=_get_file_or_pathlike(file_or_pathlike, encoding),
-        params={"repository": repository},
+        params=params,
     )
     if not response.ok:
         raise RuntimeError(
@@ -97,21 +103,32 @@ def _delete_subgraph(identifier: str, encoding: str, repository: str) -> None:
     _sparql_update(query, encoding, repository)
 
 
+def _create_subgraph(graph: Graph, encoding: str, respository: str) -> None:
+    """Create the subgraph in the remote backend"""
+    upload_file = io.BytesIO(graph.serialize(encoding=encoding))
+    _add_rdf(
+        upload_file, encoding, respository, context=f"<{graph.identifier}>"
+    )
+
+
 def _update_subgraph(graph: Graph, encoding: str, repository: str) -> None:
     """Update the subgraph in the remote backend"""
     _delete_subgraph(graph.identifier, encoding, repository)
-    _add_rdf(graph, encoding, repository)
+    _create_subgraph(graph, encoding, repository)
 
 
-def _get_subgraph(kitem_id: str, repository: str) -> Graph:
+def _get_subgraph(
+    identifier: str, repository: str, is_kitem_id: bool = False
+) -> Graph:
     """Get subgraph related to a certain dataset id."""
-    uri = _kitem_id2uri(kitem_id)
+    if is_kitem_id:
+        identifier = _kitem_id2uri(identifier)
     query = f"""
     SELECT DISTINCT
         ?s ?p ?o
     WHERE {{
         BIND(
-            <{uri}> as ?g
+            <{identifier}> as ?g
             )
         {{
             GRAPH ?g {{ ?s ?p ?o . }}
@@ -126,10 +143,10 @@ def _get_subgraph(kitem_id: str, repository: str) -> Graph:
     )
     buffer.seek(0)
 
-    graph = Graph(identifier=uri)
+    graph = Graph(identifier=identifier)
     graph.parse(buffer, format="n3")
 
     if len(graph) == 0:
-        raise ValueError(f"Subgraph for id `{kitem_id}` does not exist.")
+        raise ValueError(f"Subgraph for id `{identifier}` does not exist.")
 
     return graph

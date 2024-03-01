@@ -2,16 +2,17 @@
 import re
 from typing import Any
 from urllib.parse import urljoin
+from uuid import UUID
 
 import requests
 from requests import Response
 
 
-def _kitem_id2uri(kitem_id: str) -> str:
+def _kitem_id2uri(kitem_id: UUID) -> str:
     "Convert a kitem id in the DSMS to the full resolvable URI"
     from dsms import Context
 
-    return f"{Context.dsms.config.host_url}/{kitem_id}"
+    return urljoin(str(Context.dsms.config.host_url), str(kitem_id))
 
 
 def _uri2kitem_idi(uri: str) -> str:
