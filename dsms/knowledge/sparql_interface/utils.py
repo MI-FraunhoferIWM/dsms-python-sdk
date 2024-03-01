@@ -2,12 +2,14 @@
 import io
 from typing import TYPE_CHECKING
 
-from rdflib import Graph
+from rdflib.plugins.sparql.results.jsonresults import JSONResult
 
 from dsms.core.utils import _kitem_id2uri, _perform_request
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, TextIO, Union
+
+    from rdflib import Graph
 
 
 def _sparql_query(query: str, repository: str) -> "Dict[str, Any]":
@@ -106,7 +108,7 @@ def _delete_subgraph(identifier: str, repository: str) -> None:
         )
 
 
-def _create_subgraph(graph: Graph, encoding: str, respository: str) -> None:
+def _create_subgraph(graph: "Graph", encoding: str, respository: str) -> None:
     """Create the subgraph in the remote backend"""
     upload_file = io.BytesIO(graph.serialize(encoding=encoding))
     _add_rdf(
@@ -114,7 +116,7 @@ def _create_subgraph(graph: Graph, encoding: str, respository: str) -> None:
     )
 
 
-def _update_subgraph(graph: Graph, encoding: str, repository: str) -> None:
+def _update_subgraph(graph: "Graph", encoding: str, repository: str) -> None:
     """Update the subgraph in the remote backend"""
     _delete_subgraph(graph.identifier, repository)
     _create_subgraph(graph, encoding, repository)
@@ -122,7 +124,7 @@ def _update_subgraph(graph: Graph, encoding: str, repository: str) -> None:
 
 def _get_subgraph(
     identifier: str, repository: str, is_kitem_id: bool = False
-) -> Graph:
+) -> "Graph":
     """Get subgraph related to a certain dataset id."""
     if is_kitem_id:
         identifier = _kitem_id2uri(identifier)
@@ -137,17 +139,9 @@ def _get_subgraph(
             GRAPH ?g {{ ?s ?p ?o . }}
         }}
     }}"""
-    data = _sparql_query(query, repository)["results"]["bindings"]
-
-    buffer = io.StringIO()
-    buffer.writelines(
-        f"<{row['s']['value']}> <{row['p']['value']}> <{row['o']['value']}> ."
-        for row in data
-    )
-    buffer.seek(0)
-
-    graph = Graph(identifier=identifier)
-    graph.parse(buffer, format="n3")
+    data = _sparql_query(query, repository)
+    graph = JSONResult(data)
+    graph.identifier = identifier
 
     if len(graph) == 0:
         raise ValueError(f"Subgraph for id `{identifier}` does not exist.")
