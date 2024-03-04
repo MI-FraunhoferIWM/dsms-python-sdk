@@ -426,7 +426,9 @@ class KItem(BaseModel):
     @property
     def subgraph(cls) -> Optional[Graph]:
         """Getter for Subgraph"""
-        return _get_subgraph(cls.id, cls.dsms.config.kitem_repo)
+        return _get_subgraph(
+            cls.id, cls.dsms.config.kitem_repo, is_kitem_id=True
+        )
 
     @property
     def context(cls) -> "Context":
