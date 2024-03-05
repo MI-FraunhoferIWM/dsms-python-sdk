@@ -13,11 +13,11 @@ if TYPE_CHECKING:
 class AdditionalProperties(BaseModel):
     """Additional properties of"""
 
-    triggeredUponUpload: bool = Field(
+    triggerUponUpload: bool = Field(
         False,
         description="Whether the app should be triggered when a file is uploaded",
     )
-    triggeredUponUploadFileExtensions: Optional[list[str]] = Field(
+    triggerUponUploadFileExtensions: Optional[list[str]] = Field(
         None,
         description="File extensions for which the upload shall be triggered.",
     )
