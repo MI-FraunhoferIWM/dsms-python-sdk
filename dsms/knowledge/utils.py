@@ -142,6 +142,7 @@ def _update_kitem(kitem: "KItem") -> Response:
             "kitem_apps",
             "created_at",
             "external_links",
+            "hdf5",
         },
         exclude_none=True,
     )
@@ -280,14 +281,21 @@ def _commit_updated(buffer: "Dict[str, KItem]") -> None:
         if _kitem_exists(kitem):
             _update_attachments(kitem)
             if isinstance(kitem.hdf5, pd.DataFrame):
-                _update_hdf5(str(kitem.id), kitem.hdf5)
+                _update_hdf5(kitem.id, kitem.hdf5)
+            elif isinstance(kitem.hdf5, type(None)) and _inspect_hdf5(
+                kitem.id
+            ):
+                _delete_hdf5(kitem.id)
             _update_kitem(kitem)
+            for key, value in _get_kitem(kitem.id).__dict__.items():
+                setattr(kitem, key, value)
 
 
 def _commit_deleted(buffer: "Dict[str, KItem]") -> None:
     """Commit the buffer for the `deleted` buffers"""
     for kitem in buffer.values():
         if _kitem_exists(kitem):
+            _delete_hdf5(kitem.id)
             _delete_kitem(kitem)
 
 
@@ -381,3 +389,7 @@ def _update_hdf5(kitem_id: str, data: pd.DataFrame):
         raise RuntimeError(
             f"Could not put dataframe into kitem with id `{kitem_id}`: {response.text}"
         )
+
+
+def _delete_hdf5(kitem_id: str) -> Response:
+    return _perform_request(f"api/knowledge/data_api/{kitem_id}", "delete")

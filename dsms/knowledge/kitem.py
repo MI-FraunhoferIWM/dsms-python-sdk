@@ -134,6 +134,7 @@ class KItem(BaseModel):
         validate_assignment=True,
         validate_default=True,
         exclude={"ktype"},
+        arbitrary_types_allowed=True,
     )
 
     def __init__(self, **kwargs: "Any") -> None:
