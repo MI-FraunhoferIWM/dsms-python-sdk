@@ -1,6 +1,7 @@
 """HDF5 Properties of a KItem"""
 from typing import TYPE_CHECKING
 
+import pandas as pd
 from pydantic import Field
 
 from dsms.knowledge.properties.base import KProperty, KPropertyItem
@@ -50,3 +51,8 @@ class HDF5Container(KProperty):
     def _get(self, item: Column) -> Column:
         """Side effect when getting the Column for a specfic kitem"""
         return item
+
+    def to_df(self) -> pd.DataFrame:
+        """Return hdf5 as pandas DataFrame"""
+        data = {column.name: column.get() for column in self}
+        return pd.DataFrame.from_dict(data)

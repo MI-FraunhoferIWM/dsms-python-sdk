@@ -1,4 +1,5 @@
 """DSMS knowledge utilities"""
+import io
 import json
 import re
 from enum import Enum
@@ -6,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
+import pandas as pd
 from pydantic import BaseModel, create_model
 from requests import Response
 
@@ -277,6 +279,8 @@ def _commit_updated(buffer: "Dict[str, KItem]") -> None:
     for kitem in buffer.values():
         if _kitem_exists(kitem):
             _update_attachments(kitem)
+            if isinstance(kitem.hdf5, pd.DataFrame):
+                _update_hdf5(str(kitem.id), kitem.hdf5)
             _update_kitem(kitem)
 
 
@@ -364,3 +368,16 @@ def _inspect_hdf5(kitem_id: str) -> Optional[List[Dict[str, Any]]]:
     else:
         hdf5 = response.json()
     return hdf5
+
+
+def _update_hdf5(kitem_id: str, data: pd.DataFrame):
+    buffer = io.BytesIO()
+    data.to_json(buffer, indent=2)
+    buffer.seek(0)
+    response = _perform_request(
+        f"api/knowledge/data_api/{kitem_id}", "put", files={"data": buffer}
+    )
+    if not response.ok:
+        raise RuntimeError(
+            f"Could not put dataframe into kitem with id `{kitem_id}`: {response.text}"
+        )

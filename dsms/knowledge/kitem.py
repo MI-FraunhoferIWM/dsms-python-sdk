@@ -2,10 +2,11 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
 from uuid import UUID, uuid4
 
+import pandas as pd
 from rdflib import Graph
 
 from pydantic import (  # isort:skip
@@ -55,8 +56,6 @@ from dsms.knowledge.utils import (  # isort:skip
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
 
 if TYPE_CHECKING:
-    from typing import Dict
-
     from dsms import Context
     from dsms.core.dsms import DSMS
 
@@ -126,7 +125,9 @@ class KItem(BaseModel):
         None, description="KType of the KItem", exclude=True
     )
 
-    hdf5: Optional[Column] = Field(None, description="")
+    hdf5: Optional[
+        Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]
+    ] = Field(None, description="HDF5 interface.")
 
     model_config = ConfigDict(
         extra="forbid",
@@ -390,16 +391,28 @@ class KItem(BaseModel):
     @classmethod
     def validate_hdf5(
         cls,
-        value: List[Column],  # pylint: disable=unused-argument
+        value: Union[
+            List[Column], pd.DataFrame, Dict[str, Dict[Any, Any]]
+        ],  # pylint: disable=unused-argument
         info: ValidationInfo,
     ) -> HDF5Container:
         """Get HDF5 container if it exists."""
         kitem_id = info.data.get("id")
-        columns = _inspect_hdf5(kitem_id)
-        if columns:
-            hdf5 = HDF5Container([Column(**column) for column in columns])
+        if isinstance(value, (pd.DataFrame, dict)):
+            if isinstance(value, pd.DataFrame):
+                hdf5 = value.copy(deep=True)
+            elif isinstance(value, dict):
+                hdf5 = pd.DataFrame.from_dict(value)
+            else:
+                raise TypeError(
+                    f"Data must be of type {dict} or {pd.DataFrame}, not {type(value)}"
+                )
         else:
-            hdf5 = None
+            columns = _inspect_hdf5(kitem_id)
+            if columns:
+                hdf5 = HDF5Container([Column(**column) for column in columns])
+            else:
+                hdf5 = None
         return hdf5
 
     def _set_kitem_for_properties(self) -> None:
