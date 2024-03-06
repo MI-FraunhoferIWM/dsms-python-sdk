@@ -1,4 +1,5 @@
 """DSMS knowledge utilities"""
+import io
 import json
 import re
 from enum import Enum
@@ -6,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
+import pandas as pd
 from pydantic import BaseModel, create_model
 from requests import Response
 
@@ -140,6 +142,7 @@ def _update_kitem(kitem: "KItem") -> Response:
             "kitem_apps",
             "created_at",
             "external_links",
+            "hdf5",
         },
         exclude_none=True,
     )
@@ -277,13 +280,22 @@ def _commit_updated(buffer: "Dict[str, KItem]") -> None:
     for kitem in buffer.values():
         if _kitem_exists(kitem):
             _update_attachments(kitem)
+            if isinstance(kitem.hdf5, pd.DataFrame):
+                _update_hdf5(kitem.id, kitem.hdf5)
+            elif isinstance(kitem.hdf5, type(None)) and _inspect_hdf5(
+                kitem.id
+            ):
+                _delete_hdf5(kitem.id)
             _update_kitem(kitem)
+            for key, value in _get_kitem(kitem.id).__dict__.items():
+                setattr(kitem, key, value)
 
 
 def _commit_deleted(buffer: "Dict[str, KItem]") -> None:
     """Commit the buffer for the `deleted` buffers"""
     for kitem in buffer.values():
         if _kitem_exists(kitem):
+            _delete_hdf5(kitem.id)
             _delete_kitem(kitem)
 
 
@@ -338,3 +350,46 @@ def _slug_is_available(ktype_id: Union[str, UUID], value: str) -> bool:
         f"api/knowledge/kitems/{ktype_id}/{value}", "head"
     )
     return response.status_code == 404
+
+
+def _get_hdf5_column(kitem_id: str, column_id: int) -> List[Any]:
+    """Download the column of a hdf5 container of a certain kitem"""
+    response = _perform_request(
+        f"api/knowledge/data_api/{kitem_id}/column-{column_id}", "get"
+    )
+    if not response.ok:
+        message = f"""Something went wrong fetch column id `{column_id}`
+        for kitem `{kitem_id}`: {response.text}"""
+        raise ValueError(message)
+    return response.json().get("array")
+
+
+def _inspect_hdf5(kitem_id: str) -> Optional[List[Dict[str, Any]]]:
+    """Get column info for the hdf5 container of a certain kitem"""
+    response = _perform_request(f"api/knowledge/data_api/{kitem_id}", "get")
+    if not response.ok and response.status_code == 404:
+        hdf5 = None
+    elif not response.ok and response.status_code != 404:
+        message = f"""Something went wrong fetching intospection
+        for kitem `{kitem_id}`: {response.text}"""
+        raise ValueError(message)
+    else:
+        hdf5 = response.json()
+    return hdf5
+
+
+def _update_hdf5(kitem_id: str, data: pd.DataFrame):
+    buffer = io.BytesIO()
+    data.to_json(buffer, indent=2)
+    buffer.seek(0)
+    response = _perform_request(
+        f"api/knowledge/data_api/{kitem_id}", "put", files={"data": buffer}
+    )
+    if not response.ok:
+        raise RuntimeError(
+            f"Could not put dataframe into kitem with id `{kitem_id}`: {response.text}"
+        )
+
+
+def _delete_hdf5(kitem_id: str) -> Response:
+    return _perform_request(f"api/knowledge/data_api/{kitem_id}", "delete")

@@ -2,9 +2,11 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from urllib.parse import urljoin
 from uuid import UUID, uuid4
 
+import pandas as pd
 from rdflib import Graph
 
 from pydantic import (  # isort:skip
@@ -33,6 +35,8 @@ from dsms.knowledge.properties import (  # isort:skip
     ExternalLink,
     ExternalLinksProperty,
     KProperty,
+    HDF5Container,
+    Column,
     LinkedKItem,
     LinkedKItemsProperty,
     Summary,
@@ -46,13 +50,12 @@ from dsms.knowledge.utils import (  # isort:skip
     _kitem_exists,
     _slug_is_available,
     _slugify,
+    _inspect_hdf5,
 )
 
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
 
 if TYPE_CHECKING:
-    from typing import Dict
-
     from dsms import Context
     from dsms.core.dsms import DSMS
 
@@ -122,11 +125,16 @@ class KItem(BaseModel):
         None, description="KType of the KItem", exclude=True
     )
 
+    hdf5: Optional[
+        Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]
+    ] = Field(None, description="HDF5 interface.")
+
     model_config = ConfigDict(
         extra="forbid",
         validate_assignment=True,
         validate_default=True,
         exclude={"ktype"},
+        arbitrary_types_allowed=True,
     )
 
     def __init__(self, **kwargs: "Any") -> None:
@@ -380,6 +388,34 @@ class KItem(BaseModel):
             value = Summary(kitem=cls, text=value)
         return value
 
+    @field_validator("hdf5")
+    @classmethod
+    def validate_hdf5(
+        cls,
+        value: Union[
+            List[Column], pd.DataFrame, Dict[str, Dict[Any, Any]]
+        ],  # pylint: disable=unused-argument
+        info: ValidationInfo,
+    ) -> HDF5Container:
+        """Get HDF5 container if it exists."""
+        kitem_id = info.data.get("id")
+        if isinstance(value, (pd.DataFrame, dict)):
+            if isinstance(value, pd.DataFrame):
+                hdf5 = value.copy(deep=True)
+            elif isinstance(value, dict):
+                hdf5 = pd.DataFrame.from_dict(value)
+            else:
+                raise TypeError(
+                    f"Data must be of type {dict} or {pd.DataFrame}, not {type(value)}"
+                )
+        else:
+            columns = _inspect_hdf5(kitem_id)
+            if columns:
+                hdf5 = HDF5Container([Column(**column) for column in columns])
+            else:
+                hdf5 = None
+        return hdf5
+
     def _set_kitem_for_properties(self) -> None:
         """Set kitem for CustomProperties and KProperties in order to
         remain the context for the buffer if any of these properties is changed.
@@ -418,6 +454,8 @@ class KItem(BaseModel):
         return Context
 
     @property
-    def url(cls) -> Optional[str]:
+    def url(cls) -> str:
         """URL of the KItem"""
-        # Build url with base url, ktype and slug
+        return urljoin(
+            cls.context.dsms.config.host_url, f"{cls.ktype_id}/{cls.slug}"
+        )
