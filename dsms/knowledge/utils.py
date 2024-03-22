@@ -160,6 +160,9 @@ def _update_kitem(kitem: "KItem") -> Response:
         raise ValueError(
             f"KItem with uuid `{kitem.id}` could not be updated in DSMS: {response.text}`"
         )
+    for key, value in _get_kitem(kitem.id).__dict__.items():
+        if key != "attachments":
+            setattr(kitem, key, value)
     return response
 
 
@@ -180,8 +183,8 @@ def _update_attachments(kitem: "KItem") -> None:
         _upload_attachments(kitem, upload.name)
     for remove in differences["remove"]:
         _delete_attachments(kitem, remove.name)
-    new_kitem = _get_kitem(kitem.id)
-    kitem.attachments = new_kitem.attachments.values  # pylint: disable=E1101
+    for key, value in _get_kitem(kitem.id).__dict__.items():
+        setattr(kitem, key, value)
 
 
 def _upload_attachments(kitem: "KItem", attachment: "str") -> None:
@@ -279,7 +282,6 @@ def _commit_updated(buffer: "Dict[str, KItem]") -> None:
     """Commit the buffer for the `updated` buffers"""
     for kitem in buffer.values():
         if _kitem_exists(kitem):
-            _update_attachments(kitem)
             if isinstance(kitem.hdf5, pd.DataFrame):
                 _update_hdf5(kitem.id, kitem.hdf5)
             elif isinstance(kitem.hdf5, type(None)) and _inspect_hdf5(
@@ -287,8 +289,7 @@ def _commit_updated(buffer: "Dict[str, KItem]") -> None:
             ):
                 _delete_hdf5(kitem.id)
             _update_kitem(kitem)
-            for key, value in _get_kitem(kitem.id).__dict__.items():
-                setattr(kitem, key, value)
+            _update_attachments(kitem)
 
 
 def _commit_deleted(buffer: "Dict[str, KItem]") -> None:
