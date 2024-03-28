@@ -53,8 +53,11 @@ def _get_file_or_pathlike(
     file_or_pathlike: "Union[str, TextIO]", encoding: str
 ) -> "TextIO":
     if isinstance(file_or_pathlike, str):
-        with open(file_or_pathlike, mode="r+", encoding=encoding) as file:
-            files = {"file", file}
+        files = {
+            "file": open(  # pylint: disable=R1732
+                file_or_pathlike, mode="r+", encoding=encoding
+            )
+        }
     else:
         if "read" not in dir(file_or_pathlike):
             raise TypeError(
