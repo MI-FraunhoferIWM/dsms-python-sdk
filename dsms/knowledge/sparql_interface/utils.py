@@ -2,14 +2,13 @@
 import io
 from typing import TYPE_CHECKING
 
+from rdflib import Graph
 from rdflib.plugins.sparql.results.jsonresults import JSONResult
 
 from dsms.core.utils import _kitem_id2uri, _perform_request
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, TextIO, Union
-
-    from rdflib import Graph
 
 
 def _sparql_query(query: str, repository: str) -> "Dict[str, Any]":
@@ -142,9 +141,11 @@ def _get_subgraph(
             GRAPH ?g {{ ?s ?p ?o . }}
         }}
     }}"""
+
+    graph = Graph(identifier=identifier)
     data = _sparql_query(query, repository)
-    graph = JSONResult(data)
-    graph.identifier = identifier
+    for row in JSONResult(data).bindings:
+        graph.add(row.values())
 
     if len(graph) == 0:
         raise ValueError(f"Subgraph for id `{identifier}` does not exist.")
