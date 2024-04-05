@@ -7,7 +7,7 @@ import pytest
 import responses
 
 if TYPE_CHECKING:
-    from typing import Any, Dict
+    from typing import Any, Dict, List
 
 
 class MockDB:
@@ -64,6 +64,14 @@ def mock_responses(custom_address) -> "Dict[str, Any]":
             {"method": responses.GET, "returns": {"status": 200, "json": {}}}
         ],
     }
+
+
+@pytest.fixture(scope="function")
+def passthru() -> "List[str]":
+    return [
+        "https://qudt.org/2.1/vocab/unit",
+        "http://qudt.org/2.1/vocab/unit",
+    ]
 
 
 @pytest.fixture(scope="function")
@@ -153,7 +161,11 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
 
 
 @pytest.fixture(autouse=True, scope="function")
-def register_mocks(mock_responses, mock_callbacks, custom_address) -> str:
+def register_mocks(
+    mock_responses, mock_callbacks, passthru, custom_address
+) -> str:
+    for url in passthru:
+        responses.add_passthru(url)
     for url, endpoints in mock_responses.items():
         for response in endpoints:
             responses.add(

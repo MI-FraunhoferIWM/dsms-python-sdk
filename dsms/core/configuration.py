@@ -53,6 +53,11 @@ class Configuration(BaseSettings):
         description="Repository of the triplestore for KItems in the DSMS",
     )
 
+    qudt_uri: AnyUrl = Field(
+        "http://qudt.org/2.1/vocab/unit",
+        description="URI to QUDT Ontology for unit conversion",
+    )
+
     @field_validator("token")
     def validate_auth(cls, val, info: ValidationInfo):
         """Validate the provided authentication/authorization secrets."""
