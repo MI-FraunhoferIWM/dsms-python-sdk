@@ -71,6 +71,8 @@ def passthru() -> "List[str]":
     return [
         "https://qudt.org/2.1/vocab/unit",
         "http://qudt.org/2.1/vocab/unit",
+        "http://qudt.org/vocab/quantitykind",
+        "https://qudt.org/vocab/quantitykind",
     ]
 
 

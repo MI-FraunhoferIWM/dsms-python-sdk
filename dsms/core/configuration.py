@@ -53,9 +53,14 @@ class Configuration(BaseSettings):
         description="Repository of the triplestore for KItems in the DSMS",
     )
 
-    qudt_uri: AnyUrl = Field(
+    qudt_units: AnyUrl = Field(
         "http://qudt.org/2.1/vocab/unit",
-        description="URI to QUDT Ontology for unit conversion",
+        description="URI to QUDT Unit ontology for unit conversion",
+    )
+
+    qudt_quantity_kinds: AnyUrl = Field(
+        "http://qudt.org/vocab/quantitykind/",
+        description="URI to QUDT quantity kind ontology for unit conversion",
     )
 
     @field_validator("token")
