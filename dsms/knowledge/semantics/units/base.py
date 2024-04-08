@@ -1,0 +1,35 @@
+"""DSMS acstract class for units sparql query"""
+
+from dsms.knowledge.semantics.queries import BaseSparqlQuery
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+
+    from typing import Union, Dict, Any
+    from uuid import UUID
+
+
+class BaseUnitSparqlQuery(BaseSparqlQuery):
+    """
+    Abstract class for defining sparql queries fetching
+    the units of a hdf5 column or custom property of
+    a kitem.
+    """
+
+    def __init__(self, 
+                 kitem_id: "Union[str, UUID]",
+                 property_name: str, 
+                 is_hdf5_column: bool = False) -> None:
+        super().__init__(
+            kitem_id=kitem_id,
+            property_name=property_name,
+            is_hdf5_column=is_hdf5_column)
+
+    # OVERRIDE
+    @property
+    def result_mappings(cls) -> "Dict[str, Any]":
+        """Define mappings for the results of the units sparql queries"""
+        return {
+            "symbol": str,
+            "iri": str
+        }

@@ -1,14 +1,16 @@
 """HDF5 Properties of a KItem"""
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pandas as pd
 from pydantic import Field
 
 from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.semantics.units import get_conversion_factor, get_property_unit
 from dsms.knowledge.utils import _get_hdf5_column
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, List
+    from typing import Any, Callable, Dict, List, Optional
 
 
 class Column(KPropertyItem):
@@ -23,6 +25,26 @@ class Column(KPropertyItem):
     def get(self) -> "List[Any]":
         """Download the data for the column in a time series"""
         return _get_hdf5_column(self.id, self.column_id)
+
+    def get_unit(self) -> "Dict[str, Any]":
+        return get_property_unit(self.id, self.name, is_hdf5_column=True)
+
+    def convert_to(
+        self,
+        unit_symbol_or_iri: str,
+        decimals: "Optional[int]" = None,
+        use_input_iri: bool = False,
+    ) -> "List[Any]":
+        unit = self.get_unit()
+        if use_input_iri:
+            input_str = unit.get("iri")
+        else:
+            input_str = unit.get("symbol")
+        factor = get_conversion_factor(
+            input_str, unit_symbol_or_iri, decimals=decimals
+        )
+        data = self.get()
+        return list(np.array(data) * factor)
 
 
 class HDF5Container(KProperty):
@@ -56,3 +78,9 @@ class HDF5Container(KProperty):
         """Return hdf5 as pandas DataFrame"""
         data = {column.name: column.get() for column in self}
         return pd.DataFrame.from_dict(data)
+
+    def get(self, name: str) -> "Optional[Column]":
+        """Get a column with a certain name."""
+        for column in self:
+            if column.name == name:
+                return column
