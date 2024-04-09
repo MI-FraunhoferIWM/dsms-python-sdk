@@ -120,9 +120,9 @@ def test_unit_conversion(custom_address):
     with pytest.warns(UserWarning, match="No authentication details"):
         DSMS(host_url=custom_address)
 
-    assert get_conversion_factor("mm", "m", rounded=3) == 0.001
+    assert get_conversion_factor("mm", "m", decimals=3) == 0.001
 
-    assert get_conversion_factor("km", "in", rounded=1) == 39370.1
+    assert get_conversion_factor("km", "in", decimals=1) == 39370.1
 
     assert get_conversion_factor("GPa", "MPa") == 1000
 
@@ -130,7 +130,7 @@ def test_unit_conversion(custom_address):
         get_conversion_factor(
             "http://qudt.org/vocab/unit/M",
             "http://qudt.org/vocab/unit/IN",
-            rounded=1,
+            decimals=1,
         )
         == 39.4
     )

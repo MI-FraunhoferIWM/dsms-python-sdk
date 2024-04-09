@@ -7,7 +7,9 @@ from rdflib.plugins.sparql.results.jsonresults import JSONResult
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional
+
     from dsms import DSMS
+
 
 class BaseSparqlQuery(ABC):
     """Abstract class for DSMS Sparql Query"""
@@ -32,13 +34,13 @@ class BaseSparqlQuery(ABC):
         return cls._dsms
 
     @property
-    def results(cls) ->  "Optional[Dict[str, Any]]":
+    def results(cls) -> "Optional[Dict[str, Any]]":
         """Return query results"""
         return cls._results
 
     @property
     @abstractmethod
-    def result_mappings(self) -> "Dict[str, Any]":
+    def result_mappings(cls) -> "Dict[str, Any]":
         """
         Define a mapping between the output keys and the output datatype.
         E.g. {'foo': int, 'bar': str, 'foobar': MyCustomClass}
@@ -59,7 +61,7 @@ class BaseSparqlQuery(ABC):
             row_converted = {str(key): value for key, value in row.items()}
             self._results.append(
                 {
-                    name: func(row_converted.get(name)) 
+                    name: func(row_converted.get(name))
                     for name, func in self.result_mappings.items()
                 }
             )

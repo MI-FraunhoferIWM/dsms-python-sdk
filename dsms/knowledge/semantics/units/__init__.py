@@ -2,7 +2,4 @@
 
 from .utils import get_conversion_factor, get_property_unit
 
-__all__ = [
-    "get_conversion_factor",
-    "get_property_unit"
-]
+__all__ = ["get_conversion_factor", "get_property_unit"]

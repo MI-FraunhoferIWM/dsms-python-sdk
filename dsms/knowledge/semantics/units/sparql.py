@@ -1,7 +1,9 @@
 """Semantic units for a custom property of a KItem in DSMS"""
 
-from dsms.knowledge.semantics.units.base import BaseUnitSparqlQuery
 from urllib.parse import urljoin
+
+from dsms.knowledge.semantics.units.base import BaseUnitSparqlQuery
+
 
 class UnitSparqlQuery(BaseUnitSparqlQuery):
     """
@@ -11,8 +13,8 @@ class UnitSparqlQuery(BaseUnitSparqlQuery):
     @property
     def query(cls) -> str:
         """Construct sparql query for getting unit for hdf5 column"""
-        kitem_id  = cls.kwargs.get("kitem_id")
-        property_name  = cls.kwargs.get("property_name")
+        kitem_id = cls.kwargs.get("kitem_id")
+        property_name = cls.kwargs.get("property_name")
         if not kitem_id:
             raise ValueError("KItem ID must be defined.")
         if not property_name:
@@ -27,10 +29,10 @@ class UnitSparqlQuery(BaseUnitSparqlQuery):
             prefix perceptual: <http://emmo.info/emmo/middle/perceptual#>
             prefix reductionistic: <http://emmo.info/emmo/middle/reductionistic#>
 
-            select distinct 
+            select distinct
                 (STR(?symbol_literal) as ?symbol)
                 ?iri
-            where {{ 
+            where {{
 
                 <{url}/dataset> datamodel:composition ?prop .
 
@@ -52,10 +54,10 @@ class UnitSparqlQuery(BaseUnitSparqlQuery):
             prefix perceptual: <http://emmo.info/emmo/middle/perceptual#>
             prefix reductionistic: <http://emmo.info/emmo/middle/reductionistic#>
 
-            select distinct 
+            select distinct
                 ?symbol
                 ?iri
-            where {{ 
+            where {{
 
                 <{url}/dataset> datamodel:composition ?prop .
 

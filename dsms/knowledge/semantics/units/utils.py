@@ -1,13 +1,20 @@
 """Utilities for unit semantics of a KItem"""
 
-from .conversion import _is_valid_url, _check_qudt_mapping, _units_are_compatible, _get_factor_from_uri
-from .sparql import UnitSparqlQuery
-from typing import TYPE_CHECKING
 from functools import lru_cache
+from typing import TYPE_CHECKING
+
+from .conversion import (
+    _check_qudt_mapping,
+    _get_factor_from_uri,
+    _is_valid_url,
+    _units_are_compatible,
+)
+from .sparql import UnitSparqlQuery
 
 if TYPE_CHECKING:
-    from typing import Optional, Dict, Any, Union
+    from typing import Any, Dict, Optional, Union
     from uuid import UUID
+
 
 @lru_cache
 def get_conversion_factor(
@@ -57,7 +64,12 @@ def get_conversion_factor(
         factor = round(factor, decimals)
     return factor
 
-def get_property_unit(kitem_id: "Union[str, UUID]", property_name: str, is_hdf5_column: bool = False) -> "Dict[str, Any]":
+
+def get_property_unit(
+    kitem_id: "Union[str, UUID]",
+    property_name: str,
+    is_hdf5_column: bool = False,
+) -> "Dict[str, Any]":
     """
     Retrieve the unit associated with a given property of a KIitem.
 
@@ -69,7 +81,7 @@ def get_property_unit(kitem_id: "Union[str, UUID]", property_name: str, is_hdf5_
             column or a custom property. Defaults to False.
 
     Returns:
-        Dict[str, Any]: A dictionary with the symbol and iri of the unit associated 
+        Dict[str, Any]: A dictionary with the symbol and iri of the unit associated
             with the specified property.
 
     Raises:
@@ -79,9 +91,17 @@ def get_property_unit(kitem_id: "Union[str, UUID]", property_name: str, is_hdf5_
     try:
         query = UnitSparqlQuery(kitem_id, property_name, is_hdf5_column)
     except Exception as error:
-        raise ValueError(f"Something went wrong catching the unit for property `{property_name}`.") from error
+        raise ValueError(
+            f"Something went wrong catching the unit for property `{property_name}`."
+        ) from error
     if len(query.results) == 0:
-        raise ValueError(f"Property `{property_name}` does not own any unit with respect to the semantics applied.")
-    elif len(query.results) > 1:
-        raise ValueError(f"Property `{property_name}` owns more than one unit with respect to the semantics applied.")
+        raise ValueError(
+            f"""Property `{property_name}` does not own any
+            unit with respect to the semantics applied."""
+        )
+    if len(query.results) > 1:
+        raise ValueError(
+            f"""Property `{property_name}` owns more than one
+            unit with respect to the semantics applied."""
+        )
     return query.results.pop()
