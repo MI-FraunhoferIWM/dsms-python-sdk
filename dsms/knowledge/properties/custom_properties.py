@@ -25,6 +25,13 @@ class CustomProperties(BaseModel):
         extra="forbid", exclude={"kitem", "id"}, validate_assignment=True
     )
 
+    def __setattr__(self, name, value) -> None:
+        """Set id and name of properties when attribute is set"""
+        super().__setattr__(name, value)
+        if name == "content":
+            self._mark_as_updated()
+            self._set_id_and_name_of_content()
+
     def __str__(self) -> str:
         """Pretty print the custom properties"""
         fields = ", ".join(
@@ -66,6 +73,14 @@ class CustomProperties(BaseModel):
             )
         self._mark_as_updated()
 
+    def _set_id_and_name_of_content(self) -> None:
+        for subproperty in self.content.__fields__():
+            for key, value in subproperty.__dict__.items():
+                if not value.name:
+                    value.name = key
+                if not value.kitem_id:
+                    value.kitem_id = self.id
+
     def _mark_as_updated(self) -> None:
         if self.kitem and self.id not in self.context.buffers.updated:
             self.context.buffers.updated.update({self.id: self.kitem})
@@ -92,8 +107,8 @@ class CustomProperties(BaseModel):
         content = data.get("content")
         if kitem:
             data["id"] = kitem.id
-            if kitem.ktype.data_schema:
-                data["content"] = kitem.ktype.data_schema(**content)
+            if kitem.ktype.webform:
+                data["content"] = kitem.ktype.webform(**content)
         return data
 
     @property
@@ -108,7 +123,7 @@ class CustomProperties(BaseModel):
         """Data schema related to the ktype of the associated kitem."""
         if not cls.kitem:
             raise ValueError("KItem not defined yet.")
-        return cls.kitem.ktype.data_schema  # pylint: disable=E1101
+        return cls.kitem.ktype.webform  # pylint: disable=E1101
 
     @property
     def context(cls) -> "Context":

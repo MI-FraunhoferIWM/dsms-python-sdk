@@ -1,6 +1,9 @@
 """DSMS connection module"""
 
+import os
 from typing import TYPE_CHECKING, Any, Dict, List
+
+from dotenv import load_dotenv
 
 from dsms.apps.utils import _get_available_apps
 from dsms.core.configuration import Configuration
@@ -27,15 +30,55 @@ if TYPE_CHECKING:
 
 
 class DSMS:
-    """General class for connecting and interfacting with DSMS."""
+    """
+    General class for connecting and interfacing with DSMS.
+
+    This class provides methods to connect to and interact with a DSMS (Data
+    Space Management System) instance. It abstracts away the complexities of
+    establishing connections and executing queries.
+
+    Args:
+        config (Configuration, optional): An optional Configuration object
+            containing connection details. If not provided, default
+            configurations will be used.
+        env (str, optional): An optional string representing the path to the env-file.
+            This can be used to select environment-specific configurations. Defaults to None.
+        **kwargs: Configurations can also be set as additional keyword arguments instead of
+            passing the path to an env-file or the Configuration-object itself.
+
+    """
 
     _context = Context
 
-    def __init__(self, config: Configuration = None, **kwargs) -> None:
-        """Initialize the DSMS object."""
+    def __init__(
+        self,
+        config: "Optional[Configuration]" = None,
+        env: "Optional[str]" = None,
+        **kwargs,
+    ) -> None:
+        """Initialize the DSMS object.
+        Args:
+            config (Configuration, optional): An optional Configuration object
+                containing connection details. If not provided, default
+                configurations will be used.
+            env (str, optional): An optional string representing the path to the env-file.
+                This can be used to select environment-specific configurations. Content
+                of the env-file will be safely loaded using `python-dotenv`.
+                Hence the env-variables will be pruned once the kernel is closed.
+                Defaults to None.
+            **kwargs: Configurations can also be set as additional keyword arguments instead of
+                passing the path to an env-file or the Configuration-object itself.
+        """
 
         self._config = None
         self._context.dsms = self
+
+        if env:
+            if not os.path.exists(env):
+                raise OSError(f"File `{env}` does not exist")
+            loaded = load_dotenv(env, verbose=True)
+            if not loaded:
+                raise RuntimeError(f"Not able to parse .env file: {env}")
 
         if config is not None and not kwargs:
             self.config = config

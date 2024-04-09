@@ -2,16 +2,18 @@
 import io
 import json
 import re
+import warnings
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
 import pandas as pd
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, ConfigDict, create_model
 from requests import Response
 
 from dsms.core.utils import _name_to_camel, _perform_request
+from dsms.knowledge.properties.custom_datatype import NumericalDataType
 
 if TYPE_CHECKING:
     from dsms.core.context import Buffers
@@ -20,30 +22,38 @@ if TYPE_CHECKING:
 
 def _parse_model(value: Dict[str, Any]) -> BaseModel:
     """Convert the dict with the model schema into a pydantic model."""
-    title = value.get("title")
-    properties = value.get("properties")
-    if not title:
-        raise KeyError("`data_schema` does not have any `title`.")
-    if isinstance(properties, type(None)):
-        raise KeyError("`data_schema` does not have any `properties`.")
+
     fields = {}
-    for key, props in properties.items():
-        dtype = props.get("type")
-        default = props.get("default")
-        if dtype == "string":
-            dtype = str
-        elif dtype == "integer":
-            dtype = int
-        elif dtype == "float":
-            dtype = float
-        elif dtype == "bool":
-            dtype = bool
-        elif dtype == "object":
-            dtype = dict
-        else:
-            raise TypeError(f"Invalid `type={dtype}`")
-        fields[key] = (dtype, ... if not default else default)
-    return create_model(title, **fields)
+    title = _name_to_camel(value.get("title"))
+    for item in value.get("objects"):
+        for form_input in item.get("inputs"):
+            label = form_input.get("label")
+            dtype = form_input.get("widget")
+            default = form_input.get("defaultValue")
+            slug = _slugify(label)
+            if dtype in ("text", "file"):
+                dtype = str
+            elif dtype in ("number", "slider"):
+                dtype = NumericalDataType
+            elif dtype == "checkbox":
+                dtype = bool
+            elif dtype in ("select", "radio"):
+                dtype = Enum(
+                    _name_to_camel(label) + "Choices",
+                    {
+                        _name_to_camel(choice["value"]): choice["value"]
+                        for choice in form_input.get("choices")
+                    },
+                )
+            elif dtype == "knowledge-select":
+                warnings.warn("knowledge-select not supported for KTypes yet.")
+            fields[slug] = (dtype, ... if not default else default)
+    if fields:
+        config = ConfigDict(extra="allow")
+        model = create_model(title, __config__=config, **fields)
+    else:
+        model = None
+    return model
 
 
 def _get_remote_ktypes() -> Enum:
@@ -335,10 +345,10 @@ def _search(
     return [KItem(**item) for item in dumped]
 
 
-def _slugify(input_string):
+def _slugify(input_string: str, replacement: str = ""):
     """Turn any arbitrary string into a slug."""
     slug = re.sub(
-        r"[^\w\s]", "", input_string
+        r"[^\w\s]", replacement, input_string
     )  # Remove all non-word characters (everything except numbers and letters)
     slug = re.sub(r"\s+", "", slug)  # Replace all runs of whitespace
     slug = slug.lower()  # Convert the string to lowercase.
