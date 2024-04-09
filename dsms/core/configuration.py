@@ -2,12 +2,20 @@
 
 import urllib
 import warnings
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import requests
 from pydantic import AnyUrl, Field, SecretStr, field_validator
 from pydantic_core.core_schema import ValidationInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from .utils import get_callable
+
+if TYPE_CHECKING:
+    from typing import Callable
+
+MODULE_REGEX = r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*:[a-zA-Z_][a-zA-Z0-9_]*$"
+DEFAULT_UNIT_SPARQL = "dsms.knowledge.semantics.units.sparql:UnitSparqlQuery"
 
 
 class Configuration(BaseSettings):
@@ -62,6 +70,19 @@ class Configuration(BaseSettings):
         "http://qudt.org/vocab/quantitykind/",
         description="URI to QUDT quantity kind ontology for unit conversion",
     )
+
+    units_sparql_object: str = Field(
+        DEFAULT_UNIT_SPARQL,
+        pattern=MODULE_REGEX,
+        description="""Class and Module specification in Python for a subclass of
+          `dsms.knowledge.semantics.units.base:BaseUnitSparqlQuery` in order to retrieve
+          the units of a HDF5 column/ custom property of a KItem.""",
+    )
+
+    @field_validator("units_sparql_object")
+    def get_unit_sparql_object(cls, val: str) -> "Callable":
+        """Source the class from the given module"""
+        return get_callable(val)
 
     @field_validator("token")
     def validate_auth(cls, val, info: ValidationInfo):

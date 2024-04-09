@@ -1,11 +1,15 @@
 """Core utils of the DSMS core"""
 import re
-from typing import Any
+from importlib import import_module
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 from uuid import UUID
 
 import requests
 from requests import Response
+
+if TYPE_CHECKING:
+    from typing import Any, Callable
 
 
 def _kitem_id2uri(kitem_id: UUID) -> str:
@@ -27,7 +31,7 @@ def _ping_dsms():
     return _perform_request("api/knowledge/docs", "get")
 
 
-def _perform_request(route: str, method: str, **kwargs: Any) -> Response:
+def _perform_request(route: str, method: str, **kwargs: "Any") -> Response:
     """Perform a general request for a certain route and with a certain method.
     Kwargs are general arguments which can be passed to the `requests.request`-function.
     """
@@ -63,3 +67,9 @@ def _name_to_camel(input_string):
     camel_case_words = [word.title() for word in words]
     camel_case_string = "".join(camel_case_words)
     return camel_case_string
+
+
+def get_callable(module: str) -> "Callable":
+    """Get callable from import-specification"""
+    module, classname = module.strip().split(":")
+    return getattr(import_module(module), classname)

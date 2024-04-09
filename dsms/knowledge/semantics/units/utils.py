@@ -3,13 +3,13 @@
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
+from .base import BaseUnitSparqlQuery
 from .conversion import (
     _check_qudt_mapping,
     _get_factor_from_uri,
     _is_valid_url,
     _units_are_compatible,
 )
-from .sparql import UnitSparqlQuery
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
@@ -88,8 +88,15 @@ def get_property_unit(
         ValueError: If unable to retrieve the unit for the property due to any errors or if
             the property does not have a unit or has more than one unit associated with it.
     """
+    from dsms import Context
+
+    units_sparql_object = Context.dsms.config.units_sparql_object
+    if not issubclass(units_sparql_object, BaseUnitSparqlQuery):
+        raise TypeError(
+            f"´{units_sparql_object}´ must be a subclass of `{BaseUnitSparqlQuery}`"
+        )
     try:
-        query = UnitSparqlQuery(kitem_id, property_name, is_hdf5_column)
+        query = units_sparql_object(kitem_id, property_name, is_hdf5_column)
     except Exception as error:
         raise ValueError(
             f"Something went wrong catching the unit for property `{property_name}`."
