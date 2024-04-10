@@ -56,8 +56,9 @@ def _parse_model(value: Optional[Dict[str, Any]]) -> BaseModel:
                     )
                 elif dtype == "knowledge-select":
                     warnings.warn(
-                        "knowledge-select not supported for KTypes yet."
+                        "knowledge-select not fully supported for KTypes yet."
                     )
+                    dtype = str
                 fields[slug] = (dtype, default or None)
     if fields:
         config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
