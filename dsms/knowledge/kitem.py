@@ -15,6 +15,7 @@ from pydantic import (  # isort:skip
     Field,
     ValidationInfo,
     field_validator,
+    model_validator,
 )
 
 
@@ -31,7 +32,6 @@ from dsms.knowledge.properties import (  # isort:skip
     AuthorsProperty,
     ContactInfo,
     ContactsProperty,
-    CustomProperties,
     ExternalLink,
     ExternalLinksProperty,
     KProperty,
@@ -51,6 +51,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _slug_is_available,
     _slugify,
     _inspect_hdf5,
+    _get_ktype_from_id,
 )
 
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
@@ -145,7 +146,7 @@ class KItem(BaseModel):
         if not self.dsms:
             self.dsms = DSMS()
 
-        # initalize the kitem
+        # initialize the kitem
         super().__init__(**kwargs)
 
         # add kitem to buffer
@@ -298,21 +299,6 @@ class KItem(BaseModel):
         """Validate user groups Field"""
         return UserGroupsProperty(value)
 
-    @field_validator("custom_properties")
-    @classmethod
-    def validate_custom_properties(cls, value: Any) -> CustomProperties:
-        """Validate custom properties Field"""
-        if isinstance(value, dict) and "content" in value:
-            value = CustomProperties(content=value["content"])
-        elif isinstance(value, dict):
-            value = CustomProperties(content=value)
-        elif not isinstance(value, (CustomProperties, dict, type(None))):
-            raise TypeError(
-                f"""`custom_properties` must be of type {CustomProperties} or {dict},
-                not {type(value)}."""
-            )
-        return value
-
     @field_validator("created_at")
     @classmethod
     def validate_created(cls, value: str) -> Any:
@@ -341,20 +327,10 @@ class KItem(BaseModel):
     @classmethod
     def validate_ktype(cls, value: KType, info: ValidationInfo) -> KType:
         """Validate the data attribute of the KItem"""
-        from dsms import Context
-
-        ktype_id = info.data.get("ktype_id")
 
         if not value:
-            if not isinstance(ktype_id, str):
-                value = Context.ktypes.get(ktype_id.value)
-            else:
-                value = Context.ktypes.get(ktype_id)
-
-            if not value:
-                raise TypeError(
-                    f"KType for `ktype_id={ktype_id}` does not exist."
-                )
+            ktype_id = info.data.get("ktype_id")
+            value = _get_ktype_from_id(ktype_id)
 
         return value
 
@@ -416,15 +392,34 @@ class KItem(BaseModel):
                 hdf5 = None
         return hdf5
 
+    @model_validator(mode="after")
+    @classmethod
+    def validate_custom_properties(cls, self) -> "KItem":
+        """Validate the custom properties with respect to the KType of the KItem"""
+        if not isinstance(
+            self.custom_properties, (BaseModel, dict, type(None))
+        ):
+            raise TypeError(
+                f"""Custom properties must be one of the following types:
+                  {(BaseModel, dict, type(None))}. Not {type(self.custom_properties)}"""
+            )
+        # validate content with webform model
+        if self.ktype.webform and isinstance(self.custom_properties, dict):
+            content = (
+                self.custom_properties.get("content") or self.custom_properties
+            )
+            self.custom_properties = self.ktype.webform(**content)
+        # set kitem id for custom properties
+        if isinstance(self.custom_properties, BaseModel):
+            self.custom_properties.kitem_id = self.id
+        return self
+
     def _set_kitem_for_properties(self) -> None:
         """Set kitem for CustomProperties and KProperties in order to
         remain the context for the buffer if any of these properties is changed.
         """
         for prop in self.__dict__.values():
-            if (
-                isinstance(prop, (KProperty, CustomProperties, Summary))
-                and not prop.kitem
-            ):
+            if isinstance(prop, (KProperty, Summary)) and not prop.kitem:
                 prop.kitem = self
 
     @property

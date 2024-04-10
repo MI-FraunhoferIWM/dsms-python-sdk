@@ -9,11 +9,21 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, create_model, model_validator
 from requests import Response
 
-from dsms.core.utils import _name_to_camel, _perform_request
-from dsms.knowledge.properties.custom_datatype import NumericalDataType
+from pydantic import (  # isort: skip
+    BaseModel,
+    ConfigDict,
+    Field,
+    create_model,
+    model_validator,
+)
+
+from dsms.core.utils import _name_to_camel, _perform_request  # isort:skip
+
+from dsms.knowledge.properties.custom_datatype import (  # isort:skip
+    NumericalDataType,
+)
 
 if TYPE_CHECKING:
     from dsms.core.context import Buffers
@@ -28,7 +38,9 @@ def _is_number(value):
         return False
 
 
-def _parse_model(value: Optional[Dict[str, Any]]) -> BaseModel:
+def _create_custom_properties_model(
+    value: Optional[Dict[str, Any]]
+) -> BaseModel:
     """Convert the dict with the model schema into a pydantic model."""
 
     fields = {}
@@ -61,23 +73,80 @@ def _parse_model(value: Optional[Dict[str, Any]]) -> BaseModel:
                     dtype = str
                 fields[slug] = (dtype, default or None)
     if fields:
-        config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+        fields["kitem_id"] = (
+            Optional[Union[str, UUID]],
+            Field(None, exclude=True),
+        )
+
+        config = ConfigDict(
+            extra="allow", arbitrary_types_allowed=True, exclude={"kitem_id"}
+        )
         validators = {
             "validate_model": model_validator(mode="before")(_validate_model)
         }
         model = create_model(
             title, __config__=config, __validators__=validators, **fields
         )
+        setattr(model, "__str__", _print_properties)
+        setattr(model, "__repr__", _print_properties)
+        setattr(model, "__setattr__", __setattr_property__)
     else:
         model = None
     return model
 
 
-def _validate_model(cls, values: dict):  # pylint: disable=unused-argument
+def _print_properties(self: Any) -> str:
+    fields = ", \n".join(
+        [
+            f"\t\t{key}={value}"
+            for key, value in self.model_dump().items()
+            if key not in self.model_config["exclude"]
+        ]
+    )
+    return f"{{\n{fields}\n\t\t}}"
+
+
+def __setattr_property__(self, key, value) -> None:
+    if _is_number(value):
+        value = _create_numerical_dtype(key, value, self.kitem_id)
+    if key == "kitem_id":
+        for prop in self.model_dump().values():
+            if isinstance(prop, NumericalDataType) and not prop.kitem_id:
+                prop.kitem_id = value
+    super(BaseModel, self).__setattr__(key, value)
+
+
+def _create_numerical_dtype(
+    key: str, value: Union[int, float], kitem_id: Union[str, UUID]
+) -> NumericalDataType:
+    value = NumericalDataType(value)
+    value.name = key
+    value.kitem_id = kitem_id
+    return value
+
+
+def _validate_model(
+    cls, values: Dict[str, Any]  # pylint: disable=unused-argument
+) -> Dict[str, Any]:
     for key, value in values.items():
         if _is_number(value):
-            values[key] = NumericalDataType(value)
+            values[key] = _create_numerical_dtype(
+                key, value, values.get("kitem_id")
+            )
     return values
+
+
+def _get_ktype_from_id(ktype_id: str) -> "KType":
+    from dsms import Context
+
+    if not isinstance(ktype_id, str):
+        value = Context.ktypes.get(ktype_id.value)
+    else:
+        value = Context.ktypes.get(ktype_id)
+
+    if not value:
+        raise TypeError(f"KType for `ktype_id={ktype_id}` does not exist.")
+    return value
 
 
 def _get_remote_ktypes() -> Enum:
@@ -166,6 +235,7 @@ def _update_kitem(kitem: "KItem") -> Response:
         exclude={
             "authors",
             "annotations",
+            "custom_properties",
             "linked_kitems",
             "updated_at",
             "avatar_exists",
@@ -180,8 +250,11 @@ def _update_kitem(kitem: "KItem") -> Response:
         },
         exclude_none=True,
     )
+    custom_properties = kitem.custom_properties.model_dump_json()
     payload = json.loads(dumped)
-    payload.update(**differences)
+    payload.update(
+        custom_properties={"content": custom_properties}, **differences
+    )
     payload.update(
         external_links={
             link.label: str(link.url) for link in kitem.external_links

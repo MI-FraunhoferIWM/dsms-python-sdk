@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_serializer
 
-from dsms.knowledge.utils import _parse_model
+from dsms.knowledge.utils import _create_custom_properties_model
 
 
 class KType(BaseModel):
@@ -24,7 +24,7 @@ class KType(BaseModel):
     @classmethod
     def create_model(cls, value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Validate the data schema of the ktype"""
-        return _parse_model(value)
+        return _create_custom_properties_model(value)
 
     @model_serializer
     def serialize(self):
