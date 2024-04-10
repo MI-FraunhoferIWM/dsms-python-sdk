@@ -10,6 +10,7 @@ class UnitSparqlQuery(BaseUnitSparqlQuery):
     Define a sparql query for fetching the units of an HDf5 column of a KItem
     """
 
+    # OVERRIDE
     @property
     def query(cls) -> str:
         """Construct sparql query for getting unit for hdf5 column"""
