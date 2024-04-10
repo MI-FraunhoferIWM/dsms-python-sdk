@@ -6,10 +6,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .custom_datatype.numerical import NumericalDataType
+
 if TYPE_CHECKING:
     from typing import Set, Union
 
-    from dsms import Context, KItem
+    from dsms import Context
 
 
 class CustomProperties(BaseModel):
@@ -24,13 +26,6 @@ class CustomProperties(BaseModel):
     model_config = ConfigDict(
         extra="forbid", exclude={"kitem", "id"}, validate_assignment=True
     )
-
-    def __setattr__(self, name, value) -> None:
-        """Set id and name of properties when attribute is set"""
-        super().__setattr__(name, value)
-        if name == "content":
-            self._mark_as_updated()
-            self._set_id_and_name_of_content()
 
     def __str__(self) -> str:
         """Pretty print the custom properties"""
@@ -73,14 +68,6 @@ class CustomProperties(BaseModel):
             )
         self._mark_as_updated()
 
-    def _set_id_and_name_of_content(self) -> None:
-        for subproperty in self.content.__fields__():
-            for key, value in subproperty.__dict__.items():
-                if not value.name:
-                    value.name = key
-                if not value.kitem_id:
-                    value.kitem_id = self.id
-
     def _mark_as_updated(self) -> None:
         if self.kitem and self.id not in self.context.buffers.updated:
             self.context.buffers.updated.update({self.id: self.kitem})
@@ -99,17 +86,26 @@ class CustomProperties(BaseModel):
         """Get data for custom properties"""
         return self.content
 
-    @model_validator(mode="before")
+    @model_validator(mode="after")
     @classmethod
-    def validate_kitem(cls, data: Any) -> "KItem":
+    def validate_content(cls, self) -> "CustomProperties":
         """Validate the custom properties with respect to the KType of the KItem"""
-        kitem = data.get("kitem")
-        content = data.get("content")
-        if kitem:
-            data["id"] = kitem.id
-            if kitem.ktype.webform:
-                data["content"] = kitem.ktype.webform(**content)
-        return data
+        if self.kitem and isinstance(self.content, dict):
+            # validate content with webform model
+            if self.kitem.ktype.webform:
+                self.content = self.kitem.ktype.webform(**self.content)
+            # set name and property of the inidivdual properties
+            if isinstance(self.content, dict):
+                iterable = self.content
+            else:
+                iterable = self.content.dict()
+            for name, subproperty in iterable.items():
+                if isinstance(subproperty, NumericalDataType):
+                    if not subproperty.name:
+                        subproperty.name = name
+                    if not subproperty.kitem_id:
+                        subproperty.kitem_id = self.kitem.id
+        return self
 
     @property
     def id(cls) -> Optional[UUID]:

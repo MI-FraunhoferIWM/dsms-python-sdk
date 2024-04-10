@@ -22,15 +22,9 @@ class KType(BaseModel):
 
     @field_validator("webform")
     @classmethod
-    def create_model(cls, value) -> Dict[str, Any]:
+    def create_model(cls, value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Validate the data schema of the ktype"""
-        if not isinstance(value, (type(None), dict)):
-            raise TypeError(f"Invalid type for `webform`: {type(value)}")
-        if isinstance(value, dict):
-            model = _parse_model(value)
-        else:
-            model = None
-        return model
+        return _parse_model(value)
 
     @model_serializer
     def serialize(self):

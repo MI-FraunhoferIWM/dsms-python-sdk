@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, create_model
+from pydantic import BaseModel, ConfigDict, create_model, model_validator
 from requests import Response
 
 from dsms.core.utils import _name_to_camel, _perform_request
@@ -20,40 +20,63 @@ if TYPE_CHECKING:
     from dsms.knowledge import KItem, KType
 
 
-def _parse_model(value: Dict[str, Any]) -> BaseModel:
+def _is_number(value):
+    try:
+        float(value)
+        return True
+    except Exception:
+        return False
+
+
+def _parse_model(value: Optional[Dict[str, Any]]) -> BaseModel:
     """Convert the dict with the model schema into a pydantic model."""
 
     fields = {}
-    title = _name_to_camel(value.get("title"))
-    for item in value.get("objects"):
-        for form_input in item.get("inputs"):
-            label = form_input.get("label")
-            dtype = form_input.get("widget")
-            default = form_input.get("defaultValue")
-            slug = _slugify(label)
-            if dtype in ("text", "file"):
-                dtype = str
-            elif dtype in ("number", "slider"):
-                dtype = NumericalDataType
-            elif dtype == "checkbox":
-                dtype = bool
-            elif dtype in ("select", "radio"):
-                dtype = Enum(
-                    _name_to_camel(label) + "Choices",
-                    {
-                        _name_to_camel(choice["value"]): choice["value"]
-                        for choice in form_input.get("choices")
-                    },
-                )
-            elif dtype == "knowledge-select":
-                warnings.warn("knowledge-select not supported for KTypes yet.")
-            fields[slug] = (dtype, ... if not default else default)
+    if isinstance(value, dict):
+        title = _name_to_camel(value.get("title"))
+        for item in value.get("objects"):
+            for form_input in item.get("inputs"):
+                label = form_input.get("label")
+                dtype = form_input.get("widget")
+                default = form_input.get("defaultValue")
+                slug = _slugify(label)
+                if dtype in ("text", "file"):
+                    dtype = str
+                elif dtype in ("number", "slider"):
+                    dtype = NumericalDataType
+                elif dtype == "checkbox":
+                    dtype = bool
+                elif dtype in ("select", "radio"):
+                    dtype = Enum(
+                        _name_to_camel(label) + "Choices",
+                        {
+                            _name_to_camel(choice["value"]): choice["value"]
+                            for choice in form_input.get("choices")
+                        },
+                    )
+                elif dtype == "knowledge-select":
+                    warnings.warn(
+                        "knowledge-select not supported for KTypes yet."
+                    )
+                fields[slug] = (dtype, default or None)
     if fields:
-        config = ConfigDict(extra="allow")
-        model = create_model(title, __config__=config, **fields)
+        config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+        validators = {
+            "validate_model": model_validator(mode="before")(_validate_model)
+        }
+        model = create_model(
+            title, __config__=config, __validators__=validators, **fields
+        )
     else:
         model = None
     return model
+
+
+def _validate_model(cls, values: dict):  # pylint: disable=unused-argument
+    for key, value in values.items():
+        if _is_number(value):
+            values[key] = NumericalDataType(value)
+    return values
 
 
 def _get_remote_ktypes() -> Enum:

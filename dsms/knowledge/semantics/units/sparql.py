@@ -68,10 +68,10 @@ class UnitSparqlQuery(BaseUnitSparqlQuery):
                 ?numeric rdf:type math:EMMO_4ce76d7f_03f8_45b6_9003_90052a79bfaa ;
                         metro:EMMO_67fc0a36_8dcb_4ffa_9a43_31074efa3296 ?unit , ?literal .
 
+                ?unit rdf:type ?iri .
                 ?literal a metro:UnitLiteral ;
-                        perceptual:EMMO_23b579e1_8088_45b5_9975_064014026c42 ?symbol .
-
-                ?unit reductionistic:EMMO_b2282816_b7a3_44c6_b2cb_3feff1ceb7fe ?iri .
+                        metro:EMMO_67fc0a36_8dcb_4ffa_9a43_31074efa3296 ?symbol_literal .
+                FILTER(?iri != metro:UnitLiteral)
                 }}
             """
         return query
