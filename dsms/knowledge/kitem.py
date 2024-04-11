@@ -1,5 +1,6 @@
 """Knowledge Item implementation of the DSMS"""
 
+import json
 from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
@@ -62,12 +63,51 @@ if TYPE_CHECKING:
 
 
 class KItem(BaseModel):
-    """Knowledge Item of the DSMS."""
+    """
+    Knowledge Item of the DSMS.
+
+    Attributes:
+        name (str):
+            Human readable name of the KContext.dsms.
+        id (Optional[UUID]):
+            ID of the KItem. Defaults to a new UUID if not provided.
+        ktype_id (Union[Enum, str]):
+            Type ID of the KItem.
+        slug (Optional[str]):
+            Slug of the KContext.dsms. Minimum length: 4.
+        annotations (List[Annotation]):
+            Annotations of the KItem.
+        attachments (List[Union[Attachment, str]]):
+            File attachments of the DSMS.
+        linked_kitems (List[Union[LinkedKItem, "KItem"]]):
+            KItems linked to the current KItem.
+        affiliations (List[Affiliation]):
+            Affiliations related to a KItem.
+        authors (List[Union[Author, str]]):
+            Authorship of the KItem.
+        avatar_exists (Optional[bool]):
+            Whether the KItem holds an avatar or not.
+        contacts (List[ContactInfo]):
+            Contact information related to the KItem.
+        created_at (Optional[Union[str, datetime]]):
+            Time and date when the KItem was created.
+        updated_at (Optional[Union[str, datetime]]):
+            Time and date when the KItem was updated.
+        external_links (List[ExternalLink]):
+            External links related to the KItem.
+        kitem_apps (List[App]): Apps related to the KItem.
+        summary (Optional[Union[str, Summary]]):
+            Human readable summary text of the KItem.
+        user_groups (List[UserGroup]):
+                User groups able to access the KItem.
+        custom_properties (Optional[Any]):
+            Custom properties associated with the KItem.
+        hdf5 (Optional[Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]]):
+            HDF5 interface.
+    """
 
     # public
-    name: str = Field(
-        ..., description="Human readable name of the KContext.dsms"
-    )
+    name: str = Field(..., description="Human readable name of the KItem")
     id: Optional[UUID] = Field(
         default_factory=uuid4,
         description="ID of the KItem",
@@ -408,10 +448,17 @@ class KItem(BaseModel):
             content = (
                 self.custom_properties.get("content") or self.custom_properties
             )
+            if isinstance(content, str):
+                try:
+                    content = json.loads(content)
+                except Exception as error:
+                    raise TypeError(
+                        f"Invalid type: {type(content)}"
+                    ) from error
             self.custom_properties = self.ktype.webform(**content)
         # set kitem id for custom properties
         if isinstance(self.custom_properties, BaseModel):
-            self.custom_properties.kitem_id = self.id
+            self.custom_properties.kitem = self
         return self
 
     def _set_kitem_for_properties(self) -> None:

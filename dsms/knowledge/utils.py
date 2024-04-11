@@ -42,6 +42,7 @@ def _create_custom_properties_model(
     value: Optional[Dict[str, Any]]
 ) -> BaseModel:
     """Convert the dict with the model schema into a pydantic model."""
+    from dsms import KItem
 
     fields = {}
     if isinstance(value, dict):
@@ -72,26 +73,25 @@ def _create_custom_properties_model(
                     )
                     dtype = str
                 fields[slug] = (dtype, default or None)
-    if fields:
-        fields["kitem_id"] = (
-            Optional[Union[str, UUID]],
-            Field(None, exclude=True),
-        )
-
-        config = ConfigDict(
-            extra="allow", arbitrary_types_allowed=True, exclude={"kitem_id"}
-        )
-        validators = {
-            "validate_model": model_validator(mode="before")(_validate_model)
-        }
-        model = create_model(
-            title, __config__=config, __validators__=validators, **fields
-        )
-        setattr(model, "__str__", _print_properties)
-        setattr(model, "__repr__", _print_properties)
-        setattr(model, "__setattr__", __setattr_property__)
     else:
-        model = None
+        title = "CustomPropertiesModel"
+    fields["kitem"] = (
+        Optional[KItem],
+        Field(None, exclude=True),
+    )
+
+    config = ConfigDict(
+        extra="allow", arbitrary_types_allowed=True, exclude={"kitem"}
+    )
+    validators = {
+        "validate_model": model_validator(mode="before")(_validate_model)
+    }
+    model = create_model(
+        title, __config__=config, __validators__=validators, **fields
+    )
+    setattr(model, "__str__", _print_properties)
+    setattr(model, "__repr__", _print_properties)
+    setattr(model, "__setattr__", __setattr_property__)
     return model
 
 
@@ -108,20 +108,31 @@ def _print_properties(self: Any) -> str:
 
 def __setattr_property__(self, key, value) -> None:
     if _is_number(value):
-        value = _create_numerical_dtype(key, value, self.kitem_id)
-    if key == "kitem_id":
+        # convert to convertable numeric object
+        value = _create_numerical_dtype(key, value, self.kitem)
+        # mark as updated
+        if self.kitem:
+            self.kitem.context.buffers.updated.update(
+                {self.kitem.id: self.kitem}
+            )
+    if key == "kitem":
+        # set kitem for convertable numeric datatype
         for prop in self.model_dump().values():
-            if isinstance(prop, NumericalDataType) and not prop.kitem_id:
-                prop.kitem_id = value
+            if isinstance(prop, NumericalDataType) and not prop.kitem:
+                prop.kitem = value
+    # reassignment of extra fields does not work, seems to be a bug?
+    # have this workaround:
+    if key in self.__pydantic_extra__:
+        self.__pydantic_extra__[key] = value
     super(BaseModel, self).__setattr__(key, value)
 
 
 def _create_numerical_dtype(
-    key: str, value: Union[int, float], kitem_id: Union[str, UUID]
+    key: str, value: Union[int, float], kitem: "KItem"
 ) -> NumericalDataType:
     value = NumericalDataType(value)
     value.name = key
-    value.kitem_id = kitem_id
+    value.kitem = kitem
     return value
 
 
@@ -131,7 +142,7 @@ def _validate_model(
     for key, value in values.items():
         if _is_number(value):
             values[key] = _create_numerical_dtype(
-                key, value, values.get("kitem_id")
+                key, value, values.get("kitem")
             )
     return values
 

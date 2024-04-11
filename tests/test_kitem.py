@@ -159,3 +159,34 @@ def test_ktype_property(get_mock_kitem_ids, custom_address):
     )
 
     assert kitem.ktype == Context.ktypes.get(dsms.ktypes.Organization.value)
+
+
+# @responses.activate
+# def test_ktype_custom_property_assignment(get_mock_kitem_ids, custom_address):
+#     from dsms.knowledge.properties.custom_datatype.numerical import NumericalDataType
+#     from dsms.core.dsms import DSMS
+#     from dsms.knowledge.kitem import KItem
+
+#     with pytest.warns(UserWarning, match="No authentication details"):
+#         dsms = DSMS(host_url=custom_address)
+
+#     kitem = KItem(
+#         id=get_mock_kitem_ids[0],
+#         name="foo123",
+#         ktype_id=dsms.ktypes.Organization,
+#         custom_properties={"material": "abcd", "tester": 123}
+#     )
+
+#     assert kitem.custom_properties.material == "abcd"
+#     assert kitem.custom_properties.tester == 123
+#     assert isinstance(kitem.custom_properties.tester, NumericalDataType)
+
+#     kitem.custom_properties = {"material": "def", "tester2": 123}
+
+#     assert kitem.custom_properties.material == "def"
+#     assert kitem.custom_properties.tester2 == 123
+#     assert isinstance(kitem.custom_properties.tester2, NumericalDataType)
+
+#     kitem.custom_properties.tester2 = 456
+#     assert kitem.custom_properties.tester2 == 456
+#     assert isinstance(kitem.custom_properties.tester2, NumericalDataType)

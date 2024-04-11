@@ -85,11 +85,6 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
             {
                 "name": "organization",
                 "id": "organization",
-                "data_schema": {
-                    "title": "Organization",
-                    "type": "object",
-                    "properties": {},
-                },
             },
         ]
         header = {"content_type": "application/json"}

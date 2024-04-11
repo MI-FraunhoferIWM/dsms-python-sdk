@@ -8,26 +8,27 @@ from dsms.knowledge.semantics.units.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Union
-    from uuid import UUID
+    from typing import Any, Dict, Optional
+
+    from dsms import KItem
 
 
 class NumericalDataType(float):
     """Custom Base data type for custom properties"""
 
     def __init__(self, value) -> None:  # pylint: disable=unused-argument
-        self._kitem_id: "Optional[Union[str, UUID]]" = None
+        self._kitem: "Optional[KItem]" = None
         self._name: "Optional[str]" = None
 
     @property
-    def kitem_id(cls) -> "Optional[Union[str, UUID]]":
+    def kitem(cls) -> "Optional[KItem]":
         """Context of the current kitem for this property"""
-        return cls._kitem_id
+        return cls._kitem
 
-    @kitem_id.setter
-    def kitem_id(cls, value: "Optional[Union[str, UUID]]") -> None:
+    @kitem.setter
+    def kitem(cls, value: "Optional[KItem]") -> None:
         """Setter for current KItem context"""
-        cls._kitem_id = value
+        cls._kitem = value
 
     @property
     def name(cls) -> str:
@@ -41,7 +42,7 @@ class NumericalDataType(float):
 
     def get_unit(self) -> "Dict[str, Any]":
         """Get unit for the property"""
-        return get_property_unit(self.kitem_id, self.name)
+        return get_property_unit(self.kitem.id, self.name)
 
     def convert_to(
         self,

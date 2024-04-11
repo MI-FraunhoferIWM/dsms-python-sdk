@@ -22,8 +22,8 @@ class KType(BaseModel):
 
     @field_validator("webform")
     @classmethod
-    def create_model(cls, value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Validate the data schema of the ktype"""
+    def create_model(cls, value: Optional[Dict[str, Any]]) -> Any:
+        """Create the datamodel for the ktype"""
         return _create_custom_properties_model(value)
 
     @model_serializer
