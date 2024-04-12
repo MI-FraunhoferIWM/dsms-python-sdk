@@ -58,6 +58,13 @@ class Configuration(BaseSettings):
         description="Repository of the triplestore for KItems in the DSMS",
     )
 
+    individual_slugs: bool = Field(
+        True,
+        description="""When set to `True`, the slugs of the KItems will receive the
+        first few characters of the KItem-id, when the slug is derived automatically
+        from the KItem-name.""",
+    )
+
     @field_validator("token")
     def validate_auth(cls, val, info: ValidationInfo):
         """Validate the provided authentication/authorization secrets."""

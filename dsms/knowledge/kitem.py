@@ -362,18 +362,19 @@ class KItem(BaseModel):
     @classmethod
     def validate_slug(cls, value: str, info: ValidationInfo) -> str:
         """Validate slug"""
+        from dsms import Context
+
         ktype_id = info.data["ktype_id"]
         name = info.data.get("name")
         kitem_id = info.data.get("id")
         if not value:
             value = _slugify(name)
-        slugified = _slugify(value)
-        if len(slugified) < 4:
-            raise ValueError("Slug length must have a minimum length of 4.")
-        if value != slugified:
-            raise ValueError(
-                f"`{value}` is not a valid slug. A valid variation would be `{slugified}`"
-            )
+            if Context.dsms.config.individual_slugs:
+                value += f"-{str(kitem_id).split('-', maxsplit=1)[0]}"
+            if len(value) < 4:
+                raise ValueError(
+                    "Slug length must have a minimum length of 4."
+                )
         if not _kitem_exists(kitem_id) and not _slug_is_available(
             ktype_id.value, value
         ):
