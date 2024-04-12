@@ -500,5 +500,5 @@ class KItem(BaseModel):
     def url(cls) -> str:
         """URL of the KItem"""
         return urljoin(
-            cls.context.dsms.config.host_url, f"{cls.ktype_id}/{cls.slug}"
+            str(cls.context.dsms.config.host_url), f"{cls.ktype_id}/{cls.slug}"
         )
