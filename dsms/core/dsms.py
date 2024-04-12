@@ -163,15 +163,16 @@ def verify_connection(dsms: DSMS) -> None:
             f"""The passed object for the dsms-connection
                 is not of type {DSMS}."""
         )
-    try:
-        response = _ping_dsms()
-        if not response.ok:
+    if dsms.config.ping_dsms:
+        try:
+            response = _ping_dsms()
+            if not response.ok:
+                raise ConnectionError(
+                    f"""Host with `{dsms.config.host_url}`
+                    gave a response with status code `{response.status_code}`"""
+                )
+        except Exception as excep:
             raise ConnectionError(
-                f"""Host with `{dsms.config.host_url}`
-                gave a response with status code `{response.status_code}`"""
-            )
-    except Exception as excep:
-        raise ConnectionError(
-            f"Invalid DSMS instance: `{dsms.config.host_url}`"
-        ) from excep
+                f"Invalid DSMS instance: `{dsms.config.host_url}`"
+            ) from excep
     return dsms

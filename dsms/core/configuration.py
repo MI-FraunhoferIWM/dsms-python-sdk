@@ -21,6 +21,11 @@ class Configuration(BaseSettings):
         description="Timeout in seconds until the request to the DSMS is timed out.",
     )
 
+    ssl_verify: bool = Field(
+        True,
+        description="Whether the SSL of the DSMS shall be verified during connection.",
+    )
+
     username: Optional[SecretStr] = Field(
         None,
         description="User name for connecting to the DSMS instance",
@@ -33,9 +38,9 @@ class Configuration(BaseSettings):
         None,
         description="JWT bearer token for connecting to the DSMS instance",
     )
-    ssl_verify: bool = Field(
-        True,
-        description="Whether the SSL of the DSMS shall be verified during connection.",
+
+    ping_dsms: bool = Field(
+        True, description="Check whether the host is a DSMS instance or not."
     )
 
     encoding: str = Field(
@@ -60,6 +65,7 @@ class Configuration(BaseSettings):
         passwd = info.data.get("password")
         host_url = info.data.get("host_url")
         timeout = info.data.get("request_timeout")
+        verify = info.data.get("ssl_verify")
         if username and passwd and val:
             raise ValueError(
                 "Either `username` and `password` or `token` must be provided. Not both."
@@ -80,6 +86,7 @@ class Configuration(BaseSettings):
                 url,
                 headers={"Authorization": authorization},
                 timeout=timeout,
+                verify=verify,
             )
             if not response.ok:
                 raise RuntimeError(
