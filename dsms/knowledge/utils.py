@@ -338,7 +338,7 @@ def _search(
 def _slugify(input_string):
     """Turn any arbitrary string into a slug."""
     slug = re.sub(
-        r"[^\w\s]", "", input_string
+        r"[^\w\s\-_]", "", input_string
     )  # Remove all non-word characters (everything except numbers and letters)
     slug = re.sub(r"\s+", "", slug)  # Replace all runs of whitespace
     slug = slug.lower()  # Convert the string to lowercase.
