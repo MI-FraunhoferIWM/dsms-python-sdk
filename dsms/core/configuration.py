@@ -39,7 +39,7 @@ class Configuration(BaseSettings):
         description="JWT bearer token for connecting to the DSMS instance",
     )
 
-    verify_host: bool = Field(
+    ping_dsms: bool = Field(
         True, description="Check whether the host is a DSMS instance or not."
     )
 

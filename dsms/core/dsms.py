@@ -163,7 +163,7 @@ def verify_connection(dsms: DSMS) -> None:
             f"""The passed object for the dsms-connection
                 is not of type {DSMS}."""
         )
-    if dsms.config.verify_host:
+    if dsms.config.ping_dsms:
         try:
             response = _ping_dsms()
             if not response.ok:
