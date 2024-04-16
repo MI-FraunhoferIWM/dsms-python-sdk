@@ -1,6 +1,6 @@
 """App KProperty"""
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,7 +17,7 @@ class AdditionalProperties(BaseModel):
         False,
         description="Whether the app should be triggered when a file is uploaded",
     )
-    triggerUponUploadFileExtensions: Optional[list[str]] = Field(
+    triggerUponUploadFileExtensions: Optional[List[str]] = Field(
         None,
         description="File extensions for which the upload shall be triggered.",
     )
