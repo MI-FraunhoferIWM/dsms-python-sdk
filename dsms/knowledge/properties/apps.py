@@ -22,6 +22,17 @@ class AdditionalProperties(BaseModel):
         description="File extensions for which the upload shall be triggered.",
     )
 
+    def __str__(self) -> str:
+        """Pretty print the KProperty"""
+        values = ", ".join(
+            [f"{key}: {value}" for key, value in self.__dict__.items()]
+        )
+        return f"{{{values}}}"
+
+    def __repr__(self) -> str:
+        """Pretty print the Apps"""
+        return str(self)
+
 
 class App(KPropertyItem):
     """App of a KItem."""

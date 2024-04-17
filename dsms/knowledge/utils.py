@@ -98,12 +98,12 @@ def _create_custom_properties_model(
 def _print_properties(self: Any) -> str:
     fields = ", \n".join(
         [
-            f"\t\t{key}={value}"
+            f"\t\t{key}: {value}"
             for key, value in self.model_dump().items()
             if key not in self.model_config["exclude"]
         ]
     )
-    return f"{{\n{fields}\n\t\t}}"
+    return f"{{\n{fields}\n\t}}"
 
 
 def __setattr_property__(self, key, value) -> None:
