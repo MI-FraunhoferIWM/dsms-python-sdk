@@ -25,6 +25,8 @@ from dsms.knowledge.properties.custom_datatype import (  # isort:skip
     NumericalDataType,
 )
 
+from dsms.knowledge.search import SearchResult  # isort:skip
+
 if TYPE_CHECKING:
     from dsms.core.context import Buffers
     from dsms.knowledge import KItem, KType
@@ -46,20 +48,19 @@ def _create_custom_properties_model(
 
     fields = {}
     if isinstance(value, dict):
-        title = _name_to_camel(value.get("title"))
-        for item in value.get("objects"):
+        for item in value.get("sections"):
             for form_input in item.get("inputs"):
                 label = form_input.get("label")
                 dtype = form_input.get("widget")
                 default = form_input.get("defaultValue")
                 slug = _slugify(label)
-                if dtype in ("text", "file"):
+                if dtype in ("Text", "File", "Textarea", "Vocabulary term"):
                     dtype = str
-                elif dtype in ("number", "slider"):
+                elif dtype in ("Number", "Slider"):
                     dtype = NumericalDataType
-                elif dtype == "checkbox":
+                elif dtype == "Checkbox":
                     dtype = bool
-                elif dtype in ("select", "radio"):
+                elif dtype in ("Select", "Radio"):
                     dtype = Enum(
                         _name_to_camel(label) + "Choices",
                         {
@@ -67,14 +68,13 @@ def _create_custom_properties_model(
                             for choice in form_input.get("choices")
                         },
                     )
-                elif dtype == "knowledge-select":
+                elif dtype == "Knowledge item":
                     warnings.warn(
-                        "knowledge-select not fully supported for KTypes yet."
+                        "knowledge item not fully supported for KTypes yet."
                     )
                     dtype = str
+
                 fields[slug] = (dtype, default or None)
-    else:
-        title = "CustomPropertiesModel"
     fields["kitem"] = (
         Optional[KItem],
         Field(None, exclude=True),
@@ -87,7 +87,10 @@ def _create_custom_properties_model(
         "validate_model": model_validator(mode="before")(_validate_model)
     }
     model = create_model(
-        title, __config__=config, __validators__=validators, **fields
+        "CustomPropertiesModel",
+        __config__=config,
+        __validators__=validators,
+        **fields,
     )
     setattr(model, "__str__", _print_properties)
     setattr(model, "__repr__", _print_properties)
@@ -424,7 +427,7 @@ def _search(
     annotations: "Optional[List[str]]" = [],
     limit: "Optional[int]" = 10,
     allow_fuzzy: "Optional[bool]" = True,
-) -> "List[KItem]":
+) -> "List[SearchResult]":
     """Search for KItems in the remote backend"""
     from dsms import KItem  # isort:skip
 
@@ -450,7 +453,10 @@ def _search(
         raise RuntimeError(
             f"""Something went wrong while searching for KItems: {response.text}"""
         ) from excep
-    return [KItem(**item) for item in dumped]
+    return [
+        SearchResult(hit=KItem(**item.get("hit")), fuzzy=item.get("fuzzy"))
+        for item in dumped
+    ]
 
 
 def _slugify(input_string: str, replacement: str = ""):

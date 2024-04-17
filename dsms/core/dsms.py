@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from dsms.core.context import Buffers
     from dsms.knowledge.kitem import KItem
     from dsms.knowledge.ktype import KType
+    from dsms.knowledge.search import SearchResult
 
 
 class DSMS:
@@ -128,7 +129,7 @@ class DSMS:
         annotations: "Optional[List[str]]" = [],
         limit: int = 10,
         allow_fuzzy: "Optional[bool]" = True,
-    ) -> "List[KItem]":
+    ) -> "List[SearchResult]":
         """Search for KItems in the remote backend."""
         return _search(query, ktypes, annotations, limit, allow_fuzzy)
 
