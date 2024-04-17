@@ -48,7 +48,7 @@ class NumericalDataType(float):
         self,
         unit_symbol_or_iri: str,
         decimals: "Optional[int]" = None,
-        use_input_iri: bool = False,
+        use_input_iri: bool = True,
     ) -> float:
         """
         Convert the data of property to a different unit.

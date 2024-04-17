@@ -54,7 +54,7 @@ class Column(KPropertyItem):
         self,
         unit_symbol_or_iri: str,
         decimals: "Optional[int]" = None,
-        use_input_iri: bool = False,
+        use_input_iri: bool = True,
     ) -> "List[Any]":
         """
         Convert the data of the column to a different unit.
@@ -118,3 +118,10 @@ class HDF5Container(KProperty):
             if column.name == name:
                 response = column
         return response
+
+    def __getattr__(self, key):
+        """Return column as attribute."""
+        attribute = self.get(key)
+        if not attribute:
+            raise AttributeError(f"{self} has no attribute '{key}'")
+        return attribute
