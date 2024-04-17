@@ -264,7 +264,7 @@ def _update_kitem(kitem: "KItem") -> Response:
         },
         exclude_none=True,
     )
-    custom_properties = kitem.custom_properties.model_dump_json()
+    custom_properties = kitem.custom_properties.model_dump()
     payload = json.loads(dumped)
     payload.update(
         custom_properties={"content": custom_properties}, **differences
