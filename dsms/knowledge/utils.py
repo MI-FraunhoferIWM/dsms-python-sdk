@@ -55,24 +55,25 @@ def _create_custom_properties_model(
                 default = form_input.get("defaultValue")
                 slug = _slugify(label)
                 if dtype in ("Text", "File", "Textarea", "Vocabulary term"):
-                    dtype = str
+                    dtype = Optional[str]
                 elif dtype in ("Number", "Slider"):
-                    dtype = NumericalDataType
+                    dtype = Optional[NumericalDataType]
                 elif dtype == "Checkbox":
-                    dtype = bool
+                    dtype = Optional[bool]
                 elif dtype in ("Select", "Radio"):
-                    dtype = Enum(
+                    choices = Enum(
                         _name_to_camel(label) + "Choices",
                         {
                             _name_to_camel(choice["value"]): choice["value"]
                             for choice in form_input.get("choices")
                         },
                     )
+                    dtype = Optional[choices]
                 elif dtype == "Knowledge item":
                     warnings.warn(
                         "knowledge item not fully supported for KTypes yet."
                     )
-                    dtype = str
+                    dtype = Optional[str]
 
                 fields[slug] = (dtype, default or None)
     fields["kitem"] = (
@@ -264,16 +265,17 @@ def _update_kitem(kitem: "KItem") -> Response:
         },
         exclude_none=True,
     )
-    custom_properties = kitem.custom_properties.model_dump()
     payload = json.loads(dumped)
-    payload.update(
-        custom_properties={"content": custom_properties}, **differences
-    )
     payload.update(
         external_links={
             link.label: str(link.url) for link in kitem.external_links
         }
     )
+    if kitem.custom_properties:
+        custom_properties = kitem.custom_properties.model_dump()
+        payload.update(
+            custom_properties={"content": custom_properties}, **differences
+        )
     response = _perform_request(
         f"api/knowledge/kitems/{kitem.id}", "put", json=payload
     )
