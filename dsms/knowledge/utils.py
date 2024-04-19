@@ -269,13 +269,12 @@ def _update_kitem(kitem: "KItem") -> Response:
     payload.update(
         external_links={
             link.label: str(link.url) for link in kitem.external_links
-        }
+        },
+        **differences,
     )
     if kitem.custom_properties:
         custom_properties = kitem.custom_properties.model_dump()
-        payload.update(
-            custom_properties={"content": custom_properties}, **differences
-        )
+        payload.update(custom_properties={"content": custom_properties})
     response = _perform_request(
         f"api/knowledge/kitems/{kitem.id}", "put", json=payload
     )
