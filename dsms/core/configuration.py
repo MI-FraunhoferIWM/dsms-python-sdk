@@ -69,7 +69,7 @@ class Configuration(BaseSettings):
     )
 
     kitem_repo: str = Field(
-        "knowledge",
+        "knowledge-items",
         description="Repository of the triplestore for KItems in the DSMS",
     )
 
