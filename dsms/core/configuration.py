@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 MODULE_REGEX = r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*:[a-zA-Z_][a-zA-Z0-9_]*$"
 DEFAULT_UNIT_SPARQL = "dsms.knowledge.semantics.units.sparql:UnitSparqlQuery"
+DEFAULT_REPO = "knowledge-items"
 
 
 class Configuration(BaseSettings):
@@ -69,7 +70,7 @@ class Configuration(BaseSettings):
     )
 
     kitem_repo: str = Field(
-        "knowledge-items",
+        DEFAULT_REPO,
         description="Repository of the triplestore for KItems in the DSMS",
     )
 
