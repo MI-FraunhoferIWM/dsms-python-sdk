@@ -160,7 +160,7 @@ class KItem(BaseModel):
         description="User groups able to access the KItem.",
     )
     custom_properties: Optional[Any] = Field(
-        {}, description="Custom properties associated to the KItem"
+        None, description="Custom properties associated to the KItem"
     )
     ktype: Optional[KType] = Field(
         None, description="KType of the KItem", exclude=True
