@@ -435,7 +435,7 @@ def _search(
     payload = {
         "search_term": query or "",
         "ktypes": [ktype.value for ktype in ktypes],
-        "kitem_annotations": annotations,
+        "annotations": annotations,
         "limit": limit,
     }
     response = _perform_request(

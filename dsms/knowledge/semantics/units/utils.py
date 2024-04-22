@@ -69,6 +69,7 @@ def get_property_unit(
     kitem_id: "Union[str, UUID]",
     property_name: str,
     is_hdf5_column: bool = False,
+    autocomplete_symbol: bool = True,
 ) -> "Dict[str, Any]":
     """
     Retrieve the unit associated with a given property of a KIitem.
@@ -79,6 +80,9 @@ def get_property_unit(
             the unit is to be retrieved.
         is_hdf5_column (bool, optional): Indicates whether the property is an HDF5
             column or a custom property. Defaults to False.
+        autocomplete_symbol (bool, optional): Whether the symbol of a unit shall be
+            fetched automatically from the ontology when it is not given next to the
+            URI.
 
     Returns:
         Dict[str, Any]: A dictionary with the symbol and iri of the unit associated
@@ -96,7 +100,12 @@ def get_property_unit(
             f"´{units_sparql_object}´ must be a subclass of `{BaseUnitSparqlQuery}`"
         )
     try:
-        query = units_sparql_object(kitem_id, property_name, is_hdf5_column)
+        query = units_sparql_object(
+            kitem_id,
+            property_name,
+            is_hdf5_column=is_hdf5_column,
+            autocomplete_symbol=autocomplete_symbol,
+        )
     except Exception as error:
         raise ValueError(
             f"Something went wrong catching the unit for property `{property_name}`."

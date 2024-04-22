@@ -21,11 +21,13 @@ class BaseUnitSparqlQuery(BaseSparqlQuery):
         kitem_id: "Union[str, UUID]",
         property_name: str,
         is_hdf5_column: bool = False,
+        autocomplete_symbol: bool = True,
     ) -> None:
         super().__init__(
             kitem_id=kitem_id,
             property_name=property_name,
             is_hdf5_column=is_hdf5_column,
+            autocomplete_symbol=autocomplete_symbol,
         )
 
     # OVERRIDE

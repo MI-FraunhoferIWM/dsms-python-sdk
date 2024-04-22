@@ -53,6 +53,13 @@ class BaseSparqlQuery(ABC):
         Define sparql query by using the kwargs defined during initialization.
         """
 
+    @abstractmethod
+    def postprocess_result(cls, row: "Dict[str, Any]") -> "Dict[str, Any]":
+        """
+        Define a function that postprocesses the result of the indivudal row in the
+        sparql result. This might e.g. be some string operations etc.
+        """
+
     def execute(self) -> None:
         """Execute sparql query and bind results."""
         result = self.dsms.sparql_interface.query(self.query)
@@ -60,8 +67,10 @@ class BaseSparqlQuery(ABC):
         for row in JSONResult(result).bindings:
             row_converted = {str(key): value for key, value in row.items()}
             self._results.append(
-                {
-                    name: func(row_converted.get(name))
-                    for name, func in self.result_mappings.items()
-                }
+                self.postprocess_result(
+                    {
+                        name: func(row_converted.get(name))
+                        for name, func in self.result_mappings.items()
+                    }
+                )
             )

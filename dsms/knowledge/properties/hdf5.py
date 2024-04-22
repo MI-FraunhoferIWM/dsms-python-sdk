@@ -1,4 +1,5 @@
 """HDF5 Properties of a KItem"""
+import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -12,6 +13,8 @@ from dsms.knowledge.semantics.units import (  # isort:skip
     get_conversion_factor,
     get_property_unit,
 )
+
+logger = logging.Logger(__name__)
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional
@@ -32,6 +35,22 @@ class Column(KPropertyItem):
         ..., description="Name of the column in the data series."
     )
 
+    def __repr__(self) -> str:
+        """Pretty print the numerical datatype"""
+        if self.kitem.dsms.config.display_units:
+            try:
+                unit = f"\tunit={self.get_unit().get('symbol')}\n\t\t"
+                string = str(self)
+                string = string[:-1] + unit + string[-1:]
+            except Exception as error:
+                logger.debug(
+                    "Could not fetch unit from `%i`: %i", self.name, error.args
+                )
+                string = str(self)
+        else:
+            string = str(self)
+        return string
+
     def get(self) -> "List[Any]":
         """
         Download the data for the column in a time series.
@@ -48,7 +67,12 @@ class Column(KPropertyItem):
         Returns:
             Dict[str, Any]: Dictionary containing unit information.
         """
-        return get_property_unit(self.id, self.name, is_hdf5_column=True)
+        return get_property_unit(
+            self.id,
+            self.name,
+            is_hdf5_column=True,
+            autocomplete_symbol=self.kitem.dsms.config.autocomplete_units,
+        )
 
     def convert_to(
         self,

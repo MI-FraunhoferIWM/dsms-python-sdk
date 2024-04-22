@@ -1,5 +1,6 @@
 """Module for custom numerical data type"""
 
+import logging
 from typing import TYPE_CHECKING
 
 from dsms.knowledge.semantics.units.utils import (
@@ -13,12 +14,32 @@ if TYPE_CHECKING:
     from dsms import KItem
 
 
+logger = logging.Logger(__name__)
+
+
 class NumericalDataType(float):
     """Custom Base data type for custom properties"""
 
     def __init__(self, value) -> None:  # pylint: disable=unused-argument
         self._kitem: "Optional[KItem]" = None
         self._name: "Optional[str]" = None
+
+    def __str__(self) -> str:
+        """Pretty print the numerical datatype"""
+        if self.kitem.dsms.config.display_units:
+            try:
+                string = f"{self.__float__()} {self.get_unit().get('symbol')}"
+            except Exception as error:
+                logger.debug(
+                    "Could not fetch unit from `%i`: %i", self.name, error.args
+                )
+                string = str(self.__float__())
+        else:
+            string = str(self.__float__())
+        return string
+
+    def __repr__(self) -> str:
+        return str(self)
 
     @property
     def kitem(cls) -> "Optional[KItem]":
@@ -42,7 +63,12 @@ class NumericalDataType(float):
 
     def get_unit(self) -> "Dict[str, Any]":
         """Get unit for the property"""
-        return get_property_unit(self.kitem.id, self.name)
+        return get_property_unit(
+            self.kitem.id,
+            self.name,
+            is_hdf5_column=True,
+            autocomplete_symbol=self.kitem.dsms.config.autocomplete_units,
+        )
 
     def convert_to(
         self,

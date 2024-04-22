@@ -69,6 +69,20 @@ class Configuration(BaseSettings):
         description="Datetime format used in the DSMS instance.",
     )
 
+    display_units: bool = Field(
+        False,
+        description="""Whether the custom properties or the hdf5 columns shall
+        directly reveal their unit when printed. WARNING: This might lead to performance issues.""",
+    )
+
+    autocomplete_units: bool = Field(
+        True,
+        description="""When a unit is fetched but does not hold a symbol
+        next to its URI, it shall be fetched from the respective ontology
+        (which is general side effect from the `units_sparq_object`.)
+        WARNING: This might lead to performance issues.""",
+    )
+
     kitem_repo: str = Field(
         DEFAULT_REPO,
         description="Repository of the triplestore for KItems in the DSMS",

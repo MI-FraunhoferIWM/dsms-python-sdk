@@ -41,6 +41,15 @@ def _qudt_sparql_factor(uri: str) -> str:
         }}"""
 
 
+def _sparql_symbol_from_iri(uri: str) -> str:
+    return f"""PREFIX qudt: <http://qudt.org/schema/qudt/>
+    SELECT DISTINCT ?symbol
+        WHERE {{
+            <{uri}> a qudt:Unit ;
+                    qudt:ucumCode ?symbol .
+        }}"""
+
+
 def _qudt_sparql_quantity(original_uri: str, target_uri: str) -> str:
     return f"""PREFIX qudt: <http://qudt.org/schema/qudt/>
     SELECT DISTINCT ?kind
@@ -78,6 +87,20 @@ def _check_qudt_mapping(symbol: str) -> Optional[str]:
             f"More than one QUDT Mapping found for unit with symbol `{symbol}`."
         )
     return match.pop()
+
+
+@lru_cache
+def _get_symbol_from_uri(uri: str) -> str:
+    graph = _get_qudt_graph("qudt_units")
+    query = _sparql_symbol_from_iri(uri)
+    symbol = [str(row["symbol"]) for row in graph.query(query)]
+    if len(symbol) == 0:
+        raise ValueError(f"No symbol found for unit with uri `{uri}`.")
+    if len(symbol) > 1:
+        raise ValueError(
+            f"More than one symbol factor for unit with uri `{uri}`."
+        )
+    return symbol.pop()
 
 
 @lru_cache

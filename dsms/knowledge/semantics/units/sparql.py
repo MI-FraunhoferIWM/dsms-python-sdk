@@ -1,8 +1,14 @@
 """Semantic units for a custom property of a KItem in DSMS"""
 
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
 from dsms.knowledge.semantics.units.base import BaseUnitSparqlQuery
+
+from .conversion import _get_symbol_from_uri
+
+if TYPE_CHECKING:
+    from typing import Any, Dict
 
 
 class UnitSparqlQuery(BaseUnitSparqlQuery):
@@ -38,3 +44,15 @@ class UnitSparqlQuery(BaseUnitSparqlQuery):
                     }}
                 }}
         }}"""
+
+    # OVERRIDE
+    def postprocess_result(cls, row: "Dict[str, Any]") -> "Dict[str, Any]":
+        """
+        Define a function that postprocesses the result of the indivudal row in the
+        sparql result. This might e.g. be some string operations etc.
+        """
+        if row.get("symbol") == "None":
+            row["symbol"] = None
+        if cls.kwargs.get("autocomplete_symbol") and not row.get("symbol"):
+            row["symbol"] = _get_symbol_from_uri(row.get("iri"))
+        return row
