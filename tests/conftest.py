@@ -30,7 +30,15 @@ class MockDB:
             "name": "bar123",
             "id": "698acdc5-dd97-4217-906e-2c0b44248c17",
         },
+        "cc834fb6-d4cd-43c1-b4b8-4c720ac6f038": {
+            "name": "bar456",
+            "id": "cc834fb6-d4cd-43c1-b4b8-4c720ac6f038",
+        },
     }
+
+    slugs = [
+        value.get("name") + "-" + key[:8] for key, value in kitems.items()
+    ]
 
     hdf5 = {
         "698acdc5-dd97-4217-906e-2c0b44248c17": [
@@ -114,6 +122,14 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
         else:
             return 200, {}, json.dumps(MockDB.hdf5[item_id])
 
+    def return_slugs(request):
+        url_parts = request.url.split("/")
+        slug = url_parts[-1]
+        if slug not in MockDB.slugs:
+            return 404, {}, "Slug does not exist"
+        else:
+            return 200, {}, "Slug exists"
+
     def _get_kitems() -> "Dict[str, Any]":
         return {
             urljoin(custom_address, f"api/knowledge/kitems/{uid}"): [
@@ -142,6 +158,22 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
             for uid in MockDB.kitems
         }
 
+    def _get_slugs() -> "Dict[str, Any]":
+        return {
+            urljoin(
+                custom_address, f"api/knowledge/kitems/organization/{slug}"
+            ): [
+                {
+                    "method": responses.HEAD,
+                    "returns": {
+                        "content_type": "application/json",
+                        "callback": return_slugs,
+                    },
+                }
+            ]
+            for slug in MockDB.slugs
+        }
+
     return {
         ktypes: [
             {
@@ -154,6 +186,7 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
         ],
         **_get_kitems(),
         **_get_hdf5(),
+        **_get_slugs(),
     }
 
 

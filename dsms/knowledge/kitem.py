@@ -191,7 +191,7 @@ class KItem(BaseModel):
 
         # add kitem to buffer
         if (
-            not _kitem_exists(self)
+            not _slug_is_available(self._get_ktype_as_str(), self.slug)
             and self.id not in self.context.buffers.created
         ):
             self.context.buffers.created.update({self.id: self})
@@ -299,7 +299,7 @@ class KItem(BaseModel):
     @field_validator("linked_kitems", mode="before")
     @classmethod
     def validate_linked_kitems_list(
-        cls, value: "List[Union[Dict, KItem, Any]]", info: ValidationInfo
+        cls, value: "List[Union[Dict, KItem, Any]]"
     ) -> List[LinkedKItem]:
         """Validate each single kitem to be linked"""
         linked_kitems = []
@@ -317,9 +317,7 @@ class KItem(BaseModel):
                     raise AttributeError(
                         f"Linked KItem `{item}` has no attribute `id`."
                     ) from error
-            linked_kitems.append(
-                LinkedKItem(id=dest_id, source_id=info.data["id"])
-            )
+            linked_kitems.append(LinkedKItem(id=dest_id))
         return linked_kitems
 
     @field_validator("linked_kitems", mode="after")
@@ -385,12 +383,12 @@ class KItem(BaseModel):
         kitem_id = info.data.get("id")
         if not value:
             value = _slugify(name)
-            if Context.dsms.config.individual_slugs:
-                value += f"-{str(kitem_id).split('-', maxsplit=1)[0]}"
             if len(value) < 4:
                 raise ValueError(
                     "Slug length must have a minimum length of 4."
                 )
+            if Context.dsms.config.individual_slugs:
+                value += f"-{str(kitem_id).split('-', maxsplit=1)[0]}"
         if not _kitem_exists(kitem_id) and not _slug_is_available(
             ktype_id.value, value
         ):
@@ -500,5 +498,15 @@ class KItem(BaseModel):
     def url(cls) -> str:
         """URL of the KItem"""
         return urljoin(
-            str(cls.context.dsms.config.host_url), f"{cls.ktype_id}/{cls.slug}"
+            str(cls.context.dsms.config.host_url),
+            f"{cls._get_ktype_as_str()}/{cls.slug}",
         )
+
+    def _get_ktype_as_str(self) -> str:
+        if isinstance(self.ktype_id, str):
+            ktype = self.ktype_id
+        elif isinstance(self.ktype_id, Enum):
+            ktype = self.ktype_id.value  # pylint: disable=no-member
+        else:
+            raise TypeError(f"Datatype for KType is unknown: {type(ktype)}")
+        return ktype

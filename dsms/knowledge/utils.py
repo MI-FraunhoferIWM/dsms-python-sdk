@@ -375,11 +375,13 @@ def _get_kitems_diffs(kitem_old: "KItem", kitem_new: "KItem"):
         new_attr = getattr(kitem_new, name)
         differences[to_add_name] = [
             json.loads(attr.model_dump_json())
-            for attr in set(new_attr) - set(old_attr)
+            for attr in new_attr
+            if new_attr not in old_attr
         ]
         differences[to_remove_name] = [
             json.loads(attr.model_dump_json())
-            for attr in set(old_attr) - set(new_attr)
+            for attr in old_attr
+            if old_attr not in new_attr
         ]
     return differences
 

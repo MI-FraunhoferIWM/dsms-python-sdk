@@ -101,8 +101,8 @@ def get_property_unit(
         )
     try:
         query = units_sparql_object(
-            kitem_id,
-            property_name,
+            kitem_id=kitem_id,
+            property_name=property_name,
             is_hdf5_column=is_hdf5_column,
             autocomplete_symbol=autocomplete_symbol,
         )

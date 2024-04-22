@@ -111,25 +111,6 @@ class HDF5Container(KProperty):
     def k_property_item(cls) -> "Callable":
         return Column
 
-    # OVERRIDE
-    def _add(self, item: Column) -> Column:
-        """Side effect when an Column is added to the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _update(self, item: Column) -> Column:
-        """Side effect when an Column is updated at the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _delete(self, item: Column) -> None:
-        """Side effect when deleting the Column of a KItem"""
-
-    # OVERRIDE
-    def _get(self, item: Column) -> Column:
-        """Side effect when getting the Column for a specfic kitem"""
-        return item
-
     def to_df(self) -> pd.DataFrame:
         """Return hdf5 as pandas DataFrame"""
         data = {column.name: column.get() for column in self}

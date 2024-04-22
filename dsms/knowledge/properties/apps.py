@@ -67,22 +67,3 @@ class AppsProperty(KProperty):
     def k_property_item(cls) -> "Callable":
         """App data model"""
         return App
-
-    # OVERRIDE
-    def _add(self, item: App) -> App:
-        """Side effect when an App is added to the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _update(self, item: App) -> App:
-        """Side effect when an App is updated at the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _delete(self, item: App) -> None:
-        """Side effect when deleting the App of a KItem"""
-
-    # OVERRIDE
-    def _get(self, item: App) -> App:
-        """Side effect when getting the App for a specfic kitem"""
-        return item
