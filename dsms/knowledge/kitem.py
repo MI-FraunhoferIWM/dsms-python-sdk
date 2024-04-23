@@ -191,7 +191,7 @@ class KItem(BaseModel):
 
         # add kitem to buffer
         if (
-            not _slug_is_available(self._get_ktype_as_str(), self.slug)
+            _slug_is_available(self._get_ktype_as_str(), self.slug)
             and self.id not in self.context.buffers.created
         ):
             self.context.buffers.created.update({self.id: self})
@@ -228,7 +228,7 @@ class KItem(BaseModel):
     def __hash__(self) -> int:
         return hash(str(self))
 
-    @field_validator("affiliations")
+    @field_validator("affiliations", mode="after")
     @classmethod
     def validate_affiliation(
         cls, value: List[Affiliation]
@@ -236,7 +236,7 @@ class KItem(BaseModel):
         """Validate affiliations Field"""
         return AffiliationsProperty(value)
 
-    @field_validator("annotations")
+    @field_validator("annotations", mode="after")
     @classmethod
     def validate_annotations(
         cls, value: List[Annotation]
@@ -265,7 +265,7 @@ class KItem(BaseModel):
         """Validate attachments Field"""
         return AttachmentsProperty(value)
 
-    @field_validator("kitem_apps")
+    @field_validator("kitem_apps", mode="after")
     @classmethod
     def validate_apps(cls, value: List[App]) -> AppsProperty:
         """Validate apps Field"""
@@ -282,13 +282,13 @@ class KItem(BaseModel):
             ]
         )
 
-    @field_validator("contacts")
+    @field_validator("contacts", mode="after")
     @classmethod
     def validate_contacts(cls, value: List[ContactInfo]) -> ContactsProperty:
         """Validate contacts Field"""
         return ContactsProperty(value)
 
-    @field_validator("external_links")
+    @field_validator("external_links", mode="after")
     @classmethod
     def validate_external_links(
         cls, value: List[ExternalLink]
@@ -329,7 +329,7 @@ class KItem(BaseModel):
         """Validate the list out of linked KItems"""
         return LinkedKItemsProperty(value)
 
-    @field_validator("user_groups")
+    @field_validator("user_groups", mode="after")
     @classmethod
     def validate_user_groups(
         cls, value: List[UserGroup]
@@ -499,7 +499,7 @@ class KItem(BaseModel):
         """URL of the KItem"""
         return urljoin(
             str(cls.context.dsms.config.host_url),
-            f"{cls._get_ktype_as_str()}/{cls.slug}",
+            f"knowledge/{cls._get_ktype_as_str()}/{cls.slug}",
         )
 
     def _get_ktype_as_str(self) -> str:

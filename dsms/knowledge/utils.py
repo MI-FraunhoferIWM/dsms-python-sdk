@@ -354,8 +354,16 @@ def _get_attachment(kitem_id: "KItem", file_name: str) -> str:
 def _get_attachment_diffs(kitem_old: "KItem", kitem_new: "KItem"):
     """Check which attachments should be removed and which should be added."""
     return {
-        "remove": set(kitem_old.attachments) - set(kitem_new.attachments),
-        "add": set(kitem_new.attachments) - set(kitem_old.attachments),
+        "remove": [
+            attachment
+            for name, attachment in kitem_old.attachments.by_name.items()
+            if name not in kitem_new.attachments.by_name
+        ],
+        "add": [
+            attachment
+            for name, attachment in kitem_new.attachments.by_name.items()
+            if name not in kitem_old.attachments.by_name
+        ],
     }
 
 

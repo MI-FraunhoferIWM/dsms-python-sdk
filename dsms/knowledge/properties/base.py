@@ -148,28 +148,35 @@ class KProperty(list):
             if isinstance(item, (list, tuple)):
                 for subitem in item:
                     item = self._check_item(subitem)
-                    to_extend.append(item)
+                    if not item in self:
+                        to_extend.append(item)
             elif isinstance(item, (dict, KPropertyItem, KItem)):
                 item = self._check_item(item)
-                to_extend.append(item)
+                if not item in self:
+                    to_extend.append(item)
             else:
-                to_extend.append(item)
-        self._mark_as_updated()
-        super().extend(to_extend)
+                if not item in self:
+                    to_extend.append(item)
+        if to_extend:
+            self._mark_as_updated()
+            super().extend(to_extend)
 
     def append(self, item: "Union[Dict, Any]") -> None:
         """Append KPropertyItem to KProperty"""
 
         item = self._check_item(item)
-        self._mark_as_updated()
-        super().append(item)
+
+        if not item in self:
+            self._mark_as_updated()
+            super().append(item)
 
     def insert(self, index: int, item: "Union[Dict, Any]") -> None:
         """Insert KPropertyItem at KProperty at certain index"""
 
         item = self._check_item(item)
-        self._mark_as_updated()
-        super().insert(index, item)
+        if not item in self:
+            self._mark_as_updated()
+            super().insert(index, item)
 
     def pop(self, index=-1) -> KPropertyItem:
         """Pop KPropertyItem from KProperty"""
