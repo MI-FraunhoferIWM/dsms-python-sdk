@@ -1,10 +1,33 @@
 # Installation and Setup Guide
 How to install and setup the dsms-python-sdk.
 
-
-
 ## 1.1. Installation
-Install in your  folder (or any folder you like).
+
+Before using DSMS-SDK make sure to register your account at your DSMS Instance.You could do this by sending an email to the following contacts:
+
+- [Yoav Nahshon](mailto:yoav.nahshon@iwm.fraunhofer.de) (Fraunhofer Institute for Mechanics of Materials IWM)
+- [Matthias Büschelberger](mailto:matthias.bueschelberger@iwm.fraunhofer.de) (Fraunhofer Institute for Mechanics of Materials IWM)
+
+
+The following are the instances of the DSMS you could choose from:
+
+- [StahlDigital](https://lnkd.in/gfwe9a36)
+- [KupferDigital](https://lnkd.in/g8mvnM3K)
+- [DiMAT](https://lnkd.in/g46baB6J)
+
+
+After following the above steps, you could use either of the two ways to install DSMS to your machine.
+
+#### Method 1 : Via PyPI ####
+
+To install the [DSMS Python SDK](https://pypi.org/project/dsms-sdk/), you can use the Python Package Index (PyPI).
+Copy the below command to install DSMS SDK from PyPI 
+- `pip install dsms-sdk`
+
+
+#### Method 2 : Cloning Github Repo ####
+
+Install in your folder (or any folder you like).
 
 - `git clone git@github.com:MI-FraunhoferIWM/dsms-python-sdk.git`
 - `cd dsms-python-sdk`
