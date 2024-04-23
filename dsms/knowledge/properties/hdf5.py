@@ -111,6 +111,11 @@ class HDF5Container(KProperty):
     def k_property_item(cls) -> "Callable":
         return Column
 
+    # OVERRIDE
+    @property
+    def k_property_helper(cls) -> None:
+        """Not defined for HDF5"""
+
     def to_df(self) -> pd.DataFrame:
         """Return hdf5 as pandas DataFrame"""
         data = {column.name: column.get() for column in self}

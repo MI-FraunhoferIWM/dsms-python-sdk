@@ -24,3 +24,8 @@ class ExternalLinksProperty(KProperty):
     @property
     def k_property_item(cls) -> "Callable":
         return ExternalLink
+
+    # OVERRIDE
+    @property
+    def k_property_helper(cls) -> None:
+        """Not defined for External links"""

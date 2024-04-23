@@ -67,3 +67,7 @@ class AppsProperty(KProperty):
     def k_property_item(cls) -> "Callable":
         """App data model"""
         return App
+
+    @property
+    def k_property_helper(cls) -> None:
+        """Not defined for Apps"""

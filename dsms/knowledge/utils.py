@@ -115,11 +115,9 @@ def __setattr_property__(self, key, value) -> None:
         # convert to convertable numeric object
         value = _create_numerical_dtype(key, value, self.kitem)
         # mark as updated
-        if self.kitem:
-            self.kitem.context.buffers.updated.update(
-                {self.kitem.id: self.kitem}
-            )
-    if key == "kitem":
+    if key != "kitem" and self.kitem:
+        self.kitem.context.buffers.updated.update({self.kitem.id: self.kitem})
+    elif key == "kitem":
         # set kitem for convertable numeric datatype
         for prop in self.model_dump().values():
             if isinstance(prop, NumericalDataType) and not prop.kitem:
@@ -229,17 +227,18 @@ def _create_new_kitem(kitem: "KItem") -> None:
         )
 
 
-def _update_kitem(kitem: "KItem") -> Response:
+def _update_kitem(new_kitem: "KItem", old_kitem: "KItem") -> Response:
     """Update a KItem in the remote backend."""
-    old_kitem = _get_kitem(kitem.id)
-    differences = _get_kitems_diffs(old_kitem, kitem)
-    dumped = kitem.model_dump_json(
+    differences = _get_kitems_diffs(old_kitem, new_kitem)
+    dumped = new_kitem.model_dump_json(
         exclude={
             "authors",
             "annotations",
             "custom_properties",
             "linked_kitems",
             "updated_at",
+            "rdf_exists",
+            "in_backend",
             "avatar_exists",
             "user_groups",
             "ktype_id",
@@ -255,23 +254,20 @@ def _update_kitem(kitem: "KItem") -> Response:
     payload = json.loads(dumped)
     payload.update(
         external_links={
-            link.label: str(link.url) for link in kitem.external_links
+            link.label: str(link.url) for link in new_kitem.external_links
         },
         **differences,
     )
-    if kitem.custom_properties:
-        custom_properties = kitem.custom_properties.model_dump()
+    if new_kitem.custom_properties:
+        custom_properties = new_kitem.custom_properties.model_dump()
         payload.update(custom_properties={"content": custom_properties})
     response = _perform_request(
-        f"api/knowledge/kitems/{kitem.id}", "put", json=payload
+        f"api/knowledge/kitems/{new_kitem.id}", "put", json=payload
     )
     if not response.ok:
         raise ValueError(
-            f"KItem with uuid `{kitem.id}` could not be updated in DSMS: {response.text}`"
+            f"KItem with uuid `{new_kitem.id}` could not be updated in DSMS: {response.text}`"
         )
-    for key, value in _get_kitem(kitem.id).__dict__.items():
-        if key != "attachments":
-            setattr(kitem, key, value)
     return response
 
 
@@ -284,16 +280,13 @@ def _delete_kitem(kitem: "KItem") -> None:
         )
 
 
-def _update_attachments(kitem: "KItem") -> None:
+def _update_attachments(new_kitem: "KItem", old_kitem: "KItem") -> None:
     """Update attachments of the KItem."""
-    old_kitem = _get_kitem(kitem.id)
-    differences = _get_attachment_diffs(old_kitem, kitem)
+    differences = _get_attachment_diffs(old_kitem, new_kitem)
     for upload in differences["add"]:
-        _upload_attachments(kitem, upload.name)
+        _upload_attachments(new_kitem, upload.name)
     for remove in differences["remove"]:
-        _delete_attachments(kitem, remove.name)
-    for key, value in _get_kitem(kitem.id).__dict__.items():
-        setattr(kitem, key, value)
+        _delete_attachments(new_kitem, remove.name)
 
 
 def _upload_attachments(kitem: "KItem", attachment: "str") -> None:
@@ -392,31 +385,44 @@ def _commit(buffers: "Buffers") -> None:
 def _commit_created(buffer: "Dict[str, KItem]") -> dict:
     """Commit the buffer for the `created` buffers"""
     for kitem in buffer.values():
-        exists = _kitem_exists(kitem)
-        if not exists:
-            _create_new_kitem(kitem)
+        _create_new_kitem(kitem)
 
 
 def _commit_updated(buffer: "Dict[str, KItem]") -> None:
     """Commit the buffer for the `updated` buffers"""
-    for kitem in buffer.values():
-        if _kitem_exists(kitem):
-            if isinstance(kitem.hdf5, pd.DataFrame):
-                _update_hdf5(kitem.id, kitem.hdf5)
-            elif isinstance(kitem.hdf5, type(None)) and _inspect_hdf5(
-                kitem.id
+    for new_kitem in buffer.values():
+        old_kitem = _get_kitem(new_kitem.id)
+        if old_kitem:
+            if isinstance(new_kitem.hdf5, pd.DataFrame):
+                _update_hdf5(new_kitem.id, new_kitem.hdf5)
+            elif isinstance(new_kitem.hdf5, type(None)) and _inspect_hdf5(
+                new_kitem.id
             ):
-                _delete_hdf5(kitem.id)
-            _update_kitem(kitem)
-            _update_attachments(kitem)
+                _delete_hdf5(new_kitem.id)
+            _update_kitem(new_kitem, old_kitem)
+            _update_attachments(new_kitem, old_kitem)
+            for key, value in _get_kitem(new_kitem.id).__dict__.items():
+                setattr(new_kitem, key, value)
 
 
 def _commit_deleted(buffer: "Dict[str, KItem]") -> None:
     """Commit the buffer for the `deleted` buffers"""
     for kitem in buffer.values():
-        if _kitem_exists(kitem):
-            _delete_hdf5(kitem.id)
-            _delete_kitem(kitem)
+        _delete_hdf5(kitem.id)
+        _delete_kitem(kitem)
+
+
+def _split_iri(iri: str) -> List[str]:
+    if "#" in iri:
+        namspace, name = iri.rsplit("#", 1)
+    else:
+        namspace, name = iri.rsplit("/", 1)
+    return namspace, name
+
+
+def _make_annotation_schema(iri: str) -> Dict[str, Any]:
+    namespace, name = _split_iri(iri)
+    return {"namespace": namespace, "name": name, "iri": iri}
 
 
 def _search(
@@ -427,12 +433,12 @@ def _search(
     allow_fuzzy: "Optional[bool]" = True,
 ) -> "List[SearchResult]":
     """Search for KItems in the remote backend"""
-    from dsms import KItem  # isort:skip
+    from dsms import KItem
 
     payload = {
         "search_term": query or "",
         "ktypes": [ktype.value for ktype in ktypes],
-        "annotations": annotations,
+        "annotations": [_make_annotation_schema(iri) for iri in annotations],
         "limit": limit,
     }
     response = _perform_request(
@@ -472,11 +478,14 @@ def _slug_is_available(ktype_id: Union[str, UUID], value: str) -> bool:
     response = _perform_request(
         f"api/knowledge/kitems/{ktype_id}/{value}", "head"
     )
+    if response.status_code == 401:
+        raise RuntimeError("The access token has expired")
     return response.status_code == 404
 
 
 def _get_hdf5_column(kitem_id: str, column_id: int) -> List[Any]:
     """Download the column of a hdf5 container of a certain kitem"""
+
     response = _perform_request(
         f"api/knowledge/data_api/{kitem_id}/column-{column_id}", "get"
     )

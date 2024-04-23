@@ -15,6 +15,14 @@ if TYPE_CHECKING:
     from dsms import KItem
 
 
+def _linked_kitem_helper(kitem: "KItem"):
+    from dsms import KItem
+
+    if not isinstance(kitem, KItem):
+        raise TypeError(f"{kitem} is not of type {KItem}")
+    return {"id": kitem.id}
+
+
 class LinkedKItem(KPropertyItem):
     """Data model of a linked KItem"""
 
@@ -57,6 +65,12 @@ class LinkedKItemsProperty(KProperty):
     @property
     def k_property_item(cls) -> "Callable":
         return LinkedKItem
+
+    # OVERRIDE
+    @property
+    def k_property_helper(cls) -> "Callable":
+        """Linked KItem helper function"""
+        return _linked_kitem_helper
 
     def get(self, kitem_id: "Union[str, UUID]") -> "KItem":
         """Get the kitem with a certain id which is linked to the source KItem."""

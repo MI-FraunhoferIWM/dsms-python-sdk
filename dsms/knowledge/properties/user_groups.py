@@ -24,3 +24,7 @@ class UserGroupsProperty(KProperty):
     def k_property_item(cls) -> "Callable":
         """UserGroup data model"""
         return UserGroup
+
+    @property
+    def k_property_helper(cls) -> None:
+        """Not defined for User groups"""

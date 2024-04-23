@@ -51,11 +51,15 @@ class KPropertyItem(BaseModel):
         """Pretty print the KProperty"""
         return str(self)
 
-    def __setattr__(self, index: int, item: "Any") -> None:
+    def __setattr__(self, key: str, item: "Any") -> None:
         """Add KItem to updated buffer."""
-        if self.kitem and self.kitem.id not in self.context.buffers.updated:
+        if (
+            self.kitem
+            and self.kitem.id not in self.context.buffers.updated
+            and key not in ["_kitem", "kitem", "id"]
+        ):
             self.context.buffers.updated.update({self.id: self.kitem})
-        super().__setattr__(index, item)
+        super().__setattr__(key, item)
 
     def __hash__(self) -> int:
         return hash(str(self))
@@ -98,12 +102,19 @@ class KProperty(list):
 
     def __init__(self, *args) -> None:
         self._kitem: "KItem" = None
-        self.extend(args)
+        to_extend = self._get_extendables(args)
+        self.extend(to_extend)
 
     @property
     @abstractmethod
     def k_property_item(cls) -> "Callable":
         """Return the KPropertyItem-class for the KProperty"""
+
+    @property
+    @abstractmethod
+    def k_property_helper(cls) -> "Optional[Callable]":
+        """Optional helper for transforming a given
+        input into the k property item"""
 
     def __str__(self) -> str:
         """Pretty print the KProperty"""
@@ -139,8 +150,7 @@ class KProperty(list):
         self._mark_as_updated()
         super().__imul__(index)
 
-    def extend(self, iterable: "Iterable") -> None:
-        """Extend KProperty with list of KPropertyItem"""
+    def _get_extendables(self, iterable: "Iterable") -> "List[KPropertyItem]":
         from dsms import KItem
 
         to_extend = []
@@ -157,6 +167,12 @@ class KProperty(list):
             else:
                 if not item in self:
                     to_extend.append(item)
+        return to_extend
+
+    def extend(self, iterable: "Iterable") -> None:
+        """Extend KProperty with list of KPropertyItem"""
+        to_extend = self._get_extendables(iterable)
+
         if to_extend:
             self._mark_as_updated()
             super().extend(to_extend)
@@ -201,14 +217,15 @@ class KProperty(list):
         self, item: "Union[Dict, Any]"
     ) -> KPropertyItem:
         """Check the type of the processsed KPropertyItem"""
-        from dsms import KItem
-
-        if not isinstance(item, (self.k_property_item, dict, KItem, str)):
-            raise TypeError(
-                f"""Item `{item}` must be of type {self.k_property_item}, {KItem}, {str} or {dict},
-                not `{type(item)}`."""
-            )
-        if isinstance(item, dict):
+        if not isinstance(item, BaseModel):
+            if self.k_property_helper and not isinstance(item, dict):
+                item = self.k_property_helper(item)
+            elif not self.k_property_helper and not isinstance(item, dict):
+                raise TypeError(
+                    f"""No `k_propertyhelper` defined for {type(self)}.
+                    Hence, item `{item}` must be of type {self.k_property_item},
+                    {BaseModel} or {dict}, not `{type(item)}`."""
+                )
             item = self.k_property_item(**item)
         return item
 
