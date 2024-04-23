@@ -2,7 +2,7 @@
 
 import urllib
 import warnings
-from typing import Callable, List, Optional, Set, Union
+from typing import Callable, Optional, Set, Union
 
 import requests
 from pydantic import AnyUrl, Field, SecretStr, field_validator
@@ -101,12 +101,6 @@ class Configuration(BaseSettings):
         description="""Class and Module specification in Python for a subclass of
           `dsms.knowledge.semantics.units.base:BaseUnitSparqlQuery` in order to retrieve
           the units of a HDF5 column/ custom property of a KItem.""",
-    )
-
-    filter_bad_hdf5_types: Optional[List[Callable]] = Field(
-        [str, type(None)],
-        description="""A list of classes which should be filtered out
-        from a column of an hdf5 when fetched""",
     )
 
     hide_properties: Set[Union[str, None]] = Field(

@@ -194,7 +194,9 @@ def _kitem_exists(kitem: Union[Any, str, UUID]) -> bool:
     return response.ok
 
 
-def _get_kitem(uuid: Union[str, UUID]) -> "KItem":
+def _get_kitem(
+    uuid: Union[str, UUID], as_json=False
+) -> "Union[KItem, Dict[str, Any]]":
     """Get the KItem for a instance with a certain ID from remote backend"""
     from dsms import Context, KItem
 
@@ -209,7 +211,12 @@ def _get_kitem(uuid: Union[str, UUID]) -> "KItem":
             f"""An error occured fetching the KItem with uuid `{uuid}`:
             `{response.text}`"""
         )
-    return KItem(**response.json())
+    payload = response.json()
+    if as_json:
+        response = payload
+    else:
+        response = KItem(**payload)
+    return response
 
 
 def _create_new_kitem(kitem: "KItem") -> None:
@@ -227,9 +234,12 @@ def _create_new_kitem(kitem: "KItem") -> None:
         )
 
 
-def _update_kitem(new_kitem: "KItem", old_kitem: "KItem") -> Response:
+def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
     """Update a KItem in the remote backend."""
-    differences = _get_kitems_diffs(old_kitem, new_kitem)
+    to_compare = new_kitem.model_dump(
+        include={"annotations", "linked_kitems", "user_groups", "kitem_apps"}
+    )
+    differences = _get_kitems_diffs(old_kitem, to_compare)
     dumped = new_kitem.model_dump_json(
         exclude={
             "authors",
@@ -280,13 +290,15 @@ def _delete_kitem(kitem: "KItem") -> None:
         )
 
 
-def _update_attachments(new_kitem: "KItem", old_kitem: "KItem") -> None:
+def _update_attachments(
+    new_kitem: "KItem", old_kitem: "Dict[str, Any]"
+) -> None:
     """Update attachments of the KItem."""
     differences = _get_attachment_diffs(old_kitem, new_kitem)
     for upload in differences["add"]:
-        _upload_attachments(new_kitem, upload.name)
+        _upload_attachments(new_kitem, upload)
     for remove in differences["remove"]:
-        _delete_attachments(new_kitem, remove.name)
+        _delete_attachments(new_kitem, remove)
 
 
 def _upload_attachments(kitem: "KItem", attachment: "str") -> None:
@@ -331,23 +343,25 @@ def _get_attachment(kitem_id: "KItem", file_name: str) -> str:
     return response.text
 
 
-def _get_attachment_diffs(kitem_old: "KItem", kitem_new: "KItem"):
+def _get_attachment_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     """Check which attachments should be removed and which should be added."""
     return {
         "remove": [
             attachment
-            for name, attachment in kitem_old.attachments.by_name.items()
-            if name not in kitem_new.attachments.by_name
+            for attachment in kitem_old.get("attachments")
+            if attachment not in kitem_new.attachments.by_name
         ],
         "add": [
-            attachment
+            attachment.name
             for name, attachment in kitem_new.attachments.by_name.items()
-            if name not in kitem_old.attachments.by_name
+            if name not in kitem_old.get("attachments")
         ],
     }
 
 
-def _get_kitems_diffs(kitem_old: "KItem", kitem_new: "KItem"):
+def _get_kitems_diffs(
+    kitem_old: "Dict[str, Any]", kitem_new: "Dict[str, Any]"
+):
     """Get the differences in the attributes between two kitems"""
     differences = {}
     attributes = [
@@ -359,17 +373,13 @@ def _get_kitems_diffs(kitem_old: "KItem", kitem_new: "KItem"):
     for name, terms in attributes:
         to_add_name = terms[0] + "_to_" + terms[1]
         to_remove_name = terms[0] + "_to_" + terms[2]
-        old_attr = getattr(kitem_old, name)
-        new_attr = getattr(kitem_new, name)
+        old_attr = kitem_old.get(name)
+        new_attr = kitem_new.get(name)
         differences[to_add_name] = [
-            json.loads(attr.model_dump_json())
-            for attr in new_attr
-            if new_attr not in old_attr
+            attr for attr in new_attr if new_attr not in old_attr
         ]
         differences[to_remove_name] = [
-            json.loads(attr.model_dump_json())
-            for attr in old_attr
-            if old_attr not in new_attr
+            attr for attr in old_attr if old_attr not in new_attr
         ]
     return differences
 
@@ -391,17 +401,19 @@ def _commit_created(buffer: "Dict[str, KItem]") -> dict:
 def _commit_updated(buffer: "Dict[str, KItem]") -> None:
     """Commit the buffer for the `updated` buffers"""
     for new_kitem in buffer.values():
-        old_kitem = _get_kitem(new_kitem.id)
+        old_kitem = _get_kitem(new_kitem.id, as_json=True)
         if old_kitem:
             if isinstance(new_kitem.hdf5, pd.DataFrame):
                 _update_hdf5(new_kitem.id, new_kitem.hdf5)
+                new_kitem.hdf5 = _inspect_hdf5(new_kitem.id)
             elif isinstance(new_kitem.hdf5, type(None)) and _inspect_hdf5(
                 new_kitem.id
             ):
                 _delete_hdf5(new_kitem.id)
             _update_kitem(new_kitem, old_kitem)
             _update_attachments(new_kitem, old_kitem)
-            for key, value in _get_kitem(new_kitem.id).__dict__.items():
+            new_kitem.in_backend = True
+            for key, value in _get_kitem(new_kitem.id, as_json=True).items():
                 setattr(new_kitem, key, value)
 
 

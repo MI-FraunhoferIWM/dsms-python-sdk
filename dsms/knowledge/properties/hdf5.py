@@ -2,12 +2,11 @@
 import logging
 from typing import TYPE_CHECKING
 
-import numpy as np
 import pandas as pd
 from pydantic import Field
 
 from dsms.knowledge.properties.base import KProperty, KPropertyItem
-from dsms.knowledge.utils import _get_hdf5_column
+from dsms.knowledge.utils import _get_hdf5_column, _is_number
 
 from dsms.knowledge.semantics.units import (  # isort:skip
     get_conversion_factor,
@@ -100,7 +99,10 @@ class Column(KPropertyItem):
             input_str, unit_symbol_or_iri, decimals=decimals
         )
         data = self.get()
-        return list(np.array(data) * factor)
+        return [
+            number * factor if _is_number(number) else number
+            for number in data
+        ]
 
 
 class HDF5Container(KProperty):

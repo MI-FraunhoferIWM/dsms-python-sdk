@@ -419,8 +419,8 @@ class KItem(BaseModel):
     def validate_in_backend(cls, value: bool, info: ValidationInfo) -> bool:
         """Checks whether the kitem already exists"""
         kitem_id = info.data["id"]
-        if _kitem_exists(kitem_id):
-            value = True
+        if not value:
+            value = _kitem_exists(kitem_id)
         return value
 
     @field_validator("slug")
@@ -432,6 +432,8 @@ class KItem(BaseModel):
         ktype_id = info.data["ktype_id"]
         kitem_id = info.data.get("id")
         kitem_exists = info.data.get("in_backend")
+        if not isinstance(kitem_exists, bool):
+            kitem_exists = cls.in_backend
 
         if not isinstance(ktype_id, str):
             ktype = ktype_id.value
