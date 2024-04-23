@@ -2,48 +2,166 @@
 import io
 import json
 import re
+import warnings
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
 import pandas as pd
-from pydantic import BaseModel, create_model
 from requests import Response
 
-from dsms.core.utils import _name_to_camel, _perform_request
+from pydantic import (  # isort: skip
+    BaseModel,
+    ConfigDict,
+    Field,
+    create_model,
+    model_validator,
+)
+
+from dsms.core.utils import _name_to_camel, _perform_request  # isort:skip
+
+from dsms.knowledge.properties.custom_datatype import (  # isort:skip
+    NumericalDataType,
+)
+
+from dsms.knowledge.search import SearchResult  # isort:skip
 
 if TYPE_CHECKING:
     from dsms.core.context import Buffers
     from dsms.knowledge import KItem, KType
 
 
-def _parse_model(value: Dict[str, Any]) -> BaseModel:
+def _is_number(value):
+    try:
+        float(value)
+        return True
+    except Exception:
+        return False
+
+
+def _create_custom_properties_model(
+    value: Optional[Dict[str, Any]]
+) -> BaseModel:
     """Convert the dict with the model schema into a pydantic model."""
-    title = value.get("title")
-    properties = value.get("properties")
-    if not title:
-        raise KeyError("`data_schema` does not have any `title`.")
-    if isinstance(properties, type(None)):
-        raise KeyError("`data_schema` does not have any `properties`.")
+    from dsms import KItem
+
     fields = {}
-    for key, props in properties.items():
-        dtype = props.get("type")
-        default = props.get("default")
-        if dtype == "string":
-            dtype = str
-        elif dtype == "integer":
-            dtype = int
-        elif dtype == "float":
-            dtype = float
-        elif dtype == "bool":
-            dtype = bool
-        elif dtype == "object":
-            dtype = dict
-        else:
-            raise TypeError(f"Invalid `type={dtype}`")
-        fields[key] = (dtype, ... if not default else default)
-    return create_model(title, **fields)
+    if isinstance(value, dict):
+        for item in value.get("sections"):
+            for form_input in item.get("inputs"):
+                label = form_input.get("label")
+                dtype = form_input.get("widget")
+                default = form_input.get("defaultValue")
+                slug = _slugify(label)
+                if dtype in ("Text", "File", "Textarea", "Vocabulary term"):
+                    dtype = Optional[str]
+                elif dtype in ("Number", "Slider"):
+                    dtype = Optional[NumericalDataType]
+                elif dtype == "Checkbox":
+                    dtype = Optional[bool]
+                elif dtype in ("Select", "Radio"):
+                    choices = Enum(
+                        _name_to_camel(label) + "Choices",
+                        {
+                            _name_to_camel(choice["value"]): choice["value"]
+                            for choice in form_input.get("choices")
+                        },
+                    )
+                    dtype = Optional[choices]
+                elif dtype == "Knowledge item":
+                    warnings.warn(
+                        "knowledge item not fully supported for KTypes yet."
+                    )
+                    dtype = Optional[str]
+
+                fields[slug] = (dtype, default or None)
+    fields["kitem"] = (
+        Optional[KItem],
+        Field(None, exclude=True),
+    )
+
+    config = ConfigDict(
+        extra="allow", arbitrary_types_allowed=True, exclude={"kitem"}
+    )
+    validators = {
+        "validate_model": model_validator(mode="before")(_validate_model)
+    }
+    model = create_model(
+        "CustomPropertiesModel",
+        __config__=config,
+        __validators__=validators,
+        **fields,
+    )
+    setattr(model, "__str__", _print_properties)
+    setattr(model, "__repr__", _print_properties)
+    setattr(model, "__setattr__", __setattr_property__)
+    return model
+
+
+def _print_properties(self: Any) -> str:
+    fields = ", \n".join(
+        [
+            f"\t\t{key}: {value}"
+            for key, value in self.model_dump().items()
+            if key not in self.model_config["exclude"]
+        ]
+    )
+    return f"{{\n{fields}\n\t}}"
+
+
+def __setattr_property__(self, key, value) -> None:
+    if _is_number(value):
+        # convert to convertable numeric object
+        value = _create_numerical_dtype(key, value, self.kitem)
+        # mark as updated
+        if self.kitem:
+            self.kitem.context.buffers.updated.update(
+                {self.kitem.id: self.kitem}
+            )
+    if key == "kitem":
+        # set kitem for convertable numeric datatype
+        for prop in self.model_dump().values():
+            if isinstance(prop, NumericalDataType) and not prop.kitem:
+                prop.kitem = value
+    # reassignment of extra fields does not work, seems to be a bug?
+    # have this workaround:
+    if key in self.__pydantic_extra__:
+        self.__pydantic_extra__[key] = value
+    super(BaseModel, self).__setattr__(key, value)
+
+
+def _create_numerical_dtype(
+    key: str, value: Union[int, float], kitem: "KItem"
+) -> NumericalDataType:
+    value = NumericalDataType(value)
+    value.name = key
+    value.kitem = kitem
+    return value
+
+
+def _validate_model(
+    cls, values: Dict[str, Any]  # pylint: disable=unused-argument
+) -> Dict[str, Any]:
+    for key, value in values.items():
+        if _is_number(value):
+            values[key] = _create_numerical_dtype(
+                key, value, values.get("kitem")
+            )
+    return values
+
+
+def _get_ktype_from_id(ktype_id: str) -> "KType":
+    from dsms import Context
+
+    if not isinstance(ktype_id, str):
+        value = Context.ktypes.get(ktype_id.value)
+    else:
+        value = Context.ktypes.get(ktype_id)
+
+    if not value:
+        raise TypeError(f"KType for `ktype_id={ktype_id}` does not exist.")
+    return value
 
 
 def _get_remote_ktypes() -> Enum:
@@ -132,6 +250,7 @@ def _update_kitem(kitem: "KItem") -> Response:
         exclude={
             "authors",
             "annotations",
+            "custom_properties",
             "linked_kitems",
             "updated_at",
             "avatar_exists",
@@ -147,12 +266,15 @@ def _update_kitem(kitem: "KItem") -> Response:
         exclude_none=True,
     )
     payload = json.loads(dumped)
-    payload.update(**differences)
     payload.update(
         external_links={
             link.label: str(link.url) for link in kitem.external_links
-        }
+        },
+        **differences,
     )
+    if kitem.custom_properties:
+        custom_properties = kitem.custom_properties.model_dump()
+        payload.update(custom_properties={"content": custom_properties})
     response = _perform_request(
         f"api/knowledge/kitems/{kitem.id}", "put", json=payload
     )
@@ -232,8 +354,16 @@ def _get_attachment(kitem_id: "KItem", file_name: str) -> str:
 def _get_attachment_diffs(kitem_old: "KItem", kitem_new: "KItem"):
     """Check which attachments should be removed and which should be added."""
     return {
-        "remove": set(kitem_old.attachments) - set(kitem_new.attachments),
-        "add": set(kitem_new.attachments) - set(kitem_old.attachments),
+        "remove": [
+            attachment
+            for name, attachment in kitem_old.attachments.by_name.items()
+            if name not in kitem_new.attachments.by_name
+        ],
+        "add": [
+            attachment
+            for name, attachment in kitem_new.attachments.by_name.items()
+            if name not in kitem_old.attachments.by_name
+        ],
     }
 
 
@@ -253,11 +383,13 @@ def _get_kitems_diffs(kitem_old: "KItem", kitem_new: "KItem"):
         new_attr = getattr(kitem_new, name)
         differences[to_add_name] = [
             json.loads(attr.model_dump_json())
-            for attr in set(new_attr) - set(old_attr)
+            for attr in new_attr
+            if new_attr not in old_attr
         ]
         differences[to_remove_name] = [
             json.loads(attr.model_dump_json())
-            for attr in set(old_attr) - set(new_attr)
+            for attr in old_attr
+            if old_attr not in new_attr
         ]
     return differences
 
@@ -306,14 +438,14 @@ def _search(
     annotations: "Optional[List[str]]" = [],
     limit: "Optional[int]" = 10,
     allow_fuzzy: "Optional[bool]" = True,
-) -> "List[KItem]":
+) -> "List[SearchResult]":
     """Search for KItems in the remote backend"""
     from dsms import KItem  # isort:skip
 
     payload = {
         "search_term": query or "",
         "ktypes": [ktype.value for ktype in ktypes],
-        "kitem_annotations": annotations,
+        "annotations": annotations,
         "limit": limit,
     }
     response = _perform_request(
@@ -332,13 +464,16 @@ def _search(
         raise RuntimeError(
             f"""Something went wrong while searching for KItems: {response.text}"""
         ) from excep
-    return [KItem(**item) for item in dumped]
+    return [
+        SearchResult(hit=KItem(**item.get("hit")), fuzzy=item.get("fuzzy"))
+        for item in dumped
+    ]
 
 
-def _slugify(input_string):
+def _slugify(input_string: str, replacement: str = ""):
     """Turn any arbitrary string into a slug."""
     slug = re.sub(
-        r"[^\w\s]", "", input_string
+        r"[^\w\s\-_]", replacement, input_string
     )  # Remove all non-word characters (everything except numbers and letters)
     slug = re.sub(r"\s+", "", slug)  # Replace all runs of whitespace
     slug = slug.lower()  # Convert the string to lowercase.

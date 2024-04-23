@@ -1,5 +1,6 @@
 """Knowledge Item implementation of the DSMS"""
 
+import json
 from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
@@ -15,6 +16,7 @@ from pydantic import (  # isort:skip
     Field,
     ValidationInfo,
     field_validator,
+    model_validator,
 )
 
 
@@ -31,7 +33,6 @@ from dsms.knowledge.properties import (  # isort:skip
     AuthorsProperty,
     ContactInfo,
     ContactsProperty,
-    CustomProperties,
     ExternalLink,
     ExternalLinksProperty,
     KProperty,
@@ -51,6 +52,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _slug_is_available,
     _slugify,
     _inspect_hdf5,
+    _get_ktype_from_id,
 )
 
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
@@ -61,12 +63,51 @@ if TYPE_CHECKING:
 
 
 class KItem(BaseModel):
-    """Knowledge Item of the DSMS."""
+    """
+    Knowledge Item of the DSMS.
+
+    Attributes:
+        name (str):
+            Human readable name of the KContext.dsms.
+        id (Optional[UUID]):
+            ID of the KItem. Defaults to a new UUID if not provided.
+        ktype_id (Union[Enum, str]):
+            Type ID of the KItem.
+        slug (Optional[str]):
+            Slug of the KContext.dsms. Minimum length: 4.
+        annotations (List[Annotation]):
+            Annotations of the KItem.
+        attachments (List[Union[Attachment, str]]):
+            File attachments of the DSMS.
+        linked_kitems (List[Union[LinkedKItem, "KItem"]]):
+            KItems linked to the current KItem.
+        affiliations (List[Affiliation]):
+            Affiliations related to a KItem.
+        authors (List[Union[Author, str]]):
+            Authorship of the KItem.
+        avatar_exists (Optional[bool]):
+            Whether the KItem holds an avatar or not.
+        contacts (List[ContactInfo]):
+            Contact information related to the KItem.
+        created_at (Optional[Union[str, datetime]]):
+            Time and date when the KItem was created.
+        updated_at (Optional[Union[str, datetime]]):
+            Time and date when the KItem was updated.
+        external_links (List[ExternalLink]):
+            External links related to the KItem.
+        kitem_apps (List[App]): Apps related to the KItem.
+        summary (Optional[Union[str, Summary]]):
+            Human readable summary text of the KItem.
+        user_groups (List[UserGroup]):
+                User groups able to access the KItem.
+        custom_properties (Optional[Any]):
+            Custom properties associated with the KItem.
+        hdf5 (Optional[Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]]):
+            HDF5 interface.
+    """
 
     # public
-    name: str = Field(
-        ..., description="Human readable name of the KContext.dsms"
-    )
+    name: str = Field(..., description="Human readable name of the KItem")
     id: Optional[UUID] = Field(
         default_factory=uuid4,
         description="ID of the KItem",
@@ -119,7 +160,7 @@ class KItem(BaseModel):
         description="User groups able to access the KItem.",
     )
     custom_properties: Optional[Any] = Field(
-        {}, description="Custom properties associated to the KItem"
+        None, description="Custom properties associated to the KItem"
     )
     ktype: Optional[KType] = Field(
         None, description="KType of the KItem", exclude=True
@@ -145,12 +186,12 @@ class KItem(BaseModel):
         if not self.dsms:
             self.dsms = DSMS()
 
-        # initalize the kitem
+        # initialize the kitem
         super().__init__(**kwargs)
 
         # add kitem to buffer
         if (
-            not _kitem_exists(self)
+            _slug_is_available(self._get_ktype_as_str(), self.slug)
             and self.id not in self.context.buffers.created
         ):
             self.context.buffers.created.update({self.id: self})
@@ -187,7 +228,7 @@ class KItem(BaseModel):
     def __hash__(self) -> int:
         return hash(str(self))
 
-    @field_validator("affiliations")
+    @field_validator("affiliations", mode="after")
     @classmethod
     def validate_affiliation(
         cls, value: List[Affiliation]
@@ -195,7 +236,7 @@ class KItem(BaseModel):
         """Validate affiliations Field"""
         return AffiliationsProperty(value)
 
-    @field_validator("annotations")
+    @field_validator("annotations", mode="after")
     @classmethod
     def validate_annotations(
         cls, value: List[Annotation]
@@ -224,7 +265,7 @@ class KItem(BaseModel):
         """Validate attachments Field"""
         return AttachmentsProperty(value)
 
-    @field_validator("kitem_apps")
+    @field_validator("kitem_apps", mode="after")
     @classmethod
     def validate_apps(cls, value: List[App]) -> AppsProperty:
         """Validate apps Field"""
@@ -241,13 +282,13 @@ class KItem(BaseModel):
             ]
         )
 
-    @field_validator("contacts")
+    @field_validator("contacts", mode="after")
     @classmethod
     def validate_contacts(cls, value: List[ContactInfo]) -> ContactsProperty:
         """Validate contacts Field"""
         return ContactsProperty(value)
 
-    @field_validator("external_links")
+    @field_validator("external_links", mode="after")
     @classmethod
     def validate_external_links(
         cls, value: List[ExternalLink]
@@ -258,7 +299,7 @@ class KItem(BaseModel):
     @field_validator("linked_kitems", mode="before")
     @classmethod
     def validate_linked_kitems_list(
-        cls, value: "List[Union[Dict, KItem, Any]]", info: ValidationInfo
+        cls, value: "List[Union[Dict, KItem, Any]]"
     ) -> List[LinkedKItem]:
         """Validate each single kitem to be linked"""
         linked_kitems = []
@@ -276,9 +317,7 @@ class KItem(BaseModel):
                     raise AttributeError(
                         f"Linked KItem `{item}` has no attribute `id`."
                     ) from error
-            linked_kitems.append(
-                LinkedKItem(id=dest_id, source_id=info.data["id"])
-            )
+            linked_kitems.append(LinkedKItem(id=dest_id))
         return linked_kitems
 
     @field_validator("linked_kitems", mode="after")
@@ -290,28 +329,13 @@ class KItem(BaseModel):
         """Validate the list out of linked KItems"""
         return LinkedKItemsProperty(value)
 
-    @field_validator("user_groups")
+    @field_validator("user_groups", mode="after")
     @classmethod
     def validate_user_groups(
         cls, value: List[UserGroup]
     ) -> UserGroupsProperty:
         """Validate user groups Field"""
         return UserGroupsProperty(value)
-
-    @field_validator("custom_properties")
-    @classmethod
-    def validate_custom_properties(cls, value: Any) -> CustomProperties:
-        """Validate custom properties Field"""
-        if isinstance(value, dict) and "content" in value:
-            value = CustomProperties(content=value["content"])
-        elif isinstance(value, dict):
-            value = CustomProperties(content=value)
-        elif not isinstance(value, (CustomProperties, dict, type(None))):
-            raise TypeError(
-                f"""`custom_properties` must be of type {CustomProperties} or {dict},
-                not {type(value)}."""
-            )
-        return value
 
     @field_validator("created_at")
     @classmethod
@@ -341,20 +365,10 @@ class KItem(BaseModel):
     @classmethod
     def validate_ktype(cls, value: KType, info: ValidationInfo) -> KType:
         """Validate the data attribute of the KItem"""
-        from dsms import Context
-
-        ktype_id = info.data.get("ktype_id")
 
         if not value:
-            if not isinstance(ktype_id, str):
-                value = Context.ktypes.get(ktype_id.value)
-            else:
-                value = Context.ktypes.get(ktype_id)
-
-            if not value:
-                raise TypeError(
-                    f"KType for `ktype_id={ktype_id}` does not exist."
-                )
+            ktype_id = info.data.get("ktype_id")
+            value = _get_ktype_from_id(ktype_id)
 
         return value
 
@@ -362,18 +376,19 @@ class KItem(BaseModel):
     @classmethod
     def validate_slug(cls, value: str, info: ValidationInfo) -> str:
         """Validate slug"""
+        from dsms import Context
+
         ktype_id = info.data["ktype_id"]
         name = info.data.get("name")
         kitem_id = info.data.get("id")
         if not value:
             value = _slugify(name)
-        slugified = _slugify(value)
-        if len(slugified) < 4:
-            raise ValueError("Slug length must have a minimum length of 4.")
-        if value != slugified:
-            raise ValueError(
-                f"`{value}` is not a valid slug. A valid variation would be `{slugified}`"
-            )
+            if len(value) < 4:
+                raise ValueError(
+                    "Slug length must have a minimum length of 4."
+                )
+            if Context.dsms.config.individual_slugs:
+                value += f"-{str(kitem_id).split('-', maxsplit=1)[0]}"
         if not _kitem_exists(kitem_id) and not _slug_is_available(
             ktype_id.value, value
         ):
@@ -416,15 +431,41 @@ class KItem(BaseModel):
                 hdf5 = None
         return hdf5
 
+    @model_validator(mode="after")
+    @classmethod
+    def validate_custom_properties(cls, self) -> "KItem":
+        """Validate the custom properties with respect to the KType of the KItem"""
+        if not isinstance(
+            self.custom_properties, (BaseModel, dict, type(None))
+        ):
+            raise TypeError(
+                f"""Custom properties must be one of the following types:
+                  {(BaseModel, dict, type(None))}. Not {type(self.custom_properties)}"""
+            )
+        # validate content with webform model
+        if self.ktype.webform and isinstance(self.custom_properties, dict):
+            content = (
+                self.custom_properties.get("content") or self.custom_properties
+            )
+            if isinstance(content, str):
+                try:
+                    content = json.loads(content)
+                except Exception as error:
+                    raise TypeError(
+                        f"Invalid type: {type(content)}"
+                    ) from error
+            self.custom_properties = self.ktype.webform(**content)
+        # set kitem id for custom properties
+        if isinstance(self.custom_properties, BaseModel):
+            self.custom_properties.kitem = self
+        return self
+
     def _set_kitem_for_properties(self) -> None:
         """Set kitem for CustomProperties and KProperties in order to
         remain the context for the buffer if any of these properties is changed.
         """
         for prop in self.__dict__.values():
-            if (
-                isinstance(prop, (KProperty, CustomProperties, Summary))
-                and not prop.kitem
-            ):
+            if isinstance(prop, (KProperty, Summary)) and not prop.kitem:
                 prop.kitem = self
 
     @property
@@ -457,5 +498,15 @@ class KItem(BaseModel):
     def url(cls) -> str:
         """URL of the KItem"""
         return urljoin(
-            cls.context.dsms.config.host_url, f"{cls.ktype_id}/{cls.slug}"
+            str(cls.context.dsms.config.host_url),
+            f"knowledge/{cls._get_ktype_as_str()}/{cls.slug}",
         )
+
+    def _get_ktype_as_str(self) -> str:
+        if isinstance(self.ktype_id, str):
+            ktype = self.ktype_id
+        elif isinstance(self.ktype_id, Enum):
+            ktype = self.ktype_id.value  # pylint: disable=no-member
+        else:
+            raise TypeError(f"Datatype for KType is unknown: {type(ktype)}")
+        return ktype

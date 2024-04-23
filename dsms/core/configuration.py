@@ -2,12 +2,21 @@
 
 import urllib
 import warnings
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import requests
 from pydantic import AnyUrl, Field, SecretStr, field_validator
 from pydantic_core.core_schema import ValidationInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from .utils import get_callable
+
+if TYPE_CHECKING:
+    from typing import Callable
+
+MODULE_REGEX = r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*:[a-zA-Z_][a-zA-Z0-9_]*$"
+DEFAULT_UNIT_SPARQL = "dsms.knowledge.semantics.units.sparql:UnitSparqlQuery"
+DEFAULT_REPO = "knowledge-items"
 
 
 class Configuration(BaseSettings):
@@ -19,6 +28,11 @@ class Configuration(BaseSettings):
     request_timeout: int = Field(
         30,
         description="Timeout in seconds until the request to the DSMS is timed out.",
+    )
+
+    ssl_verify: bool = Field(
+        True,
+        description="Whether the SSL of the DSMS shall be verified during connection.",
     )
 
     username: Optional[SecretStr] = Field(
@@ -33,9 +47,16 @@ class Configuration(BaseSettings):
         None,
         description="JWT bearer token for connecting to the DSMS instance",
     )
-    ssl_verify: bool = Field(
+
+    ping_dsms: bool = Field(
+        True, description="Check whether the host is a DSMS instance or not."
+    )
+
+    individual_slugs: bool = Field(
         True,
-        description="Whether the SSL of the DSMS shall be verified during connection.",
+        description="""When set to `True`, the slugs of the KItems will receive the
+        first few characters of the KItem-id, when the slug is derived automatically
+        from the KItem-name.""",
     )
 
     encoding: str = Field(
@@ -48,10 +69,47 @@ class Configuration(BaseSettings):
         description="Datetime format used in the DSMS instance.",
     )
 
+    display_units: bool = Field(
+        False,
+        description="""Whether the custom properties or the hdf5 columns shall
+        directly reveal their unit when printed. WARNING: This might lead to performance issues.""",
+    )
+
+    autocomplete_units: bool = Field(
+        True,
+        description="""When a unit is fetched but does not hold a symbol
+        next to its URI, it shall be fetched from the respective ontology
+        (which is general side effect from the `units_sparq_object`.)
+        WARNING: This might lead to performance issues.""",
+    )
+
     kitem_repo: str = Field(
-        "knowledge",
+        DEFAULT_REPO,
         description="Repository of the triplestore for KItems in the DSMS",
     )
+
+    qudt_units: AnyUrl = Field(
+        "http://qudt.org/2.1/vocab/unit",
+        description="URI to QUDT Unit ontology for unit conversion",
+    )
+
+    qudt_quantity_kinds: AnyUrl = Field(
+        "http://qudt.org/vocab/quantitykind/",
+        description="URI to QUDT quantity kind ontology for unit conversion",
+    )
+
+    units_sparql_object: str = Field(
+        DEFAULT_UNIT_SPARQL,
+        pattern=MODULE_REGEX,
+        description="""Class and Module specification in Python for a subclass of
+          `dsms.knowledge.semantics.units.base:BaseUnitSparqlQuery` in order to retrieve
+          the units of a HDF5 column/ custom property of a KItem.""",
+    )
+
+    @field_validator("units_sparql_object")
+    def get_unit_sparql_object(cls, val: str) -> "Callable":
+        """Source the class from the given module"""
+        return get_callable(val)
 
     @field_validator("token")
     def validate_auth(cls, val, info: ValidationInfo):
@@ -60,6 +118,7 @@ class Configuration(BaseSettings):
         passwd = info.data.get("password")
         host_url = info.data.get("host_url")
         timeout = info.data.get("request_timeout")
+        verify = info.data.get("ssl_verify")
         if username and passwd and val:
             raise ValueError(
                 "Either `username` and `password` or `token` must be provided. Not both."
@@ -80,6 +139,7 @@ class Configuration(BaseSettings):
                 url,
                 headers={"Authorization": authorization},
                 timeout=timeout,
+                verify=verify,
             )
             if not response.ok:
                 raise RuntimeError(

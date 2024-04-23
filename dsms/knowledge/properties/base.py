@@ -12,7 +12,6 @@ from pydantic import (  # isort:skip
 )
 
 from dsms.core.utils import _snake_to_camel  # isort:skip
-from dsms.knowledge.utils import _get_kitem  # isort:skip
 
 
 if TYPE_CHECKING:
@@ -39,14 +38,14 @@ class KPropertyItem(BaseModel):
 
     def __str__(self) -> str:
         """Pretty print the KProperty"""
-        values = ", ".join(
+        values = ",\n\t\t\t".join(
             [
-                f"{key}={value}"
+                f"{key}: {value}"
                 for key, value in self.__dict__.items()
                 if key not in self.exclude
             ]
         )
-        return f"{self.__class__.__name__}({values})"
+        return f"{{\n\t\t\t{values}\n\t\t}}"
 
     def __repr__(self) -> str:
         """Pretty print the KProperty"""
@@ -54,8 +53,8 @@ class KPropertyItem(BaseModel):
 
     def __setattr__(self, index: int, item: "Any") -> None:
         """Add KItem to updated buffer."""
-        if self._kitem and self.id not in self.context.buffers.updated:
-            self.context.buffers.updated.update({self.id: self._kitem})
+        if self.kitem and self.kitem.id not in self.context.buffers.updated:
+            self.context.buffers.updated.update({self.id: self.kitem})
         super().__setattr__(index, item)
 
     def __hash__(self) -> int:
@@ -64,14 +63,27 @@ class KPropertyItem(BaseModel):
     @property
     def kitem(cls) -> "KItem":
         """KItem related to the KPropertyItem"""
-        if not cls.id:
-            raise ValueError("KItem not defined yet for KProperty")
-        return _get_kitem(cls.id)
+        return cls._kitem
+
+    @kitem.setter
+    def kitem(cls, item: "KItem") -> None:
+        """Set KItem related to the KPropertyItem"""
+        cls._kitem = item
+        cls.id = item.id
 
     @property
     def exclude(cls) -> "Optional[Set[str]]":
         """Fields to be excluded from the JSON-schema"""
         return cls.model_config.get("exclude")
+
+    @property
+    def context(cls) -> "Context":
+        """Getter for Context"""
+        from dsms import (  # isort:skip
+            Context,
+        )
+
+        return Context
 
     @model_serializer
     def serialize(self):
@@ -93,22 +105,6 @@ class KProperty(list):
     def k_property_item(cls) -> "Callable":
         """Return the KPropertyItem-class for the KProperty"""
 
-    @abstractmethod
-    def _add(self, item: KPropertyItem) -> KPropertyItem:
-        """Side effect when an KPropertyItem is added to the KProperty"""
-
-    @abstractmethod
-    def _update(self, item: KPropertyItem) -> KPropertyItem:
-        """Side effect when an KPropertyItem is updated in the KProperty"""
-
-    @abstractmethod
-    def _get(self, item: KPropertyItem) -> KPropertyItem:
-        """Side effect when an KPropertyItem is retrieved from the KProperty"""
-
-    @abstractmethod
-    def _delete(self, item: KPropertyItem) -> None:
-        """Side effect when an KPropertyItem is deleted from the KProperty"""
-
     def __str__(self) -> str:
         """Pretty print the KProperty"""
         values = ", \n".join(["\t\t" + repr(value) for value in self])
@@ -129,28 +125,14 @@ class KProperty(list):
         """Add or Update KPropertyItem and add it to the updated-buffer."""
 
         self._mark_as_updated()
-        item = self._check_k_property_item(item)
-        if self.kitem:
-            item.id = self.kitem.id
-        try:
-            if self[index] != item:
-                item = self._update(item)
-        except IndexError:
-            item = self._add(item)
+        item = self._check_item(item)
         super().__setitem__(index, item)
 
     def __delitem__(self, index: int) -> None:
         """Delete the KPropertyItem from the KProperty"""
 
         self._mark_as_updated()
-        item = super().__delitem__(index)
-        self._delete(item)
-
-    def __getitem__(self, index: int) -> KPropertyItem:
-        """Get the KPropertyItem from the KProperty"""
-
-        item = super().__getitem__(index)
-        return self._get(item)
+        super().__delitem__(index)
 
     def __imul__(self, index: int) -> None:
         """Imul the KPropertyItem"""
@@ -165,50 +147,55 @@ class KProperty(list):
         for item in iterable:
             if isinstance(item, (list, tuple)):
                 for subitem in item:
-                    item = self._check_and_add_item(subitem)
-                    to_extend.append(item)
+                    item = self._check_item(subitem)
+                    if not item in self:
+                        to_extend.append(item)
             elif isinstance(item, (dict, KPropertyItem, KItem)):
-                item = self._check_and_add_item(item)
-                to_extend.append(item)
+                item = self._check_item(item)
+                if not item in self:
+                    to_extend.append(item)
             else:
-                to_extend.append(item)
-        self._mark_as_updated()
-        super().extend(to_extend)
+                if not item in self:
+                    to_extend.append(item)
+        if to_extend:
+            self._mark_as_updated()
+            super().extend(to_extend)
 
     def append(self, item: "Union[Dict, Any]") -> None:
         """Append KPropertyItem to KProperty"""
 
-        item = self._check_and_add_item(item)
-        self._mark_as_updated()
-        super().append(item)
+        item = self._check_item(item)
+
+        if not item in self:
+            self._mark_as_updated()
+            super().append(item)
 
     def insert(self, index: int, item: "Union[Dict, Any]") -> None:
         """Insert KPropertyItem at KProperty at certain index"""
 
-        item = self._check_and_add_item(item)
-        self._mark_as_updated()
-        super().insert(index, item)
+        item = self._check_item(item)
+        if not item in self:
+            self._mark_as_updated()
+            super().insert(index, item)
 
     def pop(self, index=-1) -> KPropertyItem:
         """Pop KPropertyItem from KProperty"""
 
         item = super().pop(index)
         self._mark_as_updated()
-        self._delete(item)
         return item
 
     def remove(self, item: "Union[Dict, Any]") -> None:
         """Remove KPropertyItem from KProperty"""
 
         self._mark_as_updated()
-        self._delete(item)
         super().remove(item)
 
-    def _check_and_add_item(self, item: "Union[Dict, Any]") -> KPropertyItem:
+    def _check_item(self, item: "Union[Dict, Any]") -> KPropertyItem:
         item = self._check_k_property_item(item)
         if self.kitem:
-            item.id = self.kitem.id
-        return self._add(item)
+            item.kitem = self.kitem
+        return item
 
     def _check_k_property_item(
         self, item: "Union[Dict, Any]"
@@ -249,7 +236,7 @@ class KProperty(list):
         """KItem setter"""
         cls._kitem = value
         for item in cls:
-            item.id = cls.kitem.id
+            item.kitem = cls.kitem
 
     @property
     def values(cls) -> "List[Dict[str, Any]]":

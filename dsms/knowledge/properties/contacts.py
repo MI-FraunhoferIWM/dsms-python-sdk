@@ -29,22 +29,3 @@ class ContactsProperty(KProperty):
     @property
     def k_property_item(cls) -> "Callable":
         return ContactInfo
-
-    # OVERRIDE
-    def _add(self, item: ContactInfo) -> ContactInfo:
-        """Side effect when a ContactInfo is added to the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _update(self, item: ContactInfo) -> ContactInfo:
-        """Side effect when a ContactInfo is updated at the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _get(self, item: ContactInfo) -> ContactInfo:
-        """Side effect when getting the ContactInfo for a specfic kitem"""
-        return item
-
-    # OVERRIDE
-    def _delete(self, item: ContactInfo) -> None:
-        """Side effect when deleting the ContactInfo of a KItem"""

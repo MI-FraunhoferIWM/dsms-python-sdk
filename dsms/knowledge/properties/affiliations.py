@@ -23,22 +23,3 @@ class AffiliationsProperty(KProperty):
     @property
     def k_property_item(cls) -> "Callable":
         return Affiliation
-
-    # OVERRIDE
-    def _add(self, item: Affiliation) -> Affiliation:
-        """Side effect when an affiliation is added to the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _update(self, item: Affiliation) -> Affiliation:
-        """Side effect when an affiliation is updated at the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _get(self, item: Affiliation) -> Affiliation:
-        """Side effect when getting the affiliation for a specfic kitem"""
-        return item
-
-    # OVERRIDE
-    def _delete(self, item: Affiliation) -> None:
-        """Side effect when deleting the affiliation of a KItem"""

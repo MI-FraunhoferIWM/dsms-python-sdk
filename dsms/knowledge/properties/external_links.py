@@ -24,22 +24,3 @@ class ExternalLinksProperty(KProperty):
     @property
     def k_property_item(cls) -> "Callable":
         return ExternalLink
-
-    # OVERRIDE
-    def _add(self, item: ExternalLink) -> ExternalLink:
-        """Side effect when an ExternalLink is added to the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _update(self, item: ExternalLink) -> ExternalLink:
-        """Side effect when an ExternalLink is updated at the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _get(self, item: ExternalLink) -> ExternalLink:
-        """Side effect when getting the ExternalLink for a specfic kitem"""
-        return item
-
-    # OVERRIDE
-    def _delete(self, item: ExternalLink) -> None:
-        """Side effect when deleting the ExternalLink of a KItem"""

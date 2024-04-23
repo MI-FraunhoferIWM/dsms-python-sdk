@@ -109,3 +109,31 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
     }
     diffs = _get_kitems_diffs(kitem_old, kitem_new)
     assert sorted(diffs) == sorted(expected)
+
+
+@responses.activate
+def test_unit_conversion(custom_address):
+    """Test unit conversion test"""
+    from dsms import DSMS
+    from dsms.knowledge.semantics.units import get_conversion_factor
+
+    with pytest.warns(UserWarning, match="No authentication details"):
+        DSMS(host_url=custom_address)
+
+    assert get_conversion_factor("mm", "m", decimals=3) == 0.001
+
+    assert get_conversion_factor("km", "in", decimals=1) == 39370.1
+
+    assert get_conversion_factor("GPa", "MPa") == 1000
+
+    assert (
+        get_conversion_factor(
+            "http://qudt.org/vocab/unit/M",
+            "http://qudt.org/vocab/unit/IN",
+            decimals=1,
+        )
+        == 39.4
+    )
+
+    with pytest.raises(ValueError, match="Unit "):
+        get_conversion_factor("kPa", "cm")

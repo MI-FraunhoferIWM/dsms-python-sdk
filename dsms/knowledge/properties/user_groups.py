@@ -24,22 +24,3 @@ class UserGroupsProperty(KProperty):
     def k_property_item(cls) -> "Callable":
         """UserGroup data model"""
         return UserGroup
-
-    # OVERRIDE
-    def _add(self, item: UserGroup) -> UserGroup:
-        """Side effect when an UserGroup is added to the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _update(self, item: UserGroup) -> UserGroup:
-        """Side effect when an UserGroup is updated at the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _get(self, item: UserGroup) -> UserGroup:
-        """Side effect when getting the UserGroup for a specfic kitem"""
-        return item
-
-    # OVERRIDE
-    def _delete(self, item: UserGroup) -> None:
-        """Side effect when deleting the UserGroup of a KItem"""

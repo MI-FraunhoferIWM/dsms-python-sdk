@@ -1,6 +1,6 @@
 """App KProperty"""
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,10 +17,21 @@ class AdditionalProperties(BaseModel):
         False,
         description="Whether the app should be triggered when a file is uploaded",
     )
-    triggerUponUploadFileExtensions: Optional[list[str]] = Field(
+    triggerUponUploadFileExtensions: Optional[List[str]] = Field(
         None,
         description="File extensions for which the upload shall be triggered.",
     )
+
+    def __str__(self) -> str:
+        """Pretty print the KProperty"""
+        values = ", ".join(
+            [f"{key}: {value}" for key, value in self.__dict__.items()]
+        )
+        return f"{{{values}}}"
+
+    def __repr__(self) -> str:
+        """Pretty print the Apps"""
+        return str(self)
 
 
 class App(KPropertyItem):
@@ -56,22 +67,3 @@ class AppsProperty(KProperty):
     def k_property_item(cls) -> "Callable":
         """App data model"""
         return App
-
-    # OVERRIDE
-    def _add(self, item: App) -> App:
-        """Side effect when an App is added to the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _update(self, item: App) -> App:
-        """Side effect when an App is updated at the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _delete(self, item: App) -> None:
-        """Side effect when deleting the App of a KItem"""
-
-    # OVERRIDE
-    def _get(self, item: App) -> App:
-        """Side effect when getting the App for a specfic kitem"""
-        return item
