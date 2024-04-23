@@ -52,7 +52,6 @@ from dsms.knowledge.utils import (  # isort:skip
     _slug_is_available,
     _slugify,
     _inspect_hdf5,
-    _get_ktype_from_id,
 )
 
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
@@ -365,11 +364,19 @@ class KItem(BaseModel):
     @classmethod
     def validate_ktype(cls, value: KType, info: ValidationInfo) -> KType:
         """Validate the data attribute of the KItem"""
+        from dsms import Context
 
         if not value:
             ktype_id = info.data.get("ktype_id")
-            value = _get_ktype_from_id(ktype_id)
+            if not isinstance(ktype_id, str):
+                value = Context.ktypes.get(ktype_id.value)
+            else:
+                value = Context.ktypes.get(ktype_id)
 
+            if not value:
+                raise TypeError(
+                    f"KType for `ktype_id={ktype_id}` does not exist."
+                )
         return value
 
     @field_validator("slug")

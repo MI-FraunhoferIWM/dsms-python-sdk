@@ -151,19 +151,6 @@ def _validate_model(
     return values
 
 
-def _get_ktype_from_id(ktype_id: str) -> "KType":
-    from dsms import Context
-
-    if not isinstance(ktype_id, str):
-        value = Context.ktypes.get(ktype_id.value)
-    else:
-        value = Context.ktypes.get(ktype_id)
-
-    if not value:
-        raise TypeError(f"KType for `ktype_id={ktype_id}` does not exist.")
-    return value
-
-
 def _get_remote_ktypes() -> Enum:
     """Get the KTypes from the remote backend"""
     from dsms import (  # isort:skip
