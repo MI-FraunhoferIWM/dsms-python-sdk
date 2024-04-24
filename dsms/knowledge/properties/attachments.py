@@ -79,4 +79,8 @@ class AttachmentsProperty(KProperty):
     @property
     def by_name(cls) -> "List[str]":
         "Return list of names of attachments"
-        return {Path(attachment.name).stem: attachment for attachment in cls}
+        return {
+            Path(attachment.name).stem
+            + Path(attachment.name).suffix: attachment
+            for attachment in cls
+        }
