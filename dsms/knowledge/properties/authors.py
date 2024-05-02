@@ -25,3 +25,8 @@ class AuthorsProperty(KProperty):
     def k_property_item(cls) -> "Callable":
         """Author data model"""
         return Author
+
+    # OVERRIDE
+    @property
+    def k_property_helper(cls) -> None:
+        """Not defined for Authors"""

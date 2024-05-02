@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from pydantic import Field
 
 from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.properties.utils import _str_to_dict
 from dsms.knowledge.utils import _get_attachment
 
 if TYPE_CHECKING:
@@ -29,6 +30,12 @@ class AttachmentsProperty(KProperty):
     @property
     def k_property_item(cls) -> "Callable":
         return Attachment
+
+    # OVERRIDE
+    @property
+    def k_property_helper(cls) -> "Callable":
+        """Helper for constructing attachment property"""
+        return _str_to_dict
 
     def extend(self, iterable: "Iterable") -> None:
         """Extend KProperty with list of KPropertyItem"""
@@ -72,4 +79,8 @@ class AttachmentsProperty(KProperty):
     @property
     def by_name(cls) -> "List[str]":
         "Return list of names of attachments"
-        return {Path(attachment.name).stem: attachment for attachment in cls}
+        return {
+            Path(attachment.name).stem
+            + Path(attachment.name).suffix: attachment
+            for attachment in cls
+        }

@@ -107,7 +107,10 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
             obj.model_dump() for obj in kitem_old.kitem_apps
         ],
     }
-    diffs = _get_kitems_diffs(kitem_old, kitem_new)
+    to_compare = kitem_new.model_dump(
+        include={"annotations", "linked_kitems", "user_groups", "kitem_apps"}
+    )
+    diffs = _get_kitems_diffs(kitem_old.model_dump(), to_compare)
     assert sorted(diffs) == sorted(expected)
 
 

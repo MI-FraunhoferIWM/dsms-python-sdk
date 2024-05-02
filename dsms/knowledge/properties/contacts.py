@@ -29,3 +29,8 @@ class ContactsProperty(KProperty):
     @property
     def k_property_item(cls) -> "Callable":
         return ContactInfo
+
+    # OVERRIDE
+    @property
+    def k_property_helper(cls) -> None:
+        """Not defined for Contacts"""
