@@ -3,11 +3,11 @@
 
 In the dynamic world of Material Science, the introduction of our latest development brings a new way of interaction with our Dataspace Management System (DSMS): The DSMS Python SDK.
 
-What is the DSMS SDK?
+**What is the DSMS SDK?**
 
 SDK stands for Software Development Kit. In our case, it is a Python-based package for the interaction with the DSMS. This means that all fundamental functionalities of the DSMS can be accessed through a Python interface now!
 
-How does the SDK work?
+**How does the SDK work?**
 
 Just install it on your local system via the pip command line interface:
 
@@ -43,15 +43,15 @@ DSMS platform promotes and enables the provenance and catalogization of data thr
 
 ### 1.2.2. KItems and KTypes
 
-What is K-type?
+**What is K-type?**
 
 K-type stands for knowledge type and categorizes types of knowledge instances and what kind of details are relevant for them (as shown in the attached image). It basically describes a concept and its schema.
 
-What is K-item?
+**What is K-item?**
 
 K-item stands for knowledge item and represents an individual instance of a k-type following its property schema and functionalities. Knowledge items also capture the concepts of data containers and digital twin.
 
-How is it helpful?
+**How is it helpful?**
 
 This approach streamlines the schematisation, conceptualization and structurisation of data for various domains and applications. Technically speaking, it builds an ideal base for the integration of data and knowledge into large dataspaces. K-Items classify through K-Types didactically, support the upscaling of information into knowledge graphs by additional semantic annotations - which are usually mapped by ontologists.
 
@@ -69,17 +69,115 @@ For the DSMS, Pydantic has been used extensively. Pydantic is a Python library t
 
 Below given is the details of the schema of a Kitem for better understanding:
 
-- **AdditionalProperties**: Defines extra, non-standard properties that can be associated with an application. It includes properties like `triggerUponUpload` (a boolean indicating if the app should trigger when a file is uploaded) and `triggerUponUploadFileExtensions` (an array or null defining file extensions for which the upload should be triggered).
-- **Affiliation**: Represents the affiliation of a KItem, including identifiers and names. It requires the `name` property.
-- **Annotation**: Details annotations related to a KItem, with fields like `iri`, `name`, and `namespace`, all of which are required.
-- **App**: Describes an application associated with a KItem, featuring details such as an executable name and additional properties. The `executable` field is mandatory.
-- **Attachment**: Defines an attachment, requiring the `name` field and including an identifier.
-- **Author**: Specifies an author of a KItem, with a required `userId` indicating the author's user ID.
-- **Column**: Represents a column in an HDF5 data frame, requiring both `columnId` and `name`.
-- **ContactInfo**: Provides contact information including an email and name, both required.
-- **ExternalLink**: Details an external link related to a KItem, requiring `label` and `url`.
-- **KItem**: The central model for a Knowledge Item, with comprehensive properties like `affiliations`, `annotations`, `attachments`, and more. Key fields like `name` and `ktype_id` are mandatory.
-- **KType**: Describes the type of knowledge contained in a KItem, with necessary fields such as `id`.
-- **LinkedKItem**: Models a KItem that is linked to another, requiring identifiers for both the linked item and its source.
-- **Summary**: Provides a summary model for KItems, requiring a `text` field.
-- **UserGroup**: Specifies user groups related to a KItem, requiring `name` and `groupId`.
+#### KItem Schema Documentation ####
+
+All the below kitem schema elements have id which is automatically generated which has the type - `UUID`.
+
+##### 1. KItem #####
+
+**Description:** Represents a Knowledge Item within the DSMS system.
+
+**Properties:**
+- **name**: Human-readable name of the KItem.
+- **slug**: A unique slug identifier for the KItem, minimum of 4 characters.
+- **ktype_id**: The type ID of the KItem.
+- **created_at**: Timestamp of when the KItem was created.
+- **updated_at**: Timestamp of when the KItem was last updated.
+- **summary**: A brief human-readable summary of the KItem.
+- **avatar_exists**: Indicates whether the KItem has an avatar image associated with it.
+- **custom_properties**: A set of custom properties related to the KItem.
+- **kitem_apps**: A list of applications associated with the KItem.
+- **annotations**: A list of annotations related to the KItem.
+- **affiliations**: A list of affiliations associated with the KItem.
+- **authors**: A list of authors related to the KItem.
+- **contacts**: Contact information related to the KItem.
+- **external_links**: A list of external links related to the KItem.
+- **attachments**: A list of file attachments associated with the KItem.
+- **hdf5**: HDF5 data structure associated with the KItem.
+- **linked_kitems**: List of other KItems linked to this KItem.
+- **user_groups**: User groups with access to this KItem.
+
+**Required Fields:** `name`, `ktype_id`
+
+##### 2. App #####
+
+**Description:** Represents an application associated with a KItem.
+
+**Properties:**
+- **executable**: Name of the executable file related to the app.
+- **description**: Description of the application.
+- **title**: Title of the application.
+- **kitemAppId**: ID of the KItem App.
+- **tags**: Tags related to the application.
+- **additionalProperties**: Additional properties specific to the application.
+
+**Required Fields:** `executable`
+
+##### 3.Annotation #####
+
+**Description:** Represents an annotation within a KItem.
+
+**Properties:**
+- **iri**: IRI of the annotation.
+- **name**: Name of the annotation.
+- **namespace**: Namespace of the annotation.
+
+**Required Fields:** `iri`, `name`, `namespace`
+
+##### 4.Affiliation #####
+
+**Description:** Represents an affiliation associated with a KItem.
+
+**Properties:**
+- **name**: Name of the affiliation.
+
+**Required Fields:** `name`
+
+##### 5.Author #####
+
+**Description:** Represents an author of a KItem.
+
+**Properties:**
+- **userId**: DSMS User ID of the author.
+
+**Required Fields:** `userId`
+
+##### 6.Attachment #####
+
+**Description:** Represents a file attachment within a KItem.
+
+**Properties:**
+- **name**: File name of the attachment.
+
+**Required Fields:** `name`
+
+##### 7.External Link #####
+
+**Description:** Represents an external link associated with a KItem.
+
+**Properties:**
+- **label**: Label of the external link.
+- **url**: URL of the external link.
+
+**Required Fields:** `label`, `url`
+
+##### 8.KType #####
+
+**Description:** Represents the type of knowledge encapsulated in a KItem.
+
+**Properties:**
+- **name**: Human-readable name of the KType.
+- **data_schema**: OpenAPI schema of the KItem.
+- **form_data**: Form data of the KItem.
+
+**Required Fields:** `id`
+
+##### 9.User Group #####
+
+**Description:** Represents a user group associated with a KItem.
+
+**Properties:**
+- **groupId**: ID of the user group.
+- **name**: Name of the user group.
+
+**Required Fields:** `name`, `groupId`
