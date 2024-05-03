@@ -69,115 +69,345 @@ For the DSMS, Pydantic has been used extensively. Pydantic is a Python library t
 
 Below given is the details of the schema of a Kitem for better understanding:
 
-#### KItem Schema Documentation ####
+### 1.2.3. Kitem Properties
 
-All the below kitem schema elements have id which is automatically generated which has the type - `UUID`.
+A Kitem has several properties to enable to handle data effectively. This section briefly describes the properties a Kitem can consist or in simple words the schema of a K-item.
 
-##### 1. KItem #####
+The schema contains complex types and references, indicating an advanced usage scenario where various objects (like KItems and their properties) are interconnected. It also includes customizations like optional and default values, arrays of references, and conditional formats (e.g., UUID formats).
+
+For the DSMS, Pydantic has been used extensively. Pydantic is a Python library that leverages type annotations for data validation and settings management. It ensures that data conforms to predefined schemas by validating or serializing it at runtime and thus facilitates strict type checking and data integrity.
+
+Below given is the details of the schema of a Kitem for better understanding:
+
+
+# DSMS Schema Documentation
+
+**Note:** This documentation covers the various components within the DSMS schema, focusing on the properties, types, and roles of different objects.
+
+## Definitions
+
+### General Definitions
+
+All IDs are typically of the type `UUID` unless specified otherwise. Each entity defined within the system has an associated ID which is automatically generated.
+
+### 1. KItem
 
 **Description:** Represents a Knowledge Item within the DSMS system.
 
-**Properties:**
-- **name**: Human-readable name of the KItem.
-- **slug**: A unique slug identifier for the KItem, minimum of 4 characters.
-- **ktype_id**: The type ID of the KItem.
-- **created_at**: Timestamp of when the KItem was created.
-- **updated_at**: Timestamp of when the KItem was last updated.
-- **summary**: A brief human-readable summary of the KItem.
-- **avatar_exists**: Indicates whether the KItem has an avatar image associated with it.
-- **custom_properties**: A set of custom properties related to the KItem.
-- **kitem_apps**: A list of applications associated with the KItem.
-- **annotations**: A list of annotations related to the KItem.
-- **affiliations**: A list of affiliations associated with the KItem.
-- **authors**: A list of authors related to the KItem.
-- **contacts**: Contact information related to the KItem.
-- **external_links**: A list of external links related to the KItem.
-- **attachments**: A list of file attachments associated with the KItem.
-- **hdf5**: HDF5 data structure associated with the KItem.
-- **linked_kitems**: List of other KItems linked to this KItem.
-- **user_groups**: User groups with access to this KItem.
-
 **Required Fields:** `name`, `ktype_id`
 
-##### 2. App #####
+#### KItem Properties
+
+1.1. **Name**
+- **Description:** Human-readable name of the KItem.
+- **Type:** string
+- **Default:** -
+
+1.2. **Slug**
+- **Description:** A unique slug identifier for the KItem, minimum of 4 characters.
+- **Type:** string, MinLength: 4
+- **Default:** None
+
+1.3. **Ktype_id**
+- **Description:** The type ID of the KItem.
+- **Type:** string or enumeration
+- **Default:** -
+
+1.4. **Created_at**
+- **Description:** Timestamp of when the KItem was created.
+- **Type:** string, format: date-time
+- **Default:** None
+
+1.5. **Updated_at**
+- **Description:** Timestamp of when the KItem was last updated.
+- **Type:** string, format: date-time
+- **Default:** None
+
+1.6. **Summary**
+- **Description:** A brief human-readable summary of the KItem.
+- **Type:** string or summary object
+- **Default:** None
+
+1.7. **Avatar_exists**
+- **Description:** Indicates whether the KItem has an avatar image associated with it.
+- **Type:** boolean
+- **Default:** False
+
+1.8. **Custom_properties**
+- **Description:** A set of custom properties related to the KItem.
+- **Type:** object
+- **Default:** {}
+
+1.9. **Kitem_apps**
+- **Description:** A list of applications associated with the KItem.
+- **Type:** array of App objects
+- **Default:** []
+
+1.10. **Annotations**
+- **Description:** A list of annotations related to the KItem.
+- **Type:** array of Annotation objects
+- **Default:** []
+
+1.11. **Affiliations**
+- **Description:** A list of affiliations associated with the KItem.
+- **Type:** array of Affiliation objects
+- **Default:** []
+
+1.12. **Authors**
+- **Description:** A list of authors related to the KItem.
+- **Type:** array of Author objects
+- **Default:** []
+
+1.13. **Contacts**
+- **Description:** Contact information related to the KItem.
+- **Type:** array of ContactInfo objects
+- **Default:** []
+
+1.14. **External_links**
+- **Description:** A list of external links related to the KItem.
+- **Type:** array of ExternalLink objects
+- **Default:** []
+
+1.15. **Attachments**
+- **Description:** A list of file attachments associated with the KItem.
+- **Type:** array of Attachment objects or strings
+- **Default:** []
+
+1.16. **Hdf5**
+- **Description:** HDF5 data structure associated with the KItem.
+- **Type:** array of Column objects or object
+- **Default:** None
+
+1.17. **Linked_kitems**
+- **Description:** List of other KItems linked to this KItem.
+- **Type:** array of LinkedKItem or KItem objects
+- **Default:** []
+
+1.18. **User_groups**
+- **Description:** User groups with access to this KItem.
+- **Type:** array of UserGroup objects
+- **Default:** []
+
+### 2. App
 
 **Description:** Represents an application associated with a KItem.
 
-**Properties:**
-- **executable**: Name of the executable file related to the app.
-- **description**: Description of the application.
-- **title**: Title of the application.
-- **kitemAppId**: ID of the KItem App.
-- **tags**: Tags related to the application.
-- **additionalProperties**: Additional properties specific to the application.
-
 **Required Fields:** `executable`
 
-##### 3.Annotation #####
+#### App Properties
 
-**Description:** Represents an annotation within a KItem.
+2.1. **Executable**
+- **Description:** Name of the executable related to the app.
+- **Type:** string
+- **Default:** -
 
-**Properties:**
-- **iri**: IRI of the annotation.
-- **name**: Name of the annotation.
-- **namespace**: Namespace of the annotation.
+2.2. **Description**
+- **Description:** Description of the application.
+- **Type:** string or null
+- **Default:** None
 
-**Required Fields:** `iri`, `name`, `namespace`
+2.3. **KitemAppId**
+- **Description:** ID of the KItem App.
+- **Type:** integer or null
+- **Default:** None
 
-##### 4.Affiliation #####
+2.4. **Tags**
+- **Description:** Tags related to the application.
+- **Type:** object or null
+- **Default:** None
+
+2.5. **Title**
+- **Description:** Title of the application.
+- **Type:** string or null
+- **Default:** None
+
+2.6. **Additional Properties**
+- **Description:** Additional properties related to the application.
+- **Type:** Refers to `AdditionalProperties`
+- **Default:** None
+
+### 3. Affiliation
 
 **Description:** Represents an affiliation associated with a KItem.
 
-**Properties:**
-- **name**: Name of the affiliation.
+**Required Fields:** `Name`
+
+#### Affiliation Properties
+
+3.1. **Name**
+- **Description:** Name of the affiliation.
+- **Type:** string
+- **Default:** -
+
+### 4. Annotation
+
+**Description:** Represents an annotation within a KItem.
+
+**Required Fields:** `iri`, `name`, `namespace`
+
+#### Annotation Properties
+
+4.1. **Iri**
+- **Description:** IRI of the annotation.
+- **Type:** string
+- **Default:** -
+
+4.2. **Name**
+- **Description:** Name of the annotation.
+- **Type:** string
+- **Default:** -
+
+4.3. **Namespace**
+- **Description:** Namespace of the annotation.
+- **Type:** string
+- **Default:** -
+
+### 5. Attachment
+
+**Description:** Represents a file attachment uploaded by a certain user.
 
 **Required Fields:** `name`
 
-##### 5.Author #####
+#### Attachment Properties
+
+5.1. **Name**
+- **Description:** File name of the attachment.
+- **Type:** string
+- **Default:** -
+
+### 6. Author
 
 **Description:** Represents an author of a KItem.
 
-**Properties:**
-- **userId**: DSMS User ID of the author.
+**Required Fields:** `UserID`
 
-**Required Fields:** `userId`
+#### Author Properties
 
-##### 6.Attachment #####
+6.1. **UserId**
+- **Description:** ID of the DSMS User.
+- **Type:** string (UUID)
+- **Default:** -
 
-**Description:** Represents a file attachment within a KItem.
+### 7. Column
 
-**Properties:**
-- **name**: File name of the attachment.
+**Description:** Represents a column of an HDF5 data frame.
 
-**Required Fields:** `name`
+**Required Fields:** `ColumnId`, `Name`
 
-##### 7.External Link #####
+#### Column Properties
 
-**Description:** Represents an external link associated with a KItem.
+7.1. **ColumnId**
+- **Description:** Column ID in the data frame.
+- **Type:** integer
+- **Default:** -
 
-**Properties:**
-- **label**: Label of the external link.
-- **url**: URL of the external link.
+7.2. **Name**
+- **Description:** Name of the column in the data series.
+- **Type:** string
+- **Default:** -
 
-**Required Fields:** `label`, `url`
+### 8. ContactInfo
 
-##### 8.KType #####
+**Description:** Contact information for a person or entity.
 
-**Description:** Represents the type of knowledge encapsulated in a KItem.
+**Required Fields:** `name`, `email`
 
-**Properties:**
-- **name**: Human-readable name of the KType.
-- **data_schema**: OpenAPI schema of the KItem.
-- **form_data**: Form data of the KItem.
+#### ContactInfo Properties
 
-**Required Fields:** `id`
+8.1. **Email**
+- **Description:** Email of the contact person.
+- **Type:** string
+- **Default:** -
 
-##### 9.User Group #####
 
-**Description:** Represents a user group associated with a KItem.
+8.2. **Name**
+- **Description:** Name of the contact person.
+- **Type:** string
+- **Default:** -
 
-**Properties:**
-- **groupId**: ID of the user group.
-- **name**: Name of the user group.
+8.3. **UserId**
+- **Description:** User ID of the contact person.
+- **Type:** string (UUID) or null
+- **Default:** None
 
-**Required Fields:** `name`, `groupId`
+### 9. ExternalLink
+
+**Description:** Represents an external link of a KItem.
+
+**Required Fields:** `label`, `Url`
+
+#### ExternalLink Properties
+
+9.1. **Label**
+- **Description:** Label of the external link.
+- **Type:** string
+- **Default:** -
+
+9.2. **Url**
+- **Description:** URL of the external link.
+- **Type:** string, format: uri, minLength: 1
+- **Default:** -
+
+### 10. LinkedKItem
+
+**Description:** Data model for a linked KItem.
+
+**Required Fields:** None
+
+#### LinkedKItem Properties
+
+10.1. **Id**
+- **Description:** ID of the KItem to be linked.
+- **Type:** string (UUID) or null
+- **Default:** None
+
+10.2. **SourceId**
+- **Description:** Source ID of the KItem.
+- **Type:** string (UUID) or null
+- **Default:** None
+
+### 11. Summary
+
+**Description:** Model for the custom properties of the KItem.
+
+**Required Fields:** `text`
+
+#### Summary Properties
+
+11.1. **Id**
+- **Description:** KItem ID.
+- **Type:** string (UUID) or null
+- **Default:** None
+
+11.2. **Kitem**
+- **Description:** KItem related to the summary.
+- **Type:** null or object
+- **Default:** None
+
+11.3. **Text**
+- **Description:** Summary text of the KItem.
+- **Type:** string
+- **Default:** -
+
+### 12. UserGroup
+
+**Description:** User groups related to a KItem.
+
+**Required Fields:** `GroupId`, `name`
+
+#### UserGroup Properties
+
+12.1. **GroupId**
+- **Description:** ID of the user group.
+- **Type:** string
+- **Default:** -
+
+12.2. **Id**
+- **Description:** KItem ID related to the KPropertyItem.
+- **Type:** string (UUID) or null
+- **Default:** None
+
+12.3. **Name**
+- **Description:** Name of the user group.
+- **Type:** string
+- **Default:** -
