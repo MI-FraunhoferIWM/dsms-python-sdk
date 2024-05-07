@@ -1,6 +1,7 @@
 """Knowledge Item implementation of the DSMS"""
 
 import json
+import logging
 from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
@@ -60,6 +61,8 @@ from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
 if TYPE_CHECKING:
     from dsms import Context
     from dsms.core.dsms import DSMS
+
+logger = logging.getLogger(__name__)
 
 
 class KItem(BaseModel):
@@ -199,6 +202,10 @@ class KItem(BaseModel):
 
         # add kitem to buffer
         if not self.in_backend and self.id not in self.context.buffers.created:
+            logger.debug(
+                "Setting KItem with `%s` as created and updated during KItem initialization.",
+                self.id,
+            )
             self.context.buffers.created.update({self.id: self})
             self.context.buffers.updated.update({self.id: self})
 
@@ -207,12 +214,18 @@ class KItem(BaseModel):
     def __setattr__(self, name, value) -> None:
         """Add kitem to updated-buffer if an attribute is set"""
         super().__setattr__(name, value)
+        logger.debug(
+            "Setting property with key `%s` on KItem level: %s.", name, value
+        )
         self._set_kitem_for_properties()
 
         if (
             self.id not in self.context.buffers.updated
             and not name.startswith("_")
         ):
+            logger.debug(
+                "Setting KItem with `%s` as  updated KItem.__setattr__"
+            )
             self.context.buffers.updated.update({self.id: self})
 
     def __str__(self) -> str:
@@ -529,6 +542,11 @@ class KItem(BaseModel):
         """
         for prop in self.__dict__.values():
             if isinstance(prop, (KProperty, Summary)) and not prop.kitem:
+                logger.debug(
+                    "Setting kitem with ID `%s` for property `%s` on KItem level",
+                    self.id,
+                    type(prop),
+                )
                 prop.kitem = self
 
     @property

@@ -1,6 +1,7 @@
 """DSMS knowledge utilities"""
 import io
 import json
+import logging
 import re
 import warnings
 from enum import Enum
@@ -30,6 +31,8 @@ from dsms.knowledge.search import SearchResult  # isort:skip
 if TYPE_CHECKING:
     from dsms.core.context import Buffers
     from dsms.knowledge import KItem, KType
+
+logger = logging.getLogger(__name__)
 
 
 def _is_number(value):
@@ -96,6 +99,7 @@ def _create_custom_properties_model(
     setattr(model, "__str__", _print_properties)
     setattr(model, "__repr__", _print_properties)
     setattr(model, "__setattr__", __setattr_property__)
+    logging.debug("Create custom properties model with fields: %s", fields)
     return model
 
 
@@ -111,11 +115,20 @@ def _print_properties(self: Any) -> str:
 
 
 def __setattr_property__(self, key, value) -> None:
+    logger.debug(
+        "Setting property for custom property with key `%s` with value `%s`.",
+        key,
+        value,
+    )
     if _is_number(value):
         # convert to convertable numeric object
         value = _create_numerical_dtype(key, value, self.kitem)
         # mark as updated
     if key != "kitem" and self.kitem:
+        logger.debug(
+            "Setting related kitem for custom properties with id `%s` as updated",
+            self.kitem.id,
+        )
         self.kitem.context.buffers.updated.update({self.kitem.id: self.kitem})
     elif key == "kitem":
         # set kitem for convertable numeric datatype
@@ -161,9 +174,14 @@ def _get_remote_ktypes() -> Enum:
         raise ConnectionError(
             f"Something went wrong fetching the remote ktypes: {response.text}"
         )
+
     Context.ktypes = {ktype["id"]: KType(**ktype) for ktype in response.json()}
 
-    return Enum("KTypes", {_name_to_camel(key): key for key in Context.ktypes})
+    ktypes = Enum(
+        "KTypes", {_name_to_camel(key): key for key in Context.ktypes}
+    )
+    logger.debug("Got the following ktypes from backend: `%s`.", list(ktypes))
+    return ktypes
 
 
 def _get_kitem_list() -> "List[KItem]":
@@ -227,6 +245,7 @@ def _create_new_kitem(kitem: "KItem") -> None:
         "slug": kitem.slug,
         "ktype_id": kitem.ktype.id,
     }
+    logger.debug("Create new KItem with payload: %s", payload)
     response = _perform_request("api/knowledge/kitems", "post", json=payload)
     if not response.ok:
         raise ValueError(
@@ -271,6 +290,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
     if new_kitem.custom_properties:
         custom_properties = new_kitem.custom_properties.model_dump()
         payload.update(custom_properties={"content": custom_properties})
+    logger.debug("Update KItem with payload: %s", payload)
     response = _perform_request(
         f"api/knowledge/kitems/{new_kitem.id}", "put", json=payload
     )
@@ -283,6 +303,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
 
 def _delete_kitem(kitem: "KItem") -> None:
     """Delete a KItem in the remote backend"""
+    logger.debug("Delete KItem with id: %s", kitem.id)
     response = _perform_request(f"api/knowledge/kitems/{kitem.id}", "delete")
     if not response.ok:
         raise ValueError(
@@ -295,6 +316,11 @@ def _update_attachments(
 ) -> None:
     """Update attachments of the KItem."""
     differences = _get_attachment_diffs(old_kitem, new_kitem)
+    logger.debug(
+        "Found differences in attachments for kitem with id `%s`: %s",
+        new_kitem.id,
+        differences,
+    )
     for upload in differences["add"]:
         _upload_attachments(new_kitem, upload)
     for remove in differences["remove"]:
@@ -381,6 +407,9 @@ def _get_kitems_diffs(
         differences[to_remove_name] = [
             attr for attr in old_attr if old_attr not in new_attr
         ]
+    logger.debug(
+        "Found differences between new and old KItem: %s", differences
+    )
     return differences
 
 
@@ -402,8 +431,16 @@ def _commit_updated(buffer: "Dict[str, KItem]") -> None:
     """Commit the buffer for the `updated` buffers"""
     for new_kitem in buffer.values():
         old_kitem = _get_kitem(new_kitem.id, as_json=True)
+        logger.debug(
+            "Fetched data from old KItem with id `%s`: %s",
+            new_kitem.id,
+            old_kitem,
+        )
         if old_kitem:
             if isinstance(new_kitem.hdf5, pd.DataFrame):
+                logger.debug(
+                    "New KItem data has `pd.DataFrame`. Will push as hdf5."
+                )
                 _update_hdf5(new_kitem.id, new_kitem.hdf5)
                 new_kitem.hdf5 = _inspect_hdf5(new_kitem.id)
             elif isinstance(new_kitem.hdf5, type(None)) and _inspect_hdf5(
@@ -414,6 +451,12 @@ def _commit_updated(buffer: "Dict[str, KItem]") -> None:
             _update_attachments(new_kitem, old_kitem)
             new_kitem.in_backend = True
             for key, value in _get_kitem(new_kitem.id, as_json=True).items():
+                logger.debug(
+                    "Set updated property `%s` for KItem with id `%s` after commiting: %s",
+                    key,
+                    new_kitem.id,
+                    value,
+                )
                 setattr(new_kitem, key, value)
 
 
@@ -536,4 +579,5 @@ def _update_hdf5(kitem_id: str, data: pd.DataFrame):
 
 
 def _delete_hdf5(kitem_id: str) -> Response:
+    logger.debug("Delete HDF5 for kitem with id `%s`.")
     return _perform_request(f"api/knowledge/data_api/{kitem_id}", "delete")
