@@ -172,7 +172,7 @@ class DSMS:
 
     @property
     def kitems(cls) -> "List[KItem]":
-        """KItems instanciated and available in the remote backend.
+        """KItems instantiated and available in the remote backend.
         WARNING: This will download _all_ KItems in the backend owned
         by the current user and may resolve into long response times.
         The default timeout for requests is defined under the
