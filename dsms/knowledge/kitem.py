@@ -37,7 +37,7 @@ from dsms.knowledge.properties import (  # isort:skip
     ContactsProperty,
     ExternalLink,
     ExternalLinksProperty,
-    KProperty,
+    KItemPropertyList,
     HDF5Container,
     Column,
     LinkedKItem,
@@ -196,7 +196,7 @@ class KItem(BaseModel):
         """Initialize the KItem"""
         from dsms import DSMS
 
-        logger.debug("Initalize KItem with model data: %s", kwargs)
+        logger.debug("Initialize KItem with model data: %s", kwargs)
 
         # set dsms instance if not already done
         if not self.dsms:
@@ -208,7 +208,7 @@ class KItem(BaseModel):
         # add kitem to buffer
         if not self.in_backend and self.id not in self.context.buffers.created:
             logger.debug(
-                "Setting KItem with `%s` as created and updated during KItem initialization.",
+                "Marking KItem with ID `%s` as created and updated during KItem initialization.",
                 self.id,
             )
             self.context.buffers.created.update({self.id: self})
@@ -231,7 +231,8 @@ class KItem(BaseModel):
             and not name.startswith("_")
         ):
             logger.debug(
-                "Setting KItem with `%s` as  updated KItem.__setattr__"
+                "Setting KItem with ID `%s` as updated during KItem.__setattr__",
+                self.id,
             )
             self.context.buffers.updated.update({self.id: self})
 
@@ -353,9 +354,10 @@ class KItem(BaseModel):
     @field_validator("linked_kitems", mode="before")
     @classmethod
     def validate_linked_kitems_list(
-        cls, value: "List[Union[Dict, KItem, Any]]"
+        cls, value: "List[Union[Dict, KItem, Any]]", info: ValidationInfo
     ) -> List[LinkedKItem]:
         """Validate each single kitem to be linked"""
+        src_id = info.data.get("id")
         linked_kitems = []
         for item in value:
             if isinstance(item, dict):
@@ -371,6 +373,10 @@ class KItem(BaseModel):
                     raise AttributeError(
                         f"Linked KItem `{item}` has no attribute `id`."
                     ) from error
+            if str(src_id) == str(dest_id):
+                raise ValueError(
+                    f"Cannot link KItem with ID `{src_id}` to itself!"
+                )
             linked_kitems.append(LinkedKItem(id=dest_id))
         return linked_kitems
 
@@ -548,7 +554,10 @@ class KItem(BaseModel):
         remain the context for the buffer if any of these properties is changed.
         """
         for prop in self.__dict__.values():
-            if isinstance(prop, (KProperty, Summary)) and not prop.kitem:
+            if (
+                isinstance(prop, (KItemPropertyList, Summary))
+                and not prop.kitem
+            ):
                 logger.debug(
                     "Setting kitem with ID `%s` for property `%s` on KItem level",
                     self.id,

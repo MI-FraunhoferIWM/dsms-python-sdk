@@ -1,4 +1,4 @@
-"""Linked KItems KProperty"""
+"""Linked KItems KItemPropertyList"""
 
 
 from typing import TYPE_CHECKING, Optional
@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import ConfigDict, Field, PrivateAttr, model_serializer
 
-from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 from dsms.knowledge.utils import _get_kitem
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ def _linked_kitem_helper(kitem: "KItem"):
     return {"id": kitem.id}
 
 
-class LinkedKItem(KPropertyItem):
+class LinkedKItem(KItemProperty):
     """Data model of a linked KItem"""
 
     # OVERRIDE
@@ -58,8 +58,8 @@ class LinkedKItem(KPropertyItem):
         return base
 
 
-class LinkedKItemsProperty(KProperty):
-    """KProperty for linked KItems"""
+class LinkedKItemsProperty(KItemPropertyList):
+    """KItemPropertyList for linked KItems"""
 
     # OVERRIDE
     @property

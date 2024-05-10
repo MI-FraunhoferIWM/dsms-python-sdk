@@ -10,7 +10,7 @@ from dsms.knowledge.properties.annotations import (  # isort:skip
 )
 from dsms.knowledge.properties.apps import App, AppsProperty
 from dsms.knowledge.properties.authors import Author, AuthorsProperty
-from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 from dsms.knowledge.properties.contacts import ContactInfo, ContactsProperty
 from dsms.knowledge.properties.custom_datatype import NumericalDataType
 from dsms.knowledge.properties.hdf5 import Column, HDF5Container
@@ -53,8 +53,8 @@ __all__ = [
     "UserGroupsProperty",
     "UserGroup",
     "Summary",
-    "KProperty",
-    "KPropertyItem",
+    "KItemPropertyList",
+    "KItemProperty",
     "HDF5Container",
     "Column",
     "NumericalDataType",

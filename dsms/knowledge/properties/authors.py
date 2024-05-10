@@ -1,24 +1,24 @@
-"""Author KProperty"""
+"""Author KItemPropertyList"""
 
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import Field
 
-from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 
 if TYPE_CHECKING:
     from typing import Callable
 
 
-class Author(KPropertyItem):
+class Author(KItemProperty):
     """Author of a KItem."""
 
     user_id: UUID = Field(..., description="ID of the DSMS User")
 
 
-class AuthorsProperty(KProperty):
-    """KProperty for authors"""
+class AuthorsProperty(KItemPropertyList):
+    """KItemPropertyList for authors"""
 
     # OVERRIDE
     @property

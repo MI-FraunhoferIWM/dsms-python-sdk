@@ -1,10 +1,10 @@
-"""App KProperty"""
+"""App KItemPropertyList"""
 
 from typing import TYPE_CHECKING, List, Optional
 
 from pydantic import BaseModel, Field
 
-from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 
 if TYPE_CHECKING:
     from typing import Callable
@@ -23,7 +23,7 @@ class AdditionalProperties(BaseModel):
     )
 
     def __str__(self) -> str:
-        """Pretty print the KProperty"""
+        """Pretty print the KItemPropertyList"""
         values = ", ".join(
             [f"{key}: {value}" for key, value in self.__dict__.items()]
         )
@@ -34,7 +34,7 @@ class AdditionalProperties(BaseModel):
         return str(self)
 
 
-class App(KPropertyItem):
+class App(KItemProperty):
     """App of a KItem."""
 
     kitem_app_id: Optional[int] = Field(
@@ -59,8 +59,8 @@ class App(KPropertyItem):
         raise NotImplementedError
 
 
-class AppsProperty(KProperty):
-    """KProperty for apps"""
+class AppsProperty(KItemPropertyList):
+    """KItemPropertyList for apps"""
 
     # OVERRIDE
     @property

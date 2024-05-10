@@ -1,17 +1,17 @@
-"""Annotations KProperty"""
+"""Annotations KItemPropertyList"""
 
 from typing import TYPE_CHECKING
 
 from pydantic import Field
 
-from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 from dsms.knowledge.utils import _make_annotation_schema
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict
 
 
-class Annotation(KPropertyItem):
+class Annotation(KItemProperty):
     """KItem annotation model"""
 
     iri: str = Field(..., description="IRI of the annotation")
@@ -19,8 +19,8 @@ class Annotation(KPropertyItem):
     namespace: str = Field(..., description="Namespace of the annotation")
 
 
-class AnnotationsProperty(KProperty):
-    """KProperty for annotations"""
+class AnnotationsProperty(KItemPropertyList):
+    """KItemPropertyList for annotations"""
 
     # OVERRIDE
     @property

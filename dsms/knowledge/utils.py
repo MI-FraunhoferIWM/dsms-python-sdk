@@ -423,9 +423,9 @@ def _commit(buffers: "Buffers") -> None:
     """Commit the buffers for the
     created, updated and deleted buffers"""
     logger.debug("Committing KItems in buffers. Current buffers:")
-    logger.debug("Created: %s", buffers.created)
-    logger.debug("Updated: %s", buffers.updated)
-    logger.debug("Deleted: %s", buffers.deleted)
+    logger.debug("Current Created-buffer: %s", buffers.created)
+    logger.debug("Current Updated-buffer: %s", buffers.updated)
+    logger.debug("Current Deleted-buffer: %s", buffers.deleted)
     _commit_created(buffers.created)
     _commit_updated(buffers.updated)
     _commit_deleted(buffers.deleted)
@@ -461,6 +461,9 @@ def _commit_updated(buffer: "Dict[str, KItem]") -> None:
             _update_kitem(new_kitem, old_kitem)
             _update_attachments(new_kitem, old_kitem)
             new_kitem.in_backend = True
+            logger.debug(
+                "Fetching updated KItem from remote backend: %s", new_kitem.id
+            )
             for key, value in _get_kitem(new_kitem.id, as_json=True).items():
                 logger.debug(
                     "Set updated property `%s` for KItem with id `%s` after commiting: %s",
