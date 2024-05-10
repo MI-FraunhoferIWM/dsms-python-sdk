@@ -20,6 +20,7 @@ from pydantic import (  # isort:skip
     model_validator,
 )
 
+from dsms.core.logging import handler  # isort:skip
 
 from dsms.knowledge.properties import (  # isort:skip
     Affiliation,
@@ -63,6 +64,8 @@ if TYPE_CHECKING:
     from dsms.core.dsms import DSMS
 
 logger = logging.getLogger(__name__)
+logger.addHandler(handler)
+logger.propagate = False
 
 
 class KItem(BaseModel):
@@ -193,6 +196,8 @@ class KItem(BaseModel):
         """Initialize the KItem"""
         from dsms import DSMS
 
+        logger.debug("Initalize KItem with model data: %s", kwargs)
+
         # set dsms instance if not already done
         if not self.dsms:
             self.dsms = DSMS()
@@ -210,6 +215,8 @@ class KItem(BaseModel):
             self.context.buffers.updated.update({self.id: self})
 
         self._set_kitem_for_properties()
+
+        logger.debug("KItem inizialization successful.")
 
     def __setattr__(self, name, value) -> None:
         """Add kitem to updated-buffer if an attribute is set"""

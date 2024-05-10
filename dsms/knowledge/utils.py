@@ -20,6 +20,8 @@ from pydantic import (  # isort: skip
     model_validator,
 )
 
+from dsms.core.logging import handler  # isort:skip
+
 from dsms.core.utils import _name_to_camel, _perform_request  # isort:skip
 
 from dsms.knowledge.properties.custom_datatype import (  # isort:skip
@@ -33,6 +35,8 @@ if TYPE_CHECKING:
     from dsms.knowledge import KItem, KType
 
 logger = logging.getLogger(__name__)
+logger.addHandler(handler)
+logger.propagate = False
 
 
 def _is_number(value):
@@ -99,7 +103,7 @@ def _create_custom_properties_model(
     setattr(model, "__str__", _print_properties)
     setattr(model, "__repr__", _print_properties)
     setattr(model, "__setattr__", __setattr_property__)
-    logging.debug("Create custom properties model with fields: %s", fields)
+    logger.debug("Create custom properties model with fields: %s", fields)
     return model
 
 
@@ -290,7 +294,9 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
     if new_kitem.custom_properties:
         custom_properties = new_kitem.custom_properties.model_dump()
         payload.update(custom_properties={"content": custom_properties})
-    logger.debug("Update KItem with payload: %s", payload)
+    logger.debug(
+        "Update KItem for `%s` with payload: %s", new_kitem.id, payload
+    )
     response = _perform_request(
         f"api/knowledge/kitems/{new_kitem.id}", "put", json=payload
     )
@@ -416,9 +422,14 @@ def _get_kitems_diffs(
 def _commit(buffers: "Buffers") -> None:
     """Commit the buffers for the
     created, updated and deleted buffers"""
+    logger.debug("Committing KItems in buffers. Current buffers:")
+    logger.debug("Created: %s", buffers.created)
+    logger.debug("Updated: %s", buffers.updated)
+    logger.debug("Deleted: %s", buffers.deleted)
     _commit_created(buffers.created)
     _commit_updated(buffers.updated)
     _commit_deleted(buffers.deleted)
+    logger.debug("Committing successful, clearing buffers.")
 
 
 def _commit_created(buffer: "Dict[str, KItem]") -> dict:
@@ -579,5 +590,5 @@ def _update_hdf5(kitem_id: str, data: pd.DataFrame):
 
 
 def _delete_hdf5(kitem_id: str) -> Response:
-    logger.debug("Delete HDF5 for kitem with id `%s`.")
+    logger.debug("Delete HDF5 for kitem with id `%s`.", kitem_id)
     return _perform_request(f"api/knowledge/data_api/{kitem_id}", "delete")

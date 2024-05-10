@@ -1,11 +1,13 @@
 """General config for the DSMS Python SDK"""
 
+import logging
 import urllib
 import warnings
+from enum import Enum
 from typing import Callable, Optional, Set, Union
 
 import requests
-from pydantic import AnyUrl, Field, SecretStr, field_validator
+from pydantic import AnyUrl, ConfigDict, Field, SecretStr, field_validator
 from pydantic_core.core_schema import ValidationInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,6 +16,16 @@ from .utils import get_callable
 MODULE_REGEX = r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*:[a-zA-Z_][a-zA-Z0-9_]*$"
 DEFAULT_UNIT_SPARQL = "dsms.knowledge.semantics.units.sparql:UnitSparqlQuery"
 DEFAULT_REPO = "knowledge-items"
+
+
+class Loglevel(Enum):
+    """Enum mapping for default log levels"""
+
+    DEBUG: logging.DEBUG
+    INFO: logging.INFO
+    ERROR: logging.ERROR
+    CRITICAL: logging.CRITICAL
+    WARNING: logging.WARNING
 
 
 class Configuration(BaseSettings):
@@ -107,6 +119,21 @@ class Configuration(BaseSettings):
         set(),
         description="Properties to hide while printing, e.g {'external_links'}",
     )
+
+    loglevel: Optional[Union[Loglevel, str]] = Field(
+        None, description="Set level of logging messages"
+    )
+
+    model_config = ConfigDict(use_enum_values=True)
+
+    @field_validator("loglevel")
+    def get_loglevel(
+        cls, val: Optional[Union[Loglevel, str]]
+    ) -> Optional[Loglevel]:
+        """Set log level for package"""
+        if val:
+            logging.getLogger().setLevel(val)
+        return val
 
     @field_validator("units_sparql_object")
     def get_unit_sparql_object(cls, val: str) -> "Callable":
