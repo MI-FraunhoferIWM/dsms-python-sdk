@@ -1,6 +1,5 @@
 """DSMS knowledge utilities"""
 import io
-import json
 import logging
 import re
 import warnings
@@ -259,11 +258,8 @@ def _create_new_kitem(kitem: "KItem") -> None:
 
 def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
     """Update a KItem in the remote backend."""
-    to_compare = new_kitem.model_dump(
-        include={"annotations", "linked_kitems", "user_groups", "kitem_apps"}
-    )
-    differences = _get_kitems_diffs(old_kitem, to_compare)
-    dumped = new_kitem.model_dump_json(
+    differences = _get_kitems_diffs(old_kitem, new_kitem)
+    payload = new_kitem.model_dump(
         exclude={
             "authors",
             "annotations",
@@ -284,7 +280,6 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
         },
         exclude_none=True,
     )
-    payload = json.loads(dumped)
     payload.update(
         external_links={
             link.label: str(link.url) for link in new_kitem.external_links
@@ -375,6 +370,40 @@ def _get_attachment(kitem_id: "KItem", file_name: str) -> str:
     return response.text
 
 
+def _get_apps_diff(
+    old_kitem: "Dict[str, Any]", new_kitem: "KItem"
+) -> "Dict[str, List[Dict[str, Any]]]":
+    """Get differences in kitem apps from previous KItem state"""
+    differences = {}
+    old_linked = old_kitem.get("kitem_apps")
+    new_linked = [new.model_dump() for new in new_kitem.kitem_apps]
+    differences["kitem_apps_to_update"] = [
+        attr for attr in new_linked if attr not in old_linked
+    ]
+    differences["kitem_apps_to_remove"] = [
+        attr for attr in old_linked if attr not in new_linked
+    ]
+    logger.debug("Found differences in KItem apps: %s", differences)
+    return differences
+
+
+def _get_linked_diffs(
+    old_kitem: "Dict[str, Any]", new_kitem: "KItem"
+) -> "Dict[str, List[Dict[str, UUID]]]":
+    """Get differences in linked kitem from previous KItem state"""
+    differences = {}
+    old_linked = [old.get("id") for old in old_kitem.get("linked_kitems")]
+    new_linked = [str(new_kitem.id) for new_kitem in new_kitem.linked_kitems]
+    differences["kitems_to_link"] = [
+        {"id": attr} for attr in new_linked if attr not in old_linked
+    ]
+    differences["kitems_to_unlink"] = [
+        {"id": attr} for attr in old_linked if attr not in new_linked
+    ]
+    logger.debug("Found differences in linked KItems: %s", differences)
+    return differences
+
+
 def _get_attachment_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     """Check which attachments should be removed and which should be added."""
     return {
@@ -391,31 +420,35 @@ def _get_attachment_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     }
 
 
-def _get_kitems_diffs(
-    kitem_old: "Dict[str, Any]", kitem_new: "Dict[str, Any]"
-):
+def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     """Get the differences in the attributes between two kitems"""
     differences = {}
     attributes = [
-        ("linked_kitems", ("kitems", "link", "unlink")),
         ("annotations", ("annotations", "link", "unlink")),
-        ("kitem_apps", ("kitem_apps", "update", "remove")),
         ("user_groups", ("user_groups", "add", "remove")),
     ]
+    to_compare = kitem_new.model_dump(include={"annotations", "user_groups"})
     for name, terms in attributes:
         to_add_name = terms[0] + "_to_" + terms[1]
         to_remove_name = terms[0] + "_to_" + terms[2]
         old_attr = kitem_old.get(name)
-        new_attr = kitem_new.get(name)
+        new_attr = to_compare.get(name)
         differences[to_add_name] = [
-            attr for attr in new_attr if new_attr not in old_attr
+            attr for attr in new_attr if attr not in old_attr
         ]
         differences[to_remove_name] = [
-            attr for attr in old_attr if old_attr not in new_attr
+            attr for attr in old_attr if attr not in new_attr
         ]
     logger.debug(
         "Found differences between new and old KItem: %s", differences
     )
+    # linked kitems need special treatment since the linked target
+    # kitems also might differ in their new properties in some cases.
+    linked_kitems = _get_linked_diffs(kitem_old, kitem_new)
+    # same holds for kitem apps
+    kitem_apps = _get_apps_diff(kitem_old, kitem_new)
+    # merge with previously found differences
+    differences.update(**linked_kitems, **kitem_apps)
     return differences
 
 

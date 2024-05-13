@@ -87,31 +87,39 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
 
     expected = {
         "kitems_to_link": [
-            obj.model_dump() for obj in kitem_new.linked_kitems
+            {"id": str(obj.id)} for obj in kitem_new.linked_kitems
         ],
-        "annotations_to_link": [
-            obj.model_dump() for obj in kitem_new.annotations
-        ],
+        "annotations_to_link": [annotation],
         "user_groups_to_add": [],
         "kitem_apps_to_update": [
-            obj.model_dump() for obj in kitem_new.kitem_apps
+            {
+                "executable": "foo.exe",
+                "title": None,
+                "description": None,
+                "tags": None,
+                "additional_properties": None,
+            }
         ],
         "kitems_to_unlink": [
-            obj.model_dump() for obj in kitem_old.linked_kitems
+            {"id": str(obj.id)} for obj in kitem_old.linked_kitems
         ],
-        "annotations_to_unlink": [
-            obj.model_dump() for obj in kitem_old.annotations
-        ],
+        "annotations_to_unlink": [annotation2],
         "user_groups_to_remove": [],
         "kitem_apps_to_remove": [
-            obj.model_dump() for obj in kitem_old.kitem_apps
+            {
+                "executable": "bar.exe",
+                "title": None,
+                "description": None,
+                "tags": None,
+                "additional_properties": None,
+            }
         ],
     }
-    to_compare = kitem_new.model_dump(
-        include={"annotations", "linked_kitems", "user_groups", "kitem_apps"}
-    )
-    diffs = _get_kitems_diffs(kitem_old.model_dump(), to_compare)
-    assert sorted(diffs) == sorted(expected)
+    diffs = _get_kitems_diffs(kitem_old.model_dump(), kitem_new)
+
+    for key, value in diffs.items():
+        assert value == expected.pop(key)
+    assert len(expected) == 0
 
 
 @responses.activate

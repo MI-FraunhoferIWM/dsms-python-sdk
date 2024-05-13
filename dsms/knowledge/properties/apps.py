@@ -1,8 +1,8 @@
 """App KItemPropertyList"""
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_serializer
 
 from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 
@@ -53,6 +53,16 @@ class App(KItemProperty):
     additional_properties: Optional[AdditionalProperties] = Field(
         None, description="Additional properties related to the appilcation"
     )
+
+    # OVERRIDE
+    @model_serializer
+    def serialize_author(self) -> Dict[str, Any]:
+        """Serialize author model"""
+        return {
+            key: value
+            for key, value in self.__dict__.items()
+            if key not in ["id", "kitem_app_id"]
+        }
 
     def run(self, *args, **kwargs) -> None:
         """Run application"""

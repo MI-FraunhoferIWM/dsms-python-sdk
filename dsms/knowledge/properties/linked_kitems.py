@@ -1,16 +1,34 @@
 """Linked KItems KItemPropertyList"""
 
-
-from typing import TYPE_CHECKING, Optional
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
-from pydantic import ConfigDict, Field, PrivateAttr, model_serializer
+from pydantic import (  # isort:skip
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    model_serializer,
+)
 
-from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
-from dsms.knowledge.utils import _get_kitem
+from dsms.knowledge.properties.base import (  # isort:skip
+    KItemProperty,
+    KItemPropertyList,
+)
+
+from dsms.knowledge.properties.affiliations import Affiliation  # isort:skip
+from dsms.knowledge.properties.annotations import Annotation  # isort:skip
+from dsms.knowledge.properties.attachments import Attachment  # isort:skip
+from dsms.knowledge.properties.authors import Author  # isort:skip
+from dsms.knowledge.properties.contacts import ContactInfo  # isort:skip
+from dsms.knowledge.properties.external_links import ExternalLink  # isort:skip
+from dsms.knowledge.properties.user_groups import UserGroup  # isort:skip
+from dsms.knowledge.utils import _get_kitem  # isort:skip
+
 
 if TYPE_CHECKING:
-    from typing import Callable, Union
+    from typing import Callable
 
     from dsms import KItem
 
@@ -23,6 +41,23 @@ def _linked_kitem_helper(kitem: "KItem"):
     return {"id": kitem.id}
 
 
+class LinkedLinkedKItem(BaseModel):
+    """Linked KItem of linked KItems"""
+
+    id: str = Field(..., description="ID of a linked KItem of a linked KItem")
+
+    def __str__(self) -> str:
+        """Pretty print the linked KItems of the linked KItem"""
+        values = ",\n\t\t\t".join(
+            [f"{key}: {value}" for key, value in self.__dict__.items()]
+        )
+        return f"{{\n\t\t\t{values}\n\t\t}}"
+
+    def __repr__(self) -> str:
+        """Pretty print the linked KItems of the linked KItem"""
+        return str(self)
+
+
 class LinkedKItem(KItemProperty):
     """Data model of a linked KItem"""
 
@@ -32,10 +67,84 @@ class LinkedKItem(KItemProperty):
         description="ID of the KItem to be linked",
     )
 
+    name: str = Field(..., description="Name of the linked KItem")
+
+    slug: str = Field(..., description="Slug of the linked KItem")
+
+    ktype_id: str = Field(..., description="Ktype ID of the linked KItem")
+
+    summary: Optional[str] = Field(
+        None, description="Summary of the linked KItem."
+    )
+
+    avatar_exists: bool = Field(
+        False, description="Wether the linked KItem has an avatar."
+    )
+
+    annotations: List[Optional[Annotation]] = Field(
+        [], description="Annotations of the linked KItem"
+    )
+
+    linked_kitems: List[Optional[LinkedLinkedKItem]] = Field(
+        [], description="Linked KItems of the linked KItem"
+    )
+
+    external_links: List[Optional[ExternalLink]] = Field(
+        [], description="External links of the linked KItem"
+    )
+
+    contacts: List[Optional[ContactInfo]] = Field(
+        [], description="Contact info of the linked KItem"
+    )
+
+    authors: List[Optional[Author]] = Field(
+        [], description="Authors of the linked KItem"
+    )
+
+    linked_affiliations: List[Optional[Affiliation]] = Field(
+        [], description="Linked affiliations of the linked KItem"
+    )
+
+    attachments: List[Optional[Attachment]] = Field(
+        [], description="Attachment of the linked KItem"
+    )
+
+    user_groups: List[Optional[UserGroup]] = Field(
+        [], description="User groups of the linked KItem"
+    )
+
+    custom_properties: Optional[Any] = Field(
+        None, description="Custom properies of the linked KItem"
+    )
+
+    created_at: Optional[Union[str, datetime]] = Field(
+        None, description="Time and date when the KItem was created."
+    )
+    updated_at: Optional[Union[str, datetime]] = Field(
+        None, description="Time and date when the KItem was updated."
+    )
+
     _kitem = PrivateAttr(default=None)
 
     # OVERRIDE
-    model_config = ConfigDict(exclude={})
+    model_config = ConfigDict(exclude={}, arbitrary_types_allowed=True)
+
+    # OVERRIDE
+    def __str__(self) -> str:
+        """Pretty print the linked KItem"""
+        values = ",\n\t\t\t".join(
+            [
+                f"{key}: {value}"
+                for key, value in self.__dict__.items()
+                if key not in self.exclude
+            ]
+        )
+        return f"{{\n\t\t\t{values}\n\t\t}}"
+
+    # OVERRIDE
+    def __repr__(self) -> str:
+        """Pretty print the linked KItem"""
+        return str(self)
 
     # OVERRIDE
     @property
@@ -51,11 +160,16 @@ class LinkedKItem(KItemProperty):
 
     # OVERRIDE
     @model_serializer
-    def serialize(self):
-        """Serialize KPropertItem"""
-        base = {key: str(value) for key, value in self.__dict__.items()}
-        base.update(source_id=str(self.kitem.id))
-        return base
+    def serialize_author(self) -> Dict[str, Any]:
+        """Serialize author model"""
+        return {
+            key: (
+                str(value)
+                if key in ["updated_at", "created_at", "id"]
+                else value
+            )
+            for key, value in self.__dict__.items()
+        }
 
 
 class LinkedKItemsProperty(KItemPropertyList):

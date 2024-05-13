@@ -51,6 +51,7 @@ from dsms.knowledge.ktype import KType  # isort:skip
 
 from dsms.knowledge.utils import (  # isort:skip
     _kitem_exists,
+    _get_kitem,
     _slug_is_available,
     _slugify,
     _inspect_hdf5,
@@ -216,7 +217,7 @@ class KItem(BaseModel):
 
         self._set_kitem_for_properties()
 
-        logger.debug("KItem inizialization successful.")
+        logger.debug("KItem initialization successful.")
 
     def __setattr__(self, name, value) -> None:
         """Add kitem to updated-buffer if an attribute is set"""
@@ -364,11 +365,14 @@ class KItem(BaseModel):
                 dest_id = item.get("id")
                 if not dest_id:
                     raise ValueError("Linked KItem is missing `id`")
+                linked_model = _get_kitem(dest_id, as_json=True)
             elif isinstance(item, KItem):
                 dest_id = item.id
+                linked_model = item.model_dump()
             else:
                 try:
                     dest_id = getattr(item, "id")
+                    linked_model = _get_kitem(dest_id, as_json=True)
                 except AttributeError as error:
                     raise AttributeError(
                         f"Linked KItem `{item}` has no attribute `id`."
@@ -377,7 +381,7 @@ class KItem(BaseModel):
                 raise ValueError(
                     f"Cannot link KItem with ID `{src_id}` to itself!"
                 )
-            linked_kitems.append(LinkedKItem(id=dest_id))
+            linked_kitems.append(LinkedKItem(**linked_model))
         return linked_kitems
 
     @field_validator("linked_kitems", mode="after")

@@ -134,9 +134,9 @@ class DSMS:
         return _search(query, ktypes, annotations, limit, allow_fuzzy)
 
     @property
-    def sparql_interface(cls) -> SparqlInterface:
+    def sparql_interface(self) -> SparqlInterface:
         """Sparql interface of the DSMS instance."""
-        return cls._sparql_interface
+        return self._sparql_interface
 
     @property
     def ktypes(cls) -> "Enum":
