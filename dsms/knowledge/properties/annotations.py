@@ -1,6 +1,6 @@
-"""Annotations KItemPropertyList"""
+"""Annotation property of a KItem"""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from pydantic import Field
 
@@ -17,6 +17,9 @@ class Annotation(KItemProperty):
     iri: str = Field(..., description="IRI of the annotation")
     name: str = Field(..., description="Name of the annotation")
     namespace: str = Field(..., description="Namespace of the annotation")
+    description: Optional[str] = Field(
+        None, description="Description of the annotation"
+    )
 
 
 class AnnotationsProperty(KItemPropertyList):

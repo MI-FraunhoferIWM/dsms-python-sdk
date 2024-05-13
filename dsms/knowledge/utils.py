@@ -375,13 +375,17 @@ def _get_apps_diff(
 ) -> "Dict[str, List[Dict[str, Any]]]":
     """Get differences in kitem apps from previous KItem state"""
     differences = {}
-    old_linked = old_kitem.get("kitem_apps")
-    new_linked = [new.model_dump() for new in new_kitem.kitem_apps]
+    exclude = {"id", "kitem_app_id"}
+    old_apps = [
+        {key: value for key, value in old.items() if key not in exclude}
+        for old in old_kitem.get("kitem_apps")
+    ]
+    new_apps = [new.model_dump() for new in new_kitem.kitem_apps]
     differences["kitem_apps_to_update"] = [
-        attr for attr in new_linked if attr not in old_linked
+        attr for attr in new_apps if attr not in old_apps
     ]
     differences["kitem_apps_to_remove"] = [
-        attr for attr in old_linked if attr not in new_linked
+        attr for attr in old_apps if attr not in new_apps
     ]
     logger.debug("Found differences in KItem apps: %s", differences)
     return differences

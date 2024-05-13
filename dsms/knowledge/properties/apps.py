@@ -1,4 +1,4 @@
-"""App KItemPropertyList"""
+"""App  property of a KItem"""
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 

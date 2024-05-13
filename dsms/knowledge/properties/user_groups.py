@@ -1,4 +1,4 @@
-"""UserGroup KItemPropertyList"""
+"""UserGroup property of a KItem"""
 
 from typing import TYPE_CHECKING
 

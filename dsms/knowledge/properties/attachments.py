@@ -1,4 +1,4 @@
-"""Attachment KItemPropertyList"""
+"""Attachment property of a KItem"""
 
 from pathlib import Path
 from typing import TYPE_CHECKING

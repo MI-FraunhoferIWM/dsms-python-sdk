@@ -51,35 +51,58 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         name="bar123",
     )
 
-    annotation = {
-        "iri": "http://example.org/",
-        "name": "foo",
-        "namespace": "example",
-    }
-    annotation2 = {
-        "iri": "http://example.org/",
-        "name": "bar",
-        "namespace": "example",
-    }
     user_group = {"name": "private", "group_id": "private_123"}
     app = {"executable": "foo.exe"}
-    app2 = {"executable": "bar.exe"}
 
-    kitem_old = KItem(
-        id=get_mock_kitem_ids[0],
-        name="foo123",
-        ktype_id=dsms.ktypes.Organization,
-        annotations=[annotation2],
-        linked_kitems=[linked_kitem1, linked_kitem2],
-        user_groups=[user_group],
-        kitem_apps=[app2],
-    )
+    kitem_old = {
+        "id": get_mock_kitem_ids[0],
+        "name": "foo123",
+        "ktype_id": dsms.ktypes.Organization.value,
+        "annotations": [
+            {
+                "iri": "http://example.org/",
+                "name": "bar",
+                "namespace": "example",
+                "description": None,
+            }
+        ],
+        "linked_kitems": [
+            {
+                "id": str(get_mock_kitem_ids[1]),
+                "ktype_id": dsms.ktypes.Organization.value,
+                "name": "foo456",
+            },
+            {
+                "id": str(get_mock_kitem_ids[2]),
+                "ktype_id": dsms.ktypes.Organization.value,
+                "name": "foo789",
+            },
+        ],
+        "user_groups": [user_group],
+        "kitem_apps": [
+            {
+                "id": get_mock_kitem_ids[0],
+                "kitem_app_id": 17,
+                "executable": "bar.exe",
+                "title": None,
+                "description": None,
+                "tags": None,
+                "additional_properties": None,
+            }
+        ],
+    }
 
     kitem_new = KItem(
         id=get_mock_kitem_ids[0],
         name="foo123",
         ktype_id=dsms.ktypes.Organization,
-        annotations=[annotation],
+        annotations=[
+            {
+                "iri": "http://example.org/",
+                "name": "foo",
+                "namespace": "example",
+            }
+        ],
         linked_kitems=[linked_kitem3],
         user_groups=[user_group],
         kitem_apps=[app],
@@ -89,7 +112,14 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         "kitems_to_link": [
             {"id": str(obj.id)} for obj in kitem_new.linked_kitems
         ],
-        "annotations_to_link": [annotation],
+        "annotations_to_link": [
+            {
+                "iri": "http://example.org/",
+                "name": "foo",
+                "namespace": "example",
+                "description": None,
+            }
+        ],
         "user_groups_to_add": [],
         "kitem_apps_to_update": [
             {
@@ -101,9 +131,16 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
             }
         ],
         "kitems_to_unlink": [
-            {"id": str(obj.id)} for obj in kitem_old.linked_kitems
+            {"id": str(linked.id)} for linked in [linked_kitem1, linked_kitem2]
         ],
-        "annotations_to_unlink": [annotation2],
+        "annotations_to_unlink": [
+            {
+                "iri": "http://example.org/",
+                "name": "bar",
+                "namespace": "example",
+                "description": None,
+            }
+        ],
         "user_groups_to_remove": [],
         "kitem_apps_to_remove": [
             {
@@ -115,7 +152,7 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
             }
         ],
     }
-    diffs = _get_kitems_diffs(kitem_old.model_dump(), kitem_new)
+    diffs = _get_kitems_diffs(kitem_old, kitem_new)
 
     for key, value in diffs.items():
         assert value == expected.pop(key)

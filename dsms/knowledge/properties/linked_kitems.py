@@ -1,4 +1,4 @@
-"""Linked KItems KItemPropertyList"""
+"""Linked KItems of a KItem"""
 
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union

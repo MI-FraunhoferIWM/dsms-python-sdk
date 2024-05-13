@@ -1,4 +1,4 @@
-"""HDF5 Properties of a KItem"""
+"""HDF5 property of a KItem"""
 import logging
 from typing import TYPE_CHECKING
 
@@ -36,7 +36,7 @@ class Column(KItemProperty):
 
     def __repr__(self) -> str:
         """Pretty print the numerical datatype"""
-        if self.kitem.dsms.config.display_units:
+        if self.kitem and self.kitem.dsms.config.display_units:
             try:
                 unit = f"\tunit={self.get_unit().get('symbol')}\n\t\t"
                 string = str(self)
