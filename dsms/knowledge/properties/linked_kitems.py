@@ -188,10 +188,12 @@ class LinkedKItem(KItemProperty):
     @field_validator("custom_properties")
     @classmethod
     def validate_custom_properties(
-        cls, value: Dict[str, Any]
-    ) -> "Dict[str, Any]":
+        cls, value: "Optional[Dict[str, Any]]"
+    ) -> "Optional[Dict[str, Any]]":
         """Validate the custom properties of the linked KItem"""
-        return value.get("content") or value
+        if value:
+            value = value.get("content") or value
+        return value
 
 
 class LinkedKItemsProperty(KItemPropertyList):
