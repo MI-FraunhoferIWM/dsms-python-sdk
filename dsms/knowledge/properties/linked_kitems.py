@@ -10,6 +10,7 @@ from pydantic import (  # isort:skip
     Field,
     PrivateAttr,
     model_serializer,
+    field_validator,
 )
 
 from dsms.knowledge.properties.base import (  # isort:skip
@@ -105,7 +106,7 @@ class LinkedKItem(KItemProperty):
         [], description="Linked affiliations of the linked KItem"
     )
 
-    attachments: List[Optional[Attachment]] = Field(
+    attachments: List[Union[str, Optional[Attachment]]] = Field(
         [], description="Attachment of the linked KItem"
     )
 
@@ -158,10 +159,23 @@ class LinkedKItem(KItemProperty):
         """Set KItem related to the linked KItem"""
         cls._kitem = value
 
+    @field_validator("attachments", mode="before")
+    @classmethod
+    def validate_attachments_before(
+        cls, value: List[Union[str, Attachment]]
+    ) -> List[Attachment]:
+        """Validate attachments Field"""
+        return [
+            Attachment(name=attachment)
+            if isinstance(attachment, str)
+            else attachment
+            for attachment in value
+        ]
+
     # OVERRIDE
     @model_serializer
     def serialize_author(self) -> Dict[str, Any]:
-        """Serialize author model"""
+        """Serialize linked kitems model"""
         return {
             key: (
                 str(value)
@@ -170,6 +184,14 @@ class LinkedKItem(KItemProperty):
             )
             for key, value in self.__dict__.items()
         }
+
+    @field_validator("custom_properties")
+    @classmethod
+    def validate_custom_properties(
+        cls, value: Dict[str, Any]
+    ) -> "Dict[str, Any]":
+        """Validate the custom properties of the linked KItem"""
+        return value.get("content") or value
 
 
 class LinkedKItemsProperty(KItemPropertyList):
