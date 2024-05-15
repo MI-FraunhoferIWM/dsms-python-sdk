@@ -29,6 +29,7 @@ from dsms.knowledge.properties import (  # isort:skip
     AnnotationsProperty,
     App,
     AppsProperty,
+    Avatar,
     Attachment,
     AttachmentsProperty,
     Author,
@@ -185,11 +186,15 @@ class KItem(BaseModel):
         False, description="Whether the KItem holds an RDF Graph or not."
     )
 
+    avatar: Optional[Union[Avatar, Dict]] = Field(
+        default_factory=Avatar, description="KItem avatar interface"
+    )
+
     model_config = ConfigDict(
         extra="forbid",
         validate_assignment=True,
         validate_default=True,
-        exclude={"ktype"},
+        exclude={"ktype", "avatar"},
         arbitrary_types_allowed=True,
     )
 
@@ -491,6 +496,14 @@ class KItem(BaseModel):
             value = Summary(kitem=cls, text=value)
         return value
 
+    @field_validator("avatar", mode="before")
+    @classmethod
+    def validate_avatar(cls, value: "Union[Dict, Avatar]") -> Avatar:
+        """Validate avatar"""
+        if isinstance(value, dict):
+            value = Avatar(kitem=cls, **value)
+        return value
+
     @field_validator("hdf5")
     @classmethod
     def validate_hdf5(
@@ -559,7 +572,7 @@ class KItem(BaseModel):
         """
         for prop in self.__dict__.values():
             if (
-                isinstance(prop, (KItemPropertyList, Summary))
+                isinstance(prop, (KItemPropertyList, Summary, Avatar))
                 and not prop.kitem
             ):
                 logger.debug(

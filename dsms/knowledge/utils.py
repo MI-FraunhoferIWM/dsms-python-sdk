@@ -1,4 +1,5 @@
 """DSMS knowledge utilities"""
+import base64
 import io
 import logging
 import re
@@ -9,6 +10,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
 import pandas as pd
+import segno
+from PIL import Image
 from requests import Response
 
 from pydantic import (  # isort: skip
@@ -262,6 +265,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
     payload = new_kitem.model_dump(
         exclude={
             "authors",
+            "avatar",
             "annotations",
             "custom_properties",
             "linked_kitems",
@@ -288,6 +292,14 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
     )
     if new_kitem.custom_properties:
         custom_properties = new_kitem.custom_properties.model_dump()
+        # # a smarted detection whether the custom properties were updated is needed
+        # old_properties = old_kitem.get("custom_properties")
+        # if isinstance(old_properties, dict):
+        #     old_custom_properties = old_properties.get("content")
+        # else:
+        #     old_custom_properties = None
+        # if custom_properties != old_custom_properties:
+        #     payload.update(custom_properties={"content": custom_properties})
         payload.update(custom_properties={"content": custom_properties})
     logger.debug(
         "Update KItem for `%s` with payload: %s", new_kitem.id, payload
@@ -497,6 +509,8 @@ def _commit_updated(buffer: "Dict[str, KItem]") -> None:
                 _delete_hdf5(new_kitem.id)
             _update_kitem(new_kitem, old_kitem)
             _update_attachments(new_kitem, old_kitem)
+            if new_kitem.avatar.file or new_kitem.avatar.include_qr:
+                _commit_avatar(new_kitem)
             new_kitem.in_backend = True
             logger.debug(
                 "Fetching updated KItem from remote backend: %s", new_kitem.id
@@ -632,3 +646,72 @@ def _update_hdf5(kitem_id: str, data: pd.DataFrame):
 def _delete_hdf5(kitem_id: str) -> Response:
     logger.debug("Delete HDF5 for kitem with id `%s`.", kitem_id)
     return _perform_request(f"api/knowledge/data_api/{kitem_id}", "delete")
+
+
+def _commit_avatar(kitem) -> None:
+    if kitem.avatar_exists:
+        response = _perform_request(
+            f"api/knowledge/avatar/{kitem.id}", "delete"
+        )
+        if not response.ok:
+            message = (
+                f"Something went wrong deleting the avatar: {response.text}"
+            )
+            raise RuntimeError(message)
+    avatar = kitem.avatar.generate()
+    buffer = io.BytesIO()
+    avatar.save(buffer, "JPEG", quality=100)
+    buffer.seek(0)
+    encoded_image = base64.b64encode(buffer.getvalue())
+    encoded_image_str = "data:image/jpeg;base64," + encoded_image.decode(
+        "utf-8"
+    )
+    response = _perform_request(
+        f"api/knowledge/avatar/{kitem.id}",
+        "put",
+        json={
+            "croppedImage": encoded_image_str,
+            "originalImage": encoded_image_str,
+            "filename": kitem.name + ".jpeg",
+        },
+    )
+    if not response.ok:
+        raise RuntimeError(
+            f"Something went wrong while updating the avatar: {response.text}"
+        )
+
+
+def _make_avatar(
+    kitem: "KItem", image: Optional[Union[str, Image.Image]], make_qr: bool
+) -> Image.Image:
+    if make_qr:
+        qrcode = segno.make(kitem.url)
+        if image:
+            out = io.BytesIO()
+            if isinstance(image, Image.Image):
+                raise TypeError(
+                    """When a QR Code is generated with an image as background,
+                       its filepath must be a string"""
+                )
+            qrcode.to_artistic(
+                background=image, target=out, scale=5, kind="jpeg", border=0
+            )
+            avatar = Image.open(out)
+        else:
+            avatar = qrcode.to_pil(scale=5, border=0)
+    if image and not make_qr:
+        if isinstance(image, str):
+            avatar = Image.open(image)
+        else:
+            avatar = image
+    if not image and not make_qr:
+        raise RuntimeError(
+            "Cannot generate avator. Neither `include_qr` or `file` are specified."
+        )
+    return avatar
+
+
+def _get_avatar(kitem: "KItem") -> Image.Image:
+    response = _perform_request(f"api/knowledge/avatar/{kitem.id}", "get")
+    buffer = io.BytesIO(response.content)
+    return Image.open(buffer)
