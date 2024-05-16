@@ -616,6 +616,13 @@ class KItem(BaseModel):
             f"knowledge/{cls._get_ktype_as_str()}/{cls.slug}",
         )
 
+    def is_a(self, to_be_compared: KType) -> bool:
+        """Check the KType of the KItem"""
+        return (
+            self.ktype_id.value  # pylint: disable=no-member
+            == to_be_compared.value
+        )
+
     def _get_ktype_as_str(self) -> str:
         if isinstance(self.ktype_id, str):
             ktype = self.ktype_id

@@ -23,6 +23,8 @@ def test_kitem_basic(custom_address, get_mock_kitem_ids):
         ktype_id=dsms.ktypes.Organization,
     )
 
+    assert instance.is_a(dsms.ktypes.Organization)
+
     assert isinstance(instance.dsms, DSMS)
     assert isinstance(instance.dsms.config, Configuration)
     assert Context.dsms == instance.dsms
@@ -48,6 +50,8 @@ def test_kitem_config_class(custom_address, get_mock_kitem_ids):
         name="foo123",
         ktype_id=dsms.ktypes.Organization,
     )
+
+    assert instance.is_a(dsms.ktypes.Organization)
 
     assert isinstance(instance.dsms, DSMS)
     assert config == instance.dsms.config
@@ -82,8 +86,10 @@ def test_kitem_custom_config_env(custom_address, get_mock_kitem_ids):
     custom_instance = KItem(
         id=get_mock_kitem_ids[0],
         name="foo123",
-        ktype_id=dsms.ktypes.Organization,
+        ktype_id=dsms.ktypes.Dataset,
     )
+
+    assert custom_instance.is_a(dsms.ktypes.Dataset)
 
     assert str(custom_instance.dsms.config.host_url) == custom_address
 
@@ -140,7 +146,7 @@ def test_kitem_default_ktypes(custom_address):
     with pytest.warns(UserWarning, match="No authentication details"):
         dsms = DSMS(host_url=custom_address)
 
-    assert len(dsms.ktypes) == 1
+    assert len(dsms.ktypes) == 2
 
 
 @responses.activate

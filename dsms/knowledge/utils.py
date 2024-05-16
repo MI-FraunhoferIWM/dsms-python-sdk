@@ -686,6 +686,7 @@ def _make_avatar(
 ) -> Image.Image:
     avatar = None
     if make_qr:
+        # this should be moved to the backend sooner or later
         qrcode = segno.make(kitem.url)
         if image:
             out = io.BytesIO()
