@@ -684,6 +684,7 @@ def _commit_avatar(kitem) -> None:
 def _make_avatar(
     kitem: "KItem", image: Optional[Union[str, Image.Image]], make_qr: bool
 ) -> Image.Image:
+    avatar = None
     if make_qr:
         qrcode = segno.make(kitem.url)
         if image:
