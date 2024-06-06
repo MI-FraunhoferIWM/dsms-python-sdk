@@ -18,9 +18,9 @@ class Attachment(KItemProperty):
 
     name: str = Field(..., description="File name of the attachment")
 
-    def download(self) -> str:
+    def download(self, as_bytes: bool = False) -> "Union[str, bytes]":
         """Download attachment file"""
-        return _get_attachment(self.id, self.name)
+        return _get_attachment(self.id, self.name, as_bytes)
 
 
 class AttachmentsProperty(KItemPropertyList):

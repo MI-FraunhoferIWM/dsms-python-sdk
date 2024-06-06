@@ -371,7 +371,9 @@ def _delete_attachments(kitem: "KItem", file_name: str) -> None:
         )
 
 
-def _get_attachment(kitem_id: "KItem", file_name: str) -> str:
+def _get_attachment(
+    kitem_id: "KItem", file_name: str, as_bytes: bool
+) -> Union[str, bytes]:
     """Download attachment from KItem"""
     url = f"api/knowledge/attachments/{kitem_id}/{file_name}"
     response = _perform_request(url, "get")
@@ -379,7 +381,11 @@ def _get_attachment(kitem_id: "KItem", file_name: str) -> str:
         raise RuntimeError(
             f"Download for attachment `{file_name}` was not successful: {response.text}"
         )
-    return response.text
+    if not as_bytes:
+        content = response.text
+    else:
+        content = response.content
+    return content
 
 
 def _get_apps_diff(
