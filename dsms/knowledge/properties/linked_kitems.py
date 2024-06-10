@@ -59,6 +59,16 @@ class LinkedLinkedKItem(BaseModel):
         return str(self)
 
 
+class LinkedKItemSummary(BaseModel):
+    """Summary of a linked KItem"""
+
+    id: str = Field(..., description="ID of the linked KItem")
+
+    text: str = Field(
+        ..., description="Text for the summary of the linked KItem"
+    )
+
+
 class LinkedKItem(KItemProperty):
     """Data model of a linked KItem"""
 
@@ -74,7 +84,7 @@ class LinkedKItem(KItemProperty):
 
     ktype_id: str = Field(..., description="Ktype ID of the linked KItem")
 
-    summary: Optional[str] = Field(
+    summary: Optional[Union[str, LinkedKItemSummary]] = Field(
         None, description="Summary of the linked KItem."
     )
 
@@ -133,14 +143,14 @@ class LinkedKItem(KItemProperty):
     # OVERRIDE
     def __str__(self) -> str:
         """Pretty print the linked KItem"""
-        values = ",\n\t\t\t".join(
+        values = "\n\t\t\t".join(
             [
                 f"{key}: {value}"
                 for key, value in self.__dict__.items()
                 if key not in self.exclude
             ]
         )
-        return f"{{\n\t\t\t{values}\n\t\t}}"
+        return f"\n\t\t\t{values}\n\t\t"
 
     # OVERRIDE
     def __repr__(self) -> str:
@@ -171,6 +181,16 @@ class LinkedKItem(KItemProperty):
             else attachment
             for attachment in value
         ]
+
+    @field_validator("summary", mode="after")
+    @classmethod
+    def validate_summary_before(
+        cls, value: Union[str, LinkedKItemSummary]
+    ) -> str:
+        """Validate summary Field"""
+        if isinstance(value, LinkedKItemSummary):
+            value = value.text
+        return value
 
     # OVERRIDE
     @model_serializer
