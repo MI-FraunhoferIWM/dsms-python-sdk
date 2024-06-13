@@ -87,12 +87,12 @@ class App(KItemProperty):
             if key not in ["id", "kitem_app_id"]
         }
 
-    def run(self, in_background=False, **kwargs) -> None:
+    def run(self, wait=True, **kwargs) -> None:
         """Run application.
 
         Args:
-            in_background (bool, optional): whether the job shall be run asychronously
-                (in the background).
+            wait (bool, optional): whether the job shall not be run asychronously
+                (not in the background), but the object should wait until the job finished.
                 Warning: this may lead to a request timeout for long running jobs!
                     Job details may not be associated anymore when this occurs.
             **kwargs (Any, optional): Additional arguments to be passed to the workflow.
@@ -109,7 +109,7 @@ class App(KItemProperty):
                 f"api/knowledge/apps/argo/job/{name}",
                 "post",
                 json=kwargs,
-                params={"asynchronous": in_background},
+                params={"wait": wait},
             )
             if not response.ok:
                 raise RuntimeError(

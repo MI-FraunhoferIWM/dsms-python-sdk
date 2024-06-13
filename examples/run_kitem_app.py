@@ -15,7 +15,7 @@ print(job.artifacts)
 
 print("doing it asychronously")
 job = kitem.kitem_apps.by_title["Fetch from CKAN"].run(
-    transform=True, in_background=True
+    transform=True, wait=False
 )
 while True:
     time.sleep(1)
