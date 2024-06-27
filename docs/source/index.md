@@ -2,7 +2,7 @@
 
 Welcome to documentation of DSMS!
 
-Here you will find all the information regarding the installation, setup and basic usage of the DSMS and the python based DSMS-SDK.
+Here you will find all the information about DSMS and installation, setup and basic usage of the associated python based DSMS-SDK.
 
 
 ````{panels}
