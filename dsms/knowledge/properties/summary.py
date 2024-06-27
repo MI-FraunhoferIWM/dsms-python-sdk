@@ -1,4 +1,4 @@
-"""Custom properties of a KItem"""
+"""Summary of a KItem"""
 
 
 from typing import TYPE_CHECKING, Any, Optional

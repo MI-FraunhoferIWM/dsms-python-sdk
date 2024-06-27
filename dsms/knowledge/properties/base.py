@@ -1,4 +1,6 @@
 """Basic property for a KItem"""
+
+import logging
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Optional
 from uuid import UUID
@@ -11,8 +13,13 @@ from pydantic import (  # isort:skip
     model_serializer,
 )
 
+from dsms.core.logging import handler  # isort:skip
+
 from dsms.core.utils import _snake_to_camel  # isort:skip
 
+logger = logging.getLogger(__name__)
+logger.addHandler(handler)
+logger.propagate = False
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Set, Union
@@ -20,11 +27,11 @@ if TYPE_CHECKING:
     from dsms import Context, KItem
 
 
-class KPropertyItem(BaseModel):
-    """List item for the KItem-property"""
+class KItemProperty(BaseModel):
+    """Property of a KItem"""
 
     id: Optional[UUID] = Field(
-        None, description="KItem ID related to the KPropertyItem"
+        None, description="KItem ID related to the KItemProperty"
     )
 
     model_config = ConfigDict(
@@ -37,7 +44,7 @@ class KPropertyItem(BaseModel):
     _kitem = PrivateAttr(default=None)
 
     def __str__(self) -> str:
-        """Pretty print the KProperty"""
+        """Pretty print the KItemProperty"""
         values = ",\n\t\t\t".join(
             [
                 f"{key}: {value}"
@@ -48,17 +55,23 @@ class KPropertyItem(BaseModel):
         return f"{{\n\t\t\t{values}\n\t\t}}"
 
     def __repr__(self) -> str:
-        """Pretty print the KProperty"""
+        """Pretty print the KItemProperty"""
         return str(self)
 
     def __setattr__(self, key: str, item: "Any") -> None:
         """Add KItem to updated buffer."""
+        logger.debug(
+            "Setting property with key `%s` on KProperty level: %s.", key, item
+        )
         if (
             self.kitem
             and self.kitem.id not in self.context.buffers.updated
             and key not in ["_kitem", "kitem", "id"]
         ):
             self.context.buffers.updated.update({self.id: self.kitem})
+            logger.debug(
+                "Setting KItem with `%s` as  updated KItemProperty.__setattr__"
+            )
         super().__setattr__(key, item)
 
     def __hash__(self) -> int:
@@ -66,12 +79,12 @@ class KPropertyItem(BaseModel):
 
     @property
     def kitem(cls) -> "KItem":
-        """KItem related to the KPropertyItem"""
+        """KItem related to the KItemProperty"""
         return cls._kitem
 
     @kitem.setter
     def kitem(cls, item: "KItem") -> None:
-        """Set KItem related to the KPropertyItem"""
+        """Set KItem related to the KItemProperty"""
         cls._kitem = item
         cls.id = item.id
 
@@ -91,14 +104,14 @@ class KPropertyItem(BaseModel):
 
     @model_serializer
     def serialize(self):
-        """Serialize KPropertItem"""
+        """Serialize KItemProperty"""
         return {
             key: value for key, value in self.__dict__.items() if key != "id"
         }
 
 
-class KProperty(list):
-    """Basic class for an KItem-property."""
+class KItemPropertyList(list):
+    """List of a specific property belonging to a KItem."""
 
     def __init__(self, *args) -> None:
         self._kitem: "KItem" = None
@@ -108,7 +121,7 @@ class KProperty(list):
     @property
     @abstractmethod
     def k_property_item(cls) -> "Callable":
-        """Return the KPropertyItem-class for the KProperty"""
+        """Return the KItemProperty-class"""
 
     @property
     @abstractmethod
@@ -117,40 +130,51 @@ class KProperty(list):
         input into the k property item"""
 
     def __str__(self) -> str:
-        """Pretty print the KProperty"""
+        """Pretty print the KItemPropertyList"""
         values = ", \n".join(["\t\t" + repr(value) for value in self])
         if values:
             values = f"\n{values}\n\t"
         return f"[{values}]"
 
     def __repr__(self) -> str:
-        """Pretty print the KProperty"""
+        """Pretty print the KItemPropertyList"""
         return str(self)
 
     def __hash__(self) -> int:
         return hash(str(self))
 
     def __setitem__(
-        self, index: int, item: "Union[Dict, KPropertyItem]"
+        self, index: int, item: "Union[Dict, KItemPropertyList]"
     ) -> None:
-        """Add or Update KPropertyItem and add it to the updated-buffer."""
+        """Add or Update KItemPropertyList and add it to the updated-buffer."""
 
+        logger.debug(
+            "Setting property with index `%s` on KPropertyList level: %s.",
+            int,
+            item,
+        )
         self._mark_as_updated()
         item = self._check_item(item)
         super().__setitem__(index, item)
 
     def __delitem__(self, index: int) -> None:
-        """Delete the KPropertyItem from the KProperty"""
+        """Delete the KItemPropertyList from the KItemProperty"""
+
+        logger.debug(
+            "Deleting property with index `%s` on KPropertyList level", int
+        )
 
         self._mark_as_updated()
         super().__delitem__(index)
 
     def __imul__(self, index: int) -> None:
-        """Imul the KPropertyItem"""
+        """Imul the KItemPropertyList"""
         self._mark_as_updated()
         super().__imul__(index)
 
-    def _get_extendables(self, iterable: "Iterable") -> "List[KPropertyItem]":
+    def _get_extendables(
+        self, iterable: "Iterable"
+    ) -> "List[KItemPropertyList]":
         from dsms import KItem
 
         to_extend = []
@@ -160,7 +184,7 @@ class KProperty(list):
                     item = self._check_item(subitem)
                     if not item in self:
                         to_extend.append(item)
-            elif isinstance(item, (dict, KPropertyItem, KItem)):
+            elif isinstance(item, (dict, KItemPropertyList, KItem)):
                 item = self._check_item(item)
                 if not item in self:
                     to_extend.append(item)
@@ -170,44 +194,52 @@ class KProperty(list):
         return to_extend
 
     def extend(self, iterable: "Iterable") -> None:
-        """Extend KProperty with list of KPropertyItem"""
+        """Extend KItemPropertyList with list of KItemProperty"""
         to_extend = self._get_extendables(iterable)
 
         if to_extend:
+            logger.debug("Extending KPropertyList with %s.", to_extend)
             self._mark_as_updated()
             super().extend(to_extend)
 
     def append(self, item: "Union[Dict, Any]") -> None:
-        """Append KPropertyItem to KProperty"""
+        """Append KItemProperty to KItemPropertyList"""
 
         item = self._check_item(item)
 
         if not item in self:
+            logger.debug("Extending KPropertyList with %s.", item)
             self._mark_as_updated()
             super().append(item)
 
     def insert(self, index: int, item: "Union[Dict, Any]") -> None:
-        """Insert KPropertyItem at KProperty at certain index"""
+        """Insert KItemProperty at KItemPropertyList at certain index"""
 
         item = self._check_item(item)
         if not item in self:
+            logger.debug("Inserting into KPropertyList: %s.", item)
             self._mark_as_updated()
             super().insert(index, item)
 
-    def pop(self, index=-1) -> KPropertyItem:
-        """Pop KPropertyItem from KProperty"""
+    def pop(self, index=-1) -> KItemProperty:
+        """Pop KItemProperty from KItemPropertyList"""
 
         item = super().pop(index)
         self._mark_as_updated()
+        logger.debug(
+            "Popping KPropertyList with index `%s`:  %s.", index, item
+        )
         return item
 
     def remove(self, item: "Union[Dict, Any]") -> None:
-        """Remove KPropertyItem from KProperty"""
+        """Remove KItemProperty from KItemPropertyList"""
+
+        logger.debug("Remove from KPropertyList: %s.", item)
 
         self._mark_as_updated()
         super().remove(item)
 
-    def _check_item(self, item: "Union[Dict, Any]") -> KPropertyItem:
+    def _check_item(self, item: "Union[Dict, Any]") -> KItemProperty:
         item = self._check_k_property_item(item)
         if self.kitem:
             item.kitem = self.kitem
@@ -215,8 +247,8 @@ class KProperty(list):
 
     def _check_k_property_item(
         self, item: "Union[Dict, Any]"
-    ) -> KPropertyItem:
-        """Check the type of the processsed KPropertyItem"""
+    ) -> KItemProperty:
+        """Check the type of the processsed KItemProperty"""
         if not isinstance(item, BaseModel):
             if self.k_property_helper and not isinstance(item, dict):
                 item = self.k_property_helper(item)
@@ -230,8 +262,11 @@ class KProperty(list):
         return item
 
     def _mark_as_updated(self) -> None:
-        """Add KItem of KProperty to updated buffer"""
+        """Add KItem of KItemPropertyList to updated buffer"""
         if self._kitem and self._kitem.id not in self.context.buffers.updated:
+            logger.debug(
+                "Setting KItem with `%s` as updated on KItemPropertyList level"
+            )
             self.context.buffers.updated.update({self._kitem.id: self._kitem})
 
     @property
@@ -257,5 +292,5 @@ class KProperty(list):
 
     @property
     def values(cls) -> "List[Dict[str, Any]]":
-        """Values of the KProperty"""
+        """Values of the KItemPropertyList"""
         return list(cls)

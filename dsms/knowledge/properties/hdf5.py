@@ -1,11 +1,11 @@
-"""HDF5 Properties of a KItem"""
+"""HDF5 property of a KItem"""
 import logging
 from typing import TYPE_CHECKING
 
 import pandas as pd
 from pydantic import Field
 
-from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 from dsms.knowledge.utils import _get_hdf5_column, _is_number
 
 from dsms.knowledge.semantics.units import (  # isort:skip
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional
 
 
-class Column(KPropertyItem):
+class Column(KItemProperty):
     """
     Column of an HDF5 data frame.
 
@@ -36,7 +36,7 @@ class Column(KPropertyItem):
 
     def __repr__(self) -> str:
         """Pretty print the numerical datatype"""
-        if self.kitem.dsms.config.display_units:
+        if self.kitem and self.kitem.dsms.config.display_units:
             try:
                 unit = f"\tunit={self.get_unit().get('symbol')}\n\t\t"
                 string = str(self)
@@ -105,7 +105,7 @@ class Column(KPropertyItem):
         ]
 
 
-class HDF5Container(KProperty):
+class HDF5Container(KItemPropertyList):
     """HDF5 container of a data frame related to a KItem"""
 
     # OVERRIDE

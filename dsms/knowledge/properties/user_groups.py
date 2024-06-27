@@ -1,24 +1,24 @@
-"""UserGroup KProperty"""
+"""UserGroup property of a KItem"""
 
 from typing import TYPE_CHECKING
 
 from pydantic import Field
 
-from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 
 if TYPE_CHECKING:
     from typing import Callable
 
 
-class UserGroup(KPropertyItem):
+class UserGroup(KItemProperty):
     """Users groups related to a KItem."""
 
     name: str = Field(..., description="Name of the user group")
     group_id: str = Field(..., description="ID of the user group")
 
 
-class UserGroupsProperty(KProperty):
-    """KProperty for user_groups"""
+class UserGroupsProperty(KItemPropertyList):
+    """KItemPropertyList for user_groups"""
 
     @property
     def k_property_item(cls) -> "Callable":

@@ -94,6 +94,10 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
                 "name": "organization",
                 "id": "organization",
             },
+            {
+                "name": "dataset",
+                "id": "dataset",
+            },
         ]
         header = {"content_type": "application/json"}
         return (200, header, json.dumps(ktypes))

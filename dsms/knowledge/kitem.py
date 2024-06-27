@@ -1,6 +1,7 @@
 """Knowledge Item implementation of the DSMS"""
 
 import json
+import logging
 from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
@@ -19,6 +20,7 @@ from pydantic import (  # isort:skip
     model_validator,
 )
 
+from dsms.core.logging import handler  # isort:skip
 
 from dsms.knowledge.properties import (  # isort:skip
     Affiliation,
@@ -27,6 +29,7 @@ from dsms.knowledge.properties import (  # isort:skip
     AnnotationsProperty,
     App,
     AppsProperty,
+    Avatar,
     Attachment,
     AttachmentsProperty,
     Author,
@@ -35,7 +38,7 @@ from dsms.knowledge.properties import (  # isort:skip
     ContactsProperty,
     ExternalLink,
     ExternalLinksProperty,
-    KProperty,
+    KItemPropertyList,
     HDF5Container,
     Column,
     LinkedKItem,
@@ -49,6 +52,7 @@ from dsms.knowledge.ktype import KType  # isort:skip
 
 from dsms.knowledge.utils import (  # isort:skip
     _kitem_exists,
+    _get_kitem,
     _slug_is_available,
     _slugify,
     _inspect_hdf5,
@@ -60,6 +64,10 @@ from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
 if TYPE_CHECKING:
     from dsms import Context
     from dsms.core.dsms import DSMS
+
+logger = logging.getLogger(__name__)
+logger.addHandler(handler)
+logger.propagate = False
 
 
 class KItem(BaseModel):
@@ -178,17 +186,23 @@ class KItem(BaseModel):
         False, description="Whether the KItem holds an RDF Graph or not."
     )
 
+    avatar: Optional[Union[Avatar, Dict]] = Field(
+        default_factory=Avatar, description="KItem avatar interface"
+    )
+
     model_config = ConfigDict(
         extra="forbid",
         validate_assignment=True,
         validate_default=True,
-        exclude={"ktype"},
+        exclude={"ktype", "avatar"},
         arbitrary_types_allowed=True,
     )
 
     def __init__(self, **kwargs: "Any") -> None:
         """Initialize the KItem"""
         from dsms import DSMS
+
+        logger.debug("Initialize KItem with model data: %s", kwargs)
 
         # set dsms instance if not already done
         if not self.dsms:
@@ -199,20 +213,33 @@ class KItem(BaseModel):
 
         # add kitem to buffer
         if not self.in_backend and self.id not in self.context.buffers.created:
+            logger.debug(
+                "Marking KItem with ID `%s` as created and updated during KItem initialization.",
+                self.id,
+            )
             self.context.buffers.created.update({self.id: self})
             self.context.buffers.updated.update({self.id: self})
 
         self._set_kitem_for_properties()
 
+        logger.debug("KItem initialization successful.")
+
     def __setattr__(self, name, value) -> None:
         """Add kitem to updated-buffer if an attribute is set"""
         super().__setattr__(name, value)
+        logger.debug(
+            "Setting property with key `%s` on KItem level: %s.", name, value
+        )
         self._set_kitem_for_properties()
 
         if (
             self.id not in self.context.buffers.updated
             and not name.startswith("_")
         ):
+            logger.debug(
+                "Setting KItem with ID `%s` as updated during KItem.__setattr__",
+                self.id,
+            )
             self.context.buffers.updated.update({self.id: self})
 
     def __str__(self) -> str:
@@ -333,25 +360,33 @@ class KItem(BaseModel):
     @field_validator("linked_kitems", mode="before")
     @classmethod
     def validate_linked_kitems_list(
-        cls, value: "List[Union[Dict, KItem, Any]]"
+        cls, value: "List[Union[Dict, KItem, Any]]", info: ValidationInfo
     ) -> List[LinkedKItem]:
         """Validate each single kitem to be linked"""
+        src_id = info.data.get("id")
         linked_kitems = []
         for item in value:
             if isinstance(item, dict):
                 dest_id = item.get("id")
                 if not dest_id:
                     raise ValueError("Linked KItem is missing `id`")
+                linked_model = _get_kitem(dest_id, as_json=True)
             elif isinstance(item, KItem):
                 dest_id = item.id
+                linked_model = item.model_dump()
             else:
                 try:
                     dest_id = getattr(item, "id")
+                    linked_model = _get_kitem(dest_id, as_json=True)
                 except AttributeError as error:
                     raise AttributeError(
                         f"Linked KItem `{item}` has no attribute `id`."
                     ) from error
-            linked_kitems.append(LinkedKItem(id=dest_id))
+            if str(src_id) == str(dest_id):
+                raise ValueError(
+                    f"Cannot link KItem with ID `{src_id}` to itself!"
+                )
+            linked_kitems.append(LinkedKItem(**linked_model))
         return linked_kitems
 
     @field_validator("linked_kitems", mode="after")
@@ -461,6 +496,14 @@ class KItem(BaseModel):
             value = Summary(kitem=cls, text=value)
         return value
 
+    @field_validator("avatar", mode="before")
+    @classmethod
+    def validate_avatar(cls, value: "Union[Dict, Avatar]") -> Avatar:
+        """Validate avatar"""
+        if isinstance(value, dict):
+            value = Avatar(kitem=cls, **value)
+        return value
+
     @field_validator("hdf5")
     @classmethod
     def validate_hdf5(
@@ -528,7 +571,15 @@ class KItem(BaseModel):
         remain the context for the buffer if any of these properties is changed.
         """
         for prop in self.__dict__.values():
-            if isinstance(prop, (KProperty, Summary)) and not prop.kitem:
+            if (
+                isinstance(prop, (KItemPropertyList, Summary, Avatar))
+                and not prop.kitem
+            ):
+                logger.debug(
+                    "Setting kitem with ID `%s` for property `%s` on KItem level",
+                    self.id,
+                    type(prop),
+                )
                 prop.kitem = self
 
     @property
@@ -563,6 +614,13 @@ class KItem(BaseModel):
         return urljoin(
             str(cls.context.dsms.config.host_url),
             f"knowledge/{cls._get_ktype_as_str()}/{cls.slug}",
+        )
+
+    def is_a(self, to_be_compared: KType) -> bool:
+        """Check the KType of the KItem"""
+        return (
+            self.ktype_id.value  # pylint: disable=no-member
+            == to_be_compared.value
         )
 
     def _get_ktype_as_str(self) -> str:

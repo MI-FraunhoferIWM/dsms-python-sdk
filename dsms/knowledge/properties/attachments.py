@@ -1,11 +1,11 @@
-"""Attachment KProperty"""
+"""Attachment property of a KItem"""
 
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import Field
 
-from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 from dsms.knowledge.properties.utils import _str_to_dict
 from dsms.knowledge.utils import _get_attachment
 
@@ -13,18 +13,18 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Union
 
 
-class Attachment(KPropertyItem):
+class Attachment(KItemProperty):
     """Attachment uploaded by a  certain user."""
 
     name: str = Field(..., description="File name of the attachment")
 
-    def download(self) -> str:
+    def download(self, as_bytes: bool = False) -> "Union[str, bytes]":
         """Download attachment file"""
-        return _get_attachment(self.id, self.name)
+        return _get_attachment(self.id, self.name, as_bytes)
 
 
-class AttachmentsProperty(KProperty):
-    """KProperty for managing attachments."""
+class AttachmentsProperty(KItemPropertyList):
+    """KItemPropertyList for managing attachments."""
 
     # OVERRIDE
     @property
@@ -38,7 +38,7 @@ class AttachmentsProperty(KProperty):
         return _str_to_dict
 
     def extend(self, iterable: "Iterable") -> None:
-        """Extend KProperty with list of KPropertyItem"""
+        """Extend KItemPropertyList with list of KItemProperty"""
         from dsms import KItem
 
         to_extend = []
@@ -48,7 +48,7 @@ class AttachmentsProperty(KProperty):
                     item = self._check_item(subitem)
                     if not Path(item.name).stem in self.by_name:
                         to_extend.append(item)
-            elif isinstance(item, (dict, KPropertyItem, KItem)):
+            elif isinstance(item, (dict, KItemProperty, KItem)):
                 item = self._check_item(item)
                 if not Path(item.name).stem in self.by_name:
                     to_extend.append(item)
@@ -60,7 +60,7 @@ class AttachmentsProperty(KProperty):
             super().extend(to_extend)
 
     def append(self, item: "Union[Dict, Any]") -> None:
-        """Append KPropertyItem to KProperty"""
+        """Append KItemProperty to KItemPropertyList"""
 
         item = self._check_item(item)
 
@@ -69,7 +69,7 @@ class AttachmentsProperty(KProperty):
             super().append(item)
 
     def insert(self, index: int, item: "Union[Dict, Any]") -> None:
-        """Insert KPropertyItem at KProperty at certain index"""
+        """Insert KItemProperty at KItemPropertyList at certain index"""
 
         item = self._check_item(item)
         if not Path(item.name).stem in self.by_name:

@@ -1,4 +1,4 @@
-"""DContacts KProperty"""
+"""Contacts  property of a KItem"""
 
 
 from typing import TYPE_CHECKING, Optional
@@ -6,13 +6,13 @@ from uuid import UUID
 
 from pydantic import Field
 
-from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 
 if TYPE_CHECKING:
     from typing import Callable
 
 
-class ContactInfo(KPropertyItem):
+class ContactInfo(KItemProperty):
     """Contact info"""
 
     name: str = Field(..., description="Name of the contact person")
@@ -22,8 +22,8 @@ class ContactInfo(KPropertyItem):
     )
 
 
-class ContactsProperty(KProperty):
-    """KProperty for contacts"""
+class ContactsProperty(KItemPropertyList):
+    """KItemPropertyList for contacts"""
 
     # OVERRIDE
     @property
