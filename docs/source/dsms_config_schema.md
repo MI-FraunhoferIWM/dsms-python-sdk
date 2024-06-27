@@ -49,12 +49,5 @@ print(config)
 ```
 
 
-> **Reminder Tip**
->
-> As discussed in previous section in DSMS SDK section (refer to the [Accessing DSMS Core](dsms_sdk.md#accessing-dsms-core)) for accessing DSMS core, you either need to pass during initialization:
->
-> `username` and `password`
->
-> OR
->
-> `token`
+> **Reminder Tip :**
+>  As discussed in previous section in DSMS SDK section (refer to the [Accessing DSMS Core](dsms_sdk.md#accessing-dsms-core)) for accessing DSMS core, you either need to pass during initialization : `token` or `username + password`.
