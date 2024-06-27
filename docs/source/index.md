@@ -1,29 +1,47 @@
-# DSMS SDK Documentation
+# DSMS Documentation
 
-Welcome to the DSMS SDK documentation!
+Welcome to documentation of DSMS!
 
-Here you will find all the information regarding the installation, setup and basic usage of the DSMS python SDK.
+Here you will find all the information regarding the installation, setup and basic usage of the DSMS and the python based DSMS-SDK.
 
 
 ````{panels}
 :body: text-center.
 
 ---
-**Installation**
+**DSMS**
 
-Quick-setup of the DSMS-SDK
+Introduction to DSMS
 
-```{link-button} installation.html
-:text: Install the SDK!
+```{link-button} dsms.html
+:text: About DSMS
 :classes: btn-outline-primary stretched-link
 
 ---
-**Introduction**
+**DSMS-SDK**
 
- Overview of the DSMS-SDK.
+ Overview of the DSMS-SDK
 
-```{link-button} introduction.html
-:text: Basics of the SDK
+```{link-button} dsms_sdk.html
+:text: Basics of DSMS-SDK
+:classes: btn-outline-primary stretched-link
+
+---
+**DSMS KITEM SCHEMA**
+
+Overview of DSMS KItem Schema
+
+```{link-button} dsms_kitem_schema.html
+:text: DSMS KItem Schema
+:classes: btn-outline-primary stretched-link
+
+---
+**DSMS CONFIG SCHEMA**
+
+Overview of DSMS Config Schema
+
+```{link-button} dsms_config_schema.html
+:text: DSMS Config Schema
 :classes: btn-outline-primary stretched-link
 
 ---
@@ -46,8 +64,8 @@ Feel free to report any issues/missing information so we can take a look into it
 :caption: Table of contents
 :maxdepth: 1
 
-installation
-introduction
+dsms
+dsms_sdk
 Tutorials
 ```
 

@@ -16,7 +16,7 @@
 
 # -- Project information -----------------------------------------------------
 
-project = "DSMS-SDK Documentation"
+project = "DSMS Documentation"
 copyright = "2024, Materials Informatics Team at Fraunhofer IWM"
 author = "Materials Informatics, Fraunhofer IWM"
 release = "v1.0.0"
@@ -53,6 +53,10 @@ plantuml_output_format = "svg_img"
 # This pattern also affects html_static_path and html_extra_path.
 templates_path = ["_templates"]
 exclude_patterns = ["build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
+
+
+def setup(app):
+    app.add_css_file("custom.css")
 
 
 # -- Options for HTML output -------------------------------------------------

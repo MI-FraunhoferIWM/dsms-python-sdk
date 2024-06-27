@@ -1,4 +1,3 @@
-"""
 This code is part of the dsms-python-sdk package located at D:\HiWi\dsms-python-sdk\dsms.
 
 The dsms-python-sdk package provides a set of tools and utilities for interacting with the DSMS (Data Science Management System) platform. It offers functionality for data ingestion, data processing, model training, and model deployment.
@@ -11,8 +10,7 @@ The package is organized into the following packages:
 - `dsms.deploy`: Offers functionality for deploying trained models to the DSMS platform, including model packaging, versioning, and deployment management.
 
 Please refer to the individual package documentation for more details on their usage and available functionalities.
-"""
-"""
+
 This module contains the implementation of the dsms-python-sdk package.
 
 The dsms-python-sdk package provides a set of tools and utilities for interacting with the DSMS (Data Science Management System) platform.
@@ -27,18 +25,3 @@ Usage:
     ...
 
 For more information, please refer to the official documentation at https://github.com/username/dsms-python-sdk.
-"""
-# FILEPATH
-
-def calculate_sum(a, b):
-    """
-    Calculates the sum of two numbers.
-
-    Parameters:
-    a (int): The first number.
-    b (int): The second number.
-
-    Returns:
-    int: The sum of the two numbers.
-    """
-    return a + b
