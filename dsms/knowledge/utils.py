@@ -428,16 +428,21 @@ def _get_linked_diffs(
 
 def _get_attachment_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     """Check which attachments should be removed and which should be added."""
+    old_attachments = [
+        attachment.get("name")
+        for attachment in kitem_old.get("attachments")
+        if attachment.get("name")
+    ]
     return {
         "remove": [
             attachment
-            for attachment in kitem_old.get("attachments")
+            for attachment in old_attachments
             if attachment not in kitem_new.attachments.by_name
         ],
         "add": [
             attachment.name
             for name, attachment in kitem_new.attachments.by_name.items()
-            if name not in kitem_old.get("attachments")
+            if name not in old_attachments
         ],
     }
 
