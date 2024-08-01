@@ -80,7 +80,7 @@ class Configuration(BaseSettings):
 
     display_units: bool = Field(
         False,
-        description="""Whether the custom properties or the hdf5 columns shall
+        description="""Whether the custom properties or the dataframe columns shall
         directly reveal their unit when printed. WARNING: This might lead to performance issues.""",
     )
 
@@ -112,7 +112,7 @@ class Configuration(BaseSettings):
         pattern=MODULE_REGEX,
         description="""Class and Module specification in Python for a subclass of
           `dsms.knowledge.semantics.units.base:BaseUnitSparqlQuery` in order to retrieve
-          the units of a HDF5 column/ custom property of a KItem.""",
+          the units of a DataFrame column/ custom property of a KItem.""",
     )
 
     hide_properties: Set[Union[str, None]] = Field(

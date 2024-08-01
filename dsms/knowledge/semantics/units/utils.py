@@ -68,7 +68,7 @@ def get_conversion_factor(
 def get_property_unit(
     kitem_id: "Union[str, UUID]",
     property_name: str,
-    is_hdf5_column: bool = False,
+    is_dataframe_column: bool = False,
     autocomplete_symbol: bool = True,
 ) -> "Dict[str, Any]":
     """
@@ -78,7 +78,7 @@ def get_property_unit(
         kitem (KItem): The identifier of the KItem.
         property_name (str): The name of the property of the KItem  for which
             the unit is to be retrieved.
-        is_hdf5_column (bool, optional): Indicates whether the property is an HDF5
+        is_dataframe_column (bool, optional): Indicates whether the property is an DataFrame
             column or a custom property. Defaults to False.
         autocomplete_symbol (bool, optional): Whether the symbol of a unit shall be
             fetched automatically from the ontology when it is not given next to the
@@ -103,7 +103,7 @@ def get_property_unit(
         query = units_sparql_object(
             kitem_id=kitem_id,
             property_name=property_name,
-            is_hdf5_column=is_hdf5_column,
+            is_dataframe_column=is_dataframe_column,
             autocomplete_symbol=autocomplete_symbol,
         )
     except Exception as error:

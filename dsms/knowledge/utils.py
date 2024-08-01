@@ -280,7 +280,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "kitem_apps",
             "created_at",
             "external_links",
-            "hdf5",
+            "dataframe",
         },
         exclude_none=True,
     )
@@ -508,16 +508,16 @@ def _commit_updated(buffer: "Dict[str, KItem]") -> None:
             old_kitem,
         )
         if old_kitem:
-            if isinstance(new_kitem.hdf5, pd.DataFrame):
+            if isinstance(new_kitem.dataframe, pd.DataFrame):
                 logger.debug(
-                    "New KItem data has `pd.DataFrame`. Will push as hdf5."
+                    "New KItem data has `pd.DataFrame`. Will push as dataframe."
                 )
-                _update_hdf5(new_kitem.id, new_kitem.hdf5)
-                new_kitem.hdf5 = _inspect_hdf5(new_kitem.id)
-            elif isinstance(new_kitem.hdf5, type(None)) and _inspect_hdf5(
-                new_kitem.id
-            ):
-                _delete_hdf5(new_kitem.id)
+                _update_dataframe(new_kitem.id, new_kitem.dataframe)
+                new_kitem.dataframe = _inspect_dataframe(new_kitem.id)
+            elif isinstance(
+                new_kitem.dataframe, type(None)
+            ) and _inspect_dataframe(new_kitem.id):
+                _delete_dataframe(new_kitem.id)
             _update_kitem(new_kitem, old_kitem)
             _update_attachments(new_kitem, old_kitem)
             if new_kitem.avatar.file or new_kitem.avatar.include_qr:
@@ -539,7 +539,7 @@ def _commit_updated(buffer: "Dict[str, KItem]") -> None:
 def _commit_deleted(buffer: "Dict[str, KItem]") -> None:
     """Commit the buffer for the `deleted` buffers"""
     for kitem in buffer.values():
-        _delete_hdf5(kitem.id)
+        _delete_dataframe(kitem.id)
         _delete_kitem(kitem)
 
 
@@ -614,8 +614,8 @@ def _slug_is_available(ktype_id: Union[str, UUID], value: str) -> bool:
     return response.status_code == 404
 
 
-def _get_hdf5_column(kitem_id: str, column_id: int) -> List[Any]:
-    """Download the column of a hdf5 container of a certain kitem"""
+def _get_dataframe_column(kitem_id: str, column_id: int) -> List[Any]:
+    """Download the column of a dataframe container of a certain kitem"""
 
     response = _perform_request(
         f"api/knowledge/data_api/{kitem_id}/column-{column_id}", "get"
@@ -627,21 +627,21 @@ def _get_hdf5_column(kitem_id: str, column_id: int) -> List[Any]:
     return response.json().get("array")
 
 
-def _inspect_hdf5(kitem_id: str) -> Optional[List[Dict[str, Any]]]:
-    """Get column info for the hdf5 container of a certain kitem"""
+def _inspect_dataframe(kitem_id: str) -> Optional[List[Dict[str, Any]]]:
+    """Get column info for the dataframe container of a certain kitem"""
     response = _perform_request(f"api/knowledge/data_api/{kitem_id}", "get")
     if not response.ok and response.status_code == 404:
-        hdf5 = None
+        dataframe = None
     elif not response.ok and response.status_code != 404:
         message = f"""Something went wrong fetching intospection
         for kitem `{kitem_id}`: {response.text}"""
         raise ValueError(message)
     else:
-        hdf5 = response.json()
-    return hdf5
+        dataframe = response.json()
+    return dataframe
 
 
-def _update_hdf5(kitem_id: str, data: pd.DataFrame):
+def _update_dataframe(kitem_id: str, data: pd.DataFrame):
     buffer = io.BytesIO()
     data.to_json(buffer, indent=2)
     buffer.seek(0)
@@ -654,8 +654,8 @@ def _update_hdf5(kitem_id: str, data: pd.DataFrame):
         )
 
 
-def _delete_hdf5(kitem_id: str) -> Response:
-    logger.debug("Delete HDF5 for kitem with id `%s`.", kitem_id)
+def _delete_dataframe(kitem_id: str) -> Response:
+    logger.debug("Delete DataFrame for kitem with id `%s`.", kitem_id)
     return _perform_request(f"api/knowledge/data_api/{kitem_id}", "delete")
 
 

@@ -39,7 +39,7 @@ from dsms.knowledge.properties import (  # isort:skip
     ExternalLink,
     ExternalLinksProperty,
     KItemPropertyList,
-    HDF5Container,
+    DataFrameContainer,
     Column,
     LinkedKItem,
     LinkedKItemsProperty,
@@ -55,7 +55,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _get_kitem,
     _slug_is_available,
     _slugify,
-    _inspect_hdf5,
+    _inspect_dataframe,
     _make_annotation_schema,
 )
 
@@ -110,8 +110,8 @@ class KItem(BaseModel):
                 User groups able to access the KItem.
         custom_properties (Optional[Any]):
             Custom properties associated with the KItem.
-        hdf5 (Optional[Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]]):
-            HDF5 interface.
+        dataframe (Optional[Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]]):
+            DataFrame interface.
     """
 
     # public
@@ -178,9 +178,9 @@ class KItem(BaseModel):
         None, description="KType of the KItem", exclude=True
     )
 
-    hdf5: Optional[
+    dataframe: Optional[
         Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]
-    ] = Field(None, description="HDF5 interface.")
+    ] = Field(None, description="DataFrame interface.")
 
     rdf_exists: bool = Field(
         False, description="Whether the KItem holds an RDF Graph or not."
@@ -504,33 +504,35 @@ class KItem(BaseModel):
             value = Avatar(kitem=cls, **value)
         return value
 
-    @field_validator("hdf5")
+    @field_validator("dataframe")
     @classmethod
-    def validate_hdf5(
+    def validate_dataframe(
         cls,
         value: Union[
             List[Column], pd.DataFrame, Dict[str, Dict[Any, Any]]
         ],  # pylint: disable=unused-argument
         info: ValidationInfo,
-    ) -> HDF5Container:
-        """Get HDF5 container if it exists."""
+    ) -> DataFrameContainer:
+        """Get DataFrame container if it exists."""
         kitem_id = info.data.get("id")
         if isinstance(value, (pd.DataFrame, dict)):
             if isinstance(value, pd.DataFrame):
-                hdf5 = value.copy(deep=True)
+                dataframe = value.copy(deep=True)
             elif isinstance(value, dict):
-                hdf5 = pd.DataFrame.from_dict(value)
+                dataframe = pd.DataFrame.from_dict(value)
             else:
                 raise TypeError(
                     f"Data must be of type {dict} or {pd.DataFrame}, not {type(value)}"
                 )
         else:
-            columns = _inspect_hdf5(kitem_id)
+            columns = _inspect_dataframe(kitem_id)
             if columns:
-                hdf5 = HDF5Container([Column(**column) for column in columns])
+                dataframe = DataFrameContainer(
+                    [Column(**column) for column in columns]
+                )
             else:
-                hdf5 = None
-        return hdf5
+                dataframe = None
+        return dataframe
 
     @model_validator(mode="after")
     @classmethod

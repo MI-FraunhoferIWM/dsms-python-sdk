@@ -19,7 +19,7 @@ class UnitSparqlQuery(BaseUnitSparqlQuery):
     # OVERRIDE
     @property
     def query(cls) -> str:
-        """Construct sparql query for getting unit for hdf5 column"""
+        """Construct sparql query for getting unit for dataframe column"""
         kitem_id = cls.kwargs.get("kitem_id")
         property_name = cls.kwargs.get("property_name")
         if not kitem_id:

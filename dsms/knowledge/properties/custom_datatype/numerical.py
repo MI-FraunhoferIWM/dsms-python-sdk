@@ -66,7 +66,7 @@ class NumericalDataType(float):
         return get_property_unit(
             self.kitem.id,
             self.name,
-            is_hdf5_column=True,
+            is_dataframe_column=True,
             autocomplete_symbol=self.kitem.dsms.config.autocomplete_units,
         )
 
