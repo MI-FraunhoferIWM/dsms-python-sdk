@@ -182,7 +182,9 @@ class DSMS:
     @property
     def apps(cls) -> "List[App]":
         """Return available KItem apps in the DSMS"""
-        return _get_available_apps()
+        from dsms.apps import App
+
+        return [App(**app) for app in _get_available_apps()]
 
     @property
     def buffers(cls) -> "Buffers":

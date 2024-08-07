@@ -2,6 +2,7 @@
 import base64
 import io
 import logging
+import os
 import re
 import warnings
 from enum import Enum
@@ -33,6 +34,7 @@ from dsms.knowledge.properties.custom_datatype import (  # isort:skip
 from dsms.knowledge.search import SearchResult  # isort:skip
 
 if TYPE_CHECKING:
+    from dsms.apps import App
     from dsms.core.context import Buffers
     from dsms.knowledge import KItem, KType
 
@@ -492,55 +494,99 @@ def _commit(buffers: "Buffers") -> None:
     logger.debug("Committing successful, clearing buffers.")
 
 
-def _commit_created(buffer: "Dict[str, KItem]") -> dict:
+def _commit_created(buffer: "Dict[str, Union[KItem, KType, App]]") -> dict:
     """Commit the buffer for the `created` buffers"""
-    for kitem in buffer.values():
-        _create_new_kitem(kitem)
+    from dsms import App, KItem, KType
 
-
-def _commit_updated(buffer: "Dict[str, KItem]") -> None:
-    """Commit the buffer for the `updated` buffers"""
-    for new_kitem in buffer.values():
-        old_kitem = _get_kitem(new_kitem.id, as_json=True)
-        logger.debug(
-            "Fetched data from old KItem with id `%s`: %s",
-            new_kitem.id,
-            old_kitem,
-        )
-        if old_kitem:
-            if isinstance(new_kitem.dataframe, pd.DataFrame):
-                logger.debug(
-                    "New KItem data has `pd.DataFrame`. Will push as dataframe."
-                )
-                _update_dataframe(new_kitem.id, new_kitem.dataframe)
-                new_kitem.dataframe = _inspect_dataframe(new_kitem.id)
-            elif isinstance(
-                new_kitem.dataframe, type(None)
-            ) and _inspect_dataframe(new_kitem.id):
-                _delete_dataframe(new_kitem.id)
-            _update_kitem(new_kitem, old_kitem)
-            _update_attachments(new_kitem, old_kitem)
-            if new_kitem.avatar.file or new_kitem.avatar.include_qr:
-                _commit_avatar(new_kitem)
-            new_kitem.in_backend = True
-            logger.debug(
-                "Fetching updated KItem from remote backend: %s", new_kitem.id
+    for obj in buffer.values():
+        if isinstance(obj, KItem):
+            _create_new_kitem(obj)
+        elif isinstance(obj, App):
+            _create_or_update_app(obj)
+        elif isinstance(obj, KType):
+            raise NotImplementedError(
+                "Committing of KTypes not implemented yet."
             )
-            for key, value in _get_kitem(new_kitem.id, as_json=True).items():
-                logger.debug(
-                    "Set updated property `%s` for KItem with id `%s` after commiting: %s",
-                    key,
-                    new_kitem.id,
-                    value,
-                )
-                setattr(new_kitem, key, value)
+        else:
+            raise TypeError(
+                f"Object `{obj}` of type {type(obj)} cannot be committed."
+            )
 
 
-def _commit_deleted(buffer: "Dict[str, KItem]") -> None:
+def _commit_updated(buffer: "Dict[str, Union[KItem, App, KType]]") -> None:
+    """Commit the buffer for the `updated` buffers"""
+    from dsms import App, KItem, KType
+
+    for obj in buffer.values():
+        if isinstance(obj, KItem):
+            _commit_updated_kitem(obj)
+        elif isinstance(obj, App):
+            _create_or_update_app(obj, overwrite=True)
+        elif isinstance(obj, KType):
+            raise NotImplementedError(
+                "Committing of KTypes not implemented yet."
+            )
+        else:
+            raise TypeError(
+                f"Object `{obj}` of type {type(obj)} cannot be committed."
+            )
+
+
+def _commit_updated_kitem(new_kitem: "KItem") -> None:
+    """Commit the updated KItems"""
+    old_kitem = _get_kitem(new_kitem.id, as_json=True)
+    logger.debug(
+        "Fetched data from old KItem with id `%s`: %s",
+        new_kitem.id,
+        old_kitem,
+    )
+    if old_kitem:
+        if isinstance(new_kitem.dataframe, pd.DataFrame):
+            logger.debug(
+                "New KItem data has `pd.DataFrame`. Will push as dataframe."
+            )
+            _update_dataframe(new_kitem.id, new_kitem.dataframe)
+            new_kitem.dataframe = _inspect_dataframe(new_kitem.id)
+        elif isinstance(
+            new_kitem.dataframe, type(None)
+        ) and _inspect_dataframe(new_kitem.id):
+            _delete_dataframe(new_kitem.id)
+        _update_kitem(new_kitem, old_kitem)
+        _update_attachments(new_kitem, old_kitem)
+        if new_kitem.avatar.file or new_kitem.avatar.include_qr:
+            _commit_avatar(new_kitem)
+        new_kitem.in_backend = True
+        logger.debug(
+            "Fetching updated KItem from remote backend: %s", new_kitem.id
+        )
+        for key, value in _get_kitem(new_kitem.id, as_json=True).items():
+            logger.debug(
+                "Set updated property `%s` for KItem with id `%s` after commiting: %s",
+                key,
+                new_kitem.id,
+                value,
+            )
+            setattr(new_kitem, key, value)
+
+
+def _commit_deleted(buffer: "Dict[str, Union[KItem, KType, App]]") -> None:
     """Commit the buffer for the `deleted` buffers"""
-    for kitem in buffer.values():
-        _delete_dataframe(kitem.id)
-        _delete_kitem(kitem)
+    from dsms import App, KItem, KType
+
+    for obj in buffer.values():
+        if isinstance(obj, KItem):
+            _delete_dataframe(obj.id)
+            _delete_kitem(obj)
+        elif isinstance(obj, App):
+            raise NotImplementedError("Deletion of Apps not implemented yet.")
+        elif isinstance(obj, KType):
+            raise NotImplementedError(
+                "Deletion of KTypes not implemented yet."
+            )
+        else:
+            raise TypeError(
+                f"Object `{obj}` of type {type(obj)} cannot be committed or deleted."
+            )
 
 
 def _split_iri(iri: str) -> List[str]:
@@ -728,3 +774,21 @@ def _get_avatar(kitem: "KItem") -> Image.Image:
     response = _perform_request(f"api/knowledge/avatar/{kitem.id}", "get")
     buffer = io.BytesIO(response.content)
     return Image.open(buffer)
+
+
+def _create_or_update_app(app: "App", overwrite=False) -> None:
+    if os.path.exists(app.specification):
+        with open(app.specification, mode="rb") as file:
+            upload_file = {"dataFile": file}
+    else:
+        upload_file = {"dataFile": io.StringIO(app.specification)}
+    response = _perform_request(
+        f"knowledge/api/apps/argo/{app.basename}",
+        "put",
+        files=upload_file,
+        params={"overwrite": overwrite},
+    )
+    if not response.ok:
+        message = f"Something went wrong uploading app with name `{app.basename}`: {response.text}"
+        raise RuntimeError(message)
+    return response.text
