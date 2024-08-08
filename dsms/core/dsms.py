@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 
 from dotenv import load_dotenv
 
-from dsms.apps.utils import _get_available_apps
+from dsms.apps.utils import _get_available_apps_specs
 from dsms.core.configuration import Configuration
 from dsms.core.context import Context
 from dsms.core.utils import _ping_dsms
@@ -184,7 +184,7 @@ class DSMS:
         """Return available KItem apps in the DSMS"""
         from dsms.apps import App
 
-        return [App(**app) for app in _get_available_apps()]
+        return [App(**app) for app in _get_available_apps_specs()]
 
     @property
     def buffers(cls) -> "Buffers":

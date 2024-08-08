@@ -35,7 +35,7 @@ class Configuration(BaseSettings):
         ..., description="Url of the DSMS instance to connect."
     )
     request_timeout: int = Field(
-        30,
+        120,
         description="Timeout in seconds until the request to the DSMS is timed out.",
     )
 

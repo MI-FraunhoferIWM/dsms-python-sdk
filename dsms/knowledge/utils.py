@@ -34,7 +34,7 @@ from dsms.knowledge.properties.custom_datatype import (  # isort:skip
 from dsms.knowledge.search import SearchResult  # isort:skip
 
 if TYPE_CHECKING:
-    from dsms.apps import App
+    from dsms.apps import AppConfig
     from dsms.core.context import Buffers
     from dsms.knowledge import KItem, KType
 
@@ -494,15 +494,17 @@ def _commit(buffers: "Buffers") -> None:
     logger.debug("Committing successful, clearing buffers.")
 
 
-def _commit_created(buffer: "Dict[str, Union[KItem, KType, App]]") -> dict:
+def _commit_created(
+    buffer: "Dict[str, Union[KItem, KType, AppConfig]]",
+) -> dict:
     """Commit the buffer for the `created` buffers"""
-    from dsms import App, KItem, KType
+    from dsms import AppConfig, KItem, KType
 
     for obj in buffer.values():
         if isinstance(obj, KItem):
             _create_new_kitem(obj)
-        elif isinstance(obj, App):
-            _create_or_update_app(obj)
+        elif isinstance(obj, AppConfig):
+            _create_or_update_app_spec(obj)
         elif isinstance(obj, KType):
             raise NotImplementedError(
                 "Committing of KTypes not implemented yet."
@@ -513,15 +515,17 @@ def _commit_created(buffer: "Dict[str, Union[KItem, KType, App]]") -> dict:
             )
 
 
-def _commit_updated(buffer: "Dict[str, Union[KItem, App, KType]]") -> None:
+def _commit_updated(
+    buffer: "Dict[str, Union[KItem, AppConfig, KType]]",
+) -> None:
     """Commit the buffer for the `updated` buffers"""
-    from dsms import App, KItem, KType
+    from dsms import AppConfig, KItem, KType
 
     for obj in buffer.values():
         if isinstance(obj, KItem):
             _commit_updated_kitem(obj)
-        elif isinstance(obj, App):
-            _create_or_update_app(obj, overwrite=True)
+        elif isinstance(obj, AppConfig):
+            _create_or_update_app_spec(obj, overwrite=True)
         elif isinstance(obj, KType):
             raise NotImplementedError(
                 "Committing of KTypes not implemented yet."
@@ -569,16 +573,20 @@ def _commit_updated_kitem(new_kitem: "KItem") -> None:
             setattr(new_kitem, key, value)
 
 
-def _commit_deleted(buffer: "Dict[str, Union[KItem, KType, App]]") -> None:
+def _commit_deleted(
+    buffer: "Dict[str, Union[KItem, KType, AppConfig]]",
+) -> None:
     """Commit the buffer for the `deleted` buffers"""
-    from dsms import App, KItem, KType
+    from dsms import AppConfig, KItem, KType
 
     for obj in buffer.values():
         if isinstance(obj, KItem):
             _delete_dataframe(obj.id)
             _delete_kitem(obj)
-        elif isinstance(obj, App):
-            raise NotImplementedError("Deletion of Apps not implemented yet.")
+        elif isinstance(obj, AppConfig):
+            raise NotImplementedError(
+                "Deletion of AppConfigs not implemented yet."
+            )
         elif isinstance(obj, KType):
             raise NotImplementedError(
                 "Deletion of KTypes not implemented yet."
@@ -776,7 +784,7 @@ def _get_avatar(kitem: "KItem") -> Image.Image:
     return Image.open(buffer)
 
 
-def _create_or_update_app(app: "App", overwrite=False) -> None:
+def _create_or_update_app_spec(app: "AppConfig", overwrite=False) -> None:
     """Create app specfication"""
     upload_file = {"def_file": io.StringIO(yaml.safe_dump(app.specification))}
     response = _perform_request(

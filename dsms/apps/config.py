@@ -1,6 +1,5 @@
 """DSMS apps models"""
 import logging
-import os
 import urllib.parse
 from typing import TYPE_CHECKING, Any, Dict, Union
 
@@ -11,10 +10,11 @@ from pydantic import (  # isort:skip
     ConfigDict,
     Field,
     field_validator,
+    model_validator,
 )
 
 from dsms.apps.utils import (  # isort:skip
-    _app_exists,
+    _app_spec_exists,
 )
 
 
@@ -29,14 +29,14 @@ if TYPE_CHECKING:
     from dsms import DSMS, Context
 
 
-class App(BaseModel):
+class AppConfig(BaseModel):
     """KItem app list"""
 
     name: str = Field(..., description="File name of the app in the DSMS.")
 
     specification: Union[str, Dict[str, Any]] = Field(
         ...,
-        description="File path for content of YAML Specification of the app",
+        description="File path for YAML Specification of the app",
     )
 
     model_config = ConfigDict(
@@ -64,13 +64,14 @@ class App(BaseModel):
             and self.name not in self.context.buffers.created
         ):
             logger.debug(
-                "Marking App with name `%s` as created and updated during App initialization.",
+                """Marking AppConfig with name `%s` as created
+                and updated during AppConfig initialization.""",
                 self.name,
             )
             self.context.buffers.created.update({self.name: self})
             self.context.buffers.updated.update({self.name: self})
 
-        logger.debug("App initialization successful.")
+        logger.debug("AppConfig initialization successful.")
 
     def __setattr__(self, name, value) -> None:
         """Add app to updated-buffer if an attribute is set"""
@@ -80,8 +81,8 @@ class App(BaseModel):
         )
         if self.name not in self.context.buffers.updated:
             logger.debug(
-                "Setting App with name `%s` as updated during App.__setattr__",
-                self.id,
+                "Setting AppConfig with name `%s` as updated during AppConfig.__setattr__",
+                self.name,
             )
             self.context.buffers.updated.update({self.name: self})
 
@@ -94,31 +95,34 @@ class App(BaseModel):
             raise ValueError(f"Basename contains invalid characters: {value}")
         return value
 
-    @field_validator("specification")
+    @model_validator(mode="after")
     @classmethod
-    def validate_specification(cls, value: Union[str, Dict[str, Any]]) -> str:
-        """Check whether the specification to be uploaded"""
-        from dsms import Context
+    def validate_specification(cls, self: "AppConfig") -> str:
+        """Check specification to be uploaded"""
 
-        if isinstance(value, str):
+        if isinstance(self.specification, str):
             try:
-                if os.path.exists(value):
-                    with open(
-                        value, encoding=Context.dsms.config.encoding
-                    ) as file:
-                        value = yaml.safe_load(file.read())
-                else:
-                    value = yaml.safe_load(value)
+                with open(
+                    self.specification, encoding=self.dsms.config.encoding
+                ) as file:
+                    content = file.read()
+            except Exception as error:
+                raise FileNotFoundError(
+                    f"Invalid file path. File does not exist under path `{self.specification}`."
+                ) from error
+            try:
+                self.specification = yaml.safe_load(content)
             except Exception as error:
                 raise RuntimeError(
-                    "Invalid file path or YAML syntax."
+                    f"Invalid yaml specification path: `{error.args[0]}`"
                 ) from error
-        return value
+            self.context.buffers.updated.update({self.name: self})
+        return self
 
     @property
     def in_backend(self) -> bool:
         """Checks whether the app already exists."""
-        return _app_exists(self.name)
+        return _app_spec_exists(self.name)
 
     @property
     def context(cls) -> "Context":

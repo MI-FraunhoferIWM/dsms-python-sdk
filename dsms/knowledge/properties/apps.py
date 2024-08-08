@@ -66,7 +66,7 @@ class App(KItemProperty):
     executable: str = Field(
         ..., description="Name of the executable related to the app"
     )
-    title: Optional[str] = Field(None, description="Title of the appilcation")
+    title: str = Field(..., description="Title of the appilcation")
     description: Optional[str] = Field(
         None, description="Description of the appilcation"
     )
@@ -87,7 +87,13 @@ class App(KItemProperty):
             if key not in ["id", "kitem_app_id"]
         }
 
-    def run(self, wait=True, token=False, **kwargs) -> None:
+    def run(
+        self,
+        wait=True,
+        set_token: bool = False,
+        set_host_url: bool = False,
+        **kwargs,
+    ) -> None:
         """Run application.
 
         Args:
@@ -103,40 +109,31 @@ class App(KItemProperty):
 
         """
         kwargs["kitem_id"] = str(self.id)
-        if token:
+        if set_token:
             kwargs[
                 "access_token"
             ] = self.context.dsms.config.token.get_secret_value()
+        if set_host_url:
+            kwargs["host_url"] = str(self.context.dsms.config.host_url)
 
-        if self.executable.endswith(".argo.yaml"):  # pylint: disable=no-member
-            name = self.executable.strip(  # pylint: disable=no-member
-                ".argo.yaml"
+        response = _perform_request(
+            f"api/knowledge/apps/argo/job/{self.executable}",
+            "post",
+            json=kwargs,
+            params={"wait": wait},
+        )
+        if not response.ok:
+            raise RuntimeError(
+                f"Submission was not successful: {response.text}"
             )
-            response = _perform_request(
-                f"api/knowledge/apps/argo/job/{name}",
-                "post",
-                json=kwargs,
-                params={"wait": wait},
-            )
-            if not response.ok:
-                raise RuntimeError(
-                    f"Submission was not successful: {response.text}"
-                )
-            submitted = response.json()
-        else:
-            raise TypeError("Type of app not supported yet.")
+        submitted = response.json()
+
         return Job(name=submitted.get("name"), executable=self.executable)
 
     @property
     def inputs(self) -> Dict[str, Any]:
         """Inputs defined for the app from the webform builder"""
-        if self.executable.endswith(".argo.yaml"):  # pylint: disable=no-member
-            name = self.executable.strip(  # pylint: disable=no-member
-                ".argo.yaml"
-            )
-            route = f"api/knowledge/apps/argo/{name}/inputs"
-        else:
-            raise TypeError("Inputs for type of app not supported yet.")
+        route = f"api/knowledge/apps/argo/{self.executable}/inputs"
         response = _perform_request(route, "get")
         if not response.ok:
             raise RuntimeError(
@@ -157,10 +154,9 @@ class Job(BaseModel):
     @property
     def status(self) -> JobStatus:
         """Get the status of the currently running job"""
-        if self.executable.endswith(".argo.yaml"):  # pylint: disable=no-member
-            route = f"api/knowledge/apps/argo/job/{self.name}/status"
-        else:
-            raise TypeError("Status for type of app not supported yet.")
+
+        route = f"api/knowledge/apps/argo/job/{self.name}/status"
+
         response = _perform_request(route, "get")
         if not response.ok:
             raise RuntimeError(f"Could not fetch job status: {response.text}")
@@ -170,16 +166,22 @@ class Job(BaseModel):
     def artifacts(self) -> Dict[str, Any]:
         """Get the atrifcats of a finished job"""
 
-        if self.executable.endswith(".argo.yaml"):  # pylint: disable=no-member
-            route = f"api/knowledge/apps/argo/job/{self.name}/artifacts"
-        else:
-            raise TypeError("Artifacts for type of app not supported yet.")
+        route = f"api/knowledge/apps/argo/job/{self.name}/artifacts"
         response = _perform_request(route, "get")
         if not response.ok:
             raise RuntimeError(
                 f"Could not fetch job artifacts: {response.text}"
             )
         return response.json()
+
+    @property
+    def logs(self) -> str:
+        """Get the logs of a job"""
+        route = f"api/knowledge/apps/argo/job/{self.name}/logs"
+        response = _perform_request(route, "get")
+        if not response.ok:
+            raise RuntimeError(f"Could not fetch job logs: {response.text}")
+        return response.text
 
 
 class AppsProperty(KItemPropertyList):

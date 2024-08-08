@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, List
 
 
-def _get_available_apps() -> "List[Dict[str, Any]]":
+def _get_available_apps_specs() -> "List[Dict[str, Any]]":
     """Get available KItem app."""
     response = _perform_request("api/knowledge/apps/list/argo", "get")
     if not response.ok:
@@ -18,7 +18,7 @@ def _get_available_apps() -> "List[Dict[str, Any]]":
     return response.json()
 
 
-def _app_exists(name: str) -> bool:
+def _app_spec_exists(name: str) -> bool:
     """Check whether the specification of the app already exists."""
     response = _perform_request(f"api/knowledge/apps/argo/{name}", "head")
     return response.ok
