@@ -21,10 +21,10 @@ item = KItem(
         {
             "executable": "testapp",
             "title": "data2rdf",
-                "additional_properties": {
-                    "triggerUponUpload": True,
-                    "triggerUponUploadFileExtensions": [".xlsx"],
-                },
+            "additional_properties": {
+                "triggerUponUpload": True,
+                "triggerUponUploadFileExtensions": [".xlsx"],
+            },
         }
     ],
 )
