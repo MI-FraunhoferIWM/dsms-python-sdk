@@ -1,16 +1,16 @@
 """Attachment property of a KItem"""
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Union
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 from dsms.knowledge.properties.utils import _str_to_dict
 from dsms.knowledge.utils import _get_attachment
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, List, Union
+    from typing import Any, Callable, Dict, Iterable, List
 
 
 class Attachment(KItemProperty):
@@ -18,9 +18,41 @@ class Attachment(KItemProperty):
 
     name: str = Field(..., description="File name of the attachment")
 
+    content: Optional[Union[str, bytes]] = Field(
+        None, description="Content of the file"
+    )
+
+    # OVERRIDE
+    model_config = ConfigDict(
+        exclude={"id", "content"},
+        populate_by_name=True,
+        from_attributes=True,
+    )
+
+    # OVERRIDE
+    def __str__(self) -> str:
+        """Pretty print the Attachment"""
+        values = ",\n\t\t\t".join(
+            [
+                f"{key}: {value}"
+                for key, value in self.__dict__.items()
+                if key not in self.exclude
+            ]
+        )
+        return f"{{\n\t\t\t{values}\n\t\t}}"
+
+    # OVERRIDE
+    def __repr__(self) -> str:
+        """Pretty print the Attachment"""
+        return str(self)
+
     def download(self, as_bytes: bool = False) -> "Union[str, bytes]":
         """Download attachment file"""
-        return _get_attachment(self.id, self.name, as_bytes)
+        if not self.content:
+            content = _get_attachment(self.id, self.name, as_bytes)
+        else:
+            content = self.content
+        return content
 
 
 class AttachmentsProperty(KItemPropertyList):

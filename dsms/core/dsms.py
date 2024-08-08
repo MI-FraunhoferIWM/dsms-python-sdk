@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from enum import Enum
     from typing import Optional
 
-    from dsms.apps import App
+    from dsms.apps import AppConfig
     from dsms.core.context import Buffers
     from dsms.knowledge.kitem import KItem
     from dsms.knowledge.ktype import KType
@@ -180,11 +180,14 @@ class DSMS:
         return _get_kitem_list()
 
     @property
-    def apps(cls) -> "List[App]":
-        """Return available KItem apps in the DSMS"""
-        from dsms.apps import App
+    def app_configs(cls) -> "List[AppConfig]":
+        """Return available app configs in the DSMS"""
+        from dsms.apps import AppConfig
 
-        return [App(**app) for app in _get_available_apps_specs()]
+        return [
+            AppConfig(**app_config)
+            for app_config in _get_available_apps_specs()
+        ]
 
     @property
     def buffers(cls) -> "Buffers":

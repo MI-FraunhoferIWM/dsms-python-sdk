@@ -1,4 +1,4 @@
-"""DSMS apps models"""
+"""DSMS app models"""
 import logging
 import urllib.parse
 from typing import TYPE_CHECKING, Any, Dict, Union
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 
 class AppConfig(BaseModel):
-    """KItem app list"""
+    """App config model"""
 
     name: str = Field(..., description="File name of the app in the DSMS.")
 
@@ -55,10 +55,10 @@ class AppConfig(BaseModel):
         if not self.dsms:
             self.dsms = DSMS()
 
-        # initialize the app
+        # initialize the app config
         super().__init__(**kwargs)
 
-        # add app to buffer
+        # add app config to buffer
         if (
             not self.in_backend
             and self.name not in self.context.buffers.created
@@ -85,6 +85,31 @@ class AppConfig(BaseModel):
                 self.name,
             )
             self.context.buffers.updated.update({self.name: self})
+
+    def __str__(self) -> str:
+        """Pretty print the app config fields"""
+        fields = ", ".join(
+            [
+                "{key}={value}".format(  # pylint: disable=consider-using-f-string
+                    key=key,
+                    value=(
+                        value
+                        if key != "specification"
+                        else {
+                            "metadata": value.get(  # pylint: disable=no-member
+                                "metadata"
+                            )
+                        }
+                    ),
+                )
+                for key, value in self.__dict__.items()
+            ]
+        )
+        return f"{self.__class__.__name__}({fields})"
+
+    def __repr__(self) -> str:
+        """Pretty print the kitem Fields"""
+        return str(self)
 
     @field_validator("name")
     @classmethod
@@ -121,7 +146,7 @@ class AppConfig(BaseModel):
 
     @property
     def in_backend(self) -> bool:
-        """Checks whether the app already exists."""
+        """Checks whether the app config already exists."""
         return _app_spec_exists(self.name)
 
     @property

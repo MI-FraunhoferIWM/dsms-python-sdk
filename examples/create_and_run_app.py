@@ -21,10 +21,10 @@ item = KItem(
         {
             "executable": "testapp",
             "title": "data2rdf",
-            #     "additional_properties": {
-            #         "triggerUponUpload": True,
-            #         "triggerUponUploadFileExtensions": [".xlsx"],
-            #     },
+                "additional_properties": {
+                    "triggerUponUpload": True,
+                    "triggerUponUploadFileExtensions": [".xlsx"],
+                },
         }
     ],
 )
@@ -65,5 +65,5 @@ while True:
     print(job.status)
     print("\n Current logs:")
     print(job.logs)
-    if job.status.phase == "Succeeded":
+    if job.status.phase != "Running":
         break

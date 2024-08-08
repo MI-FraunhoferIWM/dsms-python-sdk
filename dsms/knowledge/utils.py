@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from dsms.apps import AppConfig
     from dsms.core.context import Buffers
     from dsms.knowledge import KItem, KType
+    from dsms.knowledge.properties import Attachment
 
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
@@ -342,11 +343,11 @@ def _update_attachments(
         _delete_attachments(new_kitem, remove)
 
 
-def _upload_attachments(kitem: "KItem", attachment: "str") -> None:
+def _upload_attachments(kitem: "KItem", attachment: "Attachment") -> None:
     """Upload the attachments of the KItem"""
-    path = Path(attachment)
+    path = Path(attachment.name)
 
-    if path.is_file():
+    if path.is_file() and not attachment.content:
         if not path.exists():
             raise FileNotFoundError(f"File {path} does not exist.")
 
@@ -361,6 +362,31 @@ def _upload_attachments(kitem: "KItem", attachment: "str") -> None:
             raise RuntimeError(
                 f"Could not upload attachment `{path}`: {response.text}"
             )
+    elif not path.is_file() and attachment.content:
+        if isinstance(attachment.content, str):
+            file = io.StringIO(attachment.content)
+        elif isinstance(attachment.content, bytes):
+            file = io.BytesIO(attachment.content)
+        else:
+            raise TypeError(
+                f"""Invalid content type of attachment with name
+                `{attachment.name}`: {type(attachment.content)}"""
+            )
+        upload_file = {"dataFile": file}
+        response = _perform_request(
+            f"api/knowledge/attachments/{kitem.id}",
+            "put",
+            files=upload_file,
+        )
+        if not response.ok:
+            raise RuntimeError(
+                f"Could not upload attachment `{path}`: {response.text}"
+            )
+    else:
+        raise RuntimeError(
+            f"""Invalid file path, attachment name or attachment content:
+            name={attachment.name},content={attachment.content}"""
+        )
 
 
 def _delete_attachments(kitem: "KItem", file_name: str) -> None:
@@ -442,9 +468,9 @@ def _get_attachment_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
             if attachment not in kitem_new.attachments.by_name
         ],
         "add": [
-            attachment.name
+            attachment
             for name, attachment in kitem_new.attachments.by_name.items()
-            if name not in old_attachments
+            if name not in old_attachments or attachment.content
         ],
     }
 
