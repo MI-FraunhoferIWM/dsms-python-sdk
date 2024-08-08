@@ -87,7 +87,7 @@ class App(KItemProperty):
             if key not in ["id", "kitem_app_id"]
         }
 
-    def run(self, wait=True, **kwargs) -> None:
+    def run(self, wait=True, token=False, **kwargs) -> None:
         """Run application.
 
         Args:
@@ -95,11 +95,18 @@ class App(KItemProperty):
                 (not in the background), but the object should wait until the job finished.
                 Warning: this may lead to a request timeout for long running jobs!
                     Job details may not be associated anymore when this occurs.
+            token (bool, optional): Whether the job also should receive the access
+                 token as paramter.If `True`, the JWT will be set as parameter with
+                 the name ´access_token`.
             **kwargs (Any, optional): Additional arguments to be passed to the workflow.
                 KItem ID is passed automatically
 
         """
         kwargs["kitem_id"] = str(self.id)
+        if token:
+            kwargs[
+                "access_token"
+            ] = self.context.dsms.config.token.get_secret_value()
 
         if self.executable.endswith(".argo.yaml"):  # pylint: disable=no-member
             name = self.executable.strip(  # pylint: disable=no-member

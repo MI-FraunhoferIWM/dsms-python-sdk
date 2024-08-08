@@ -2,7 +2,6 @@
 import base64
 import io
 import logging
-import os
 import re
 import warnings
 from enum import Enum
@@ -12,6 +11,7 @@ from uuid import UUID
 
 import pandas as pd
 import segno
+import yaml
 from PIL import Image
 from requests import Response
 
@@ -777,18 +777,15 @@ def _get_avatar(kitem: "KItem") -> Image.Image:
 
 
 def _create_or_update_app(app: "App", overwrite=False) -> None:
-    if os.path.exists(app.specification):
-        with open(app.specification, mode="rb") as file:
-            upload_file = {"dataFile": file}
-    else:
-        upload_file = {"dataFile": io.StringIO(app.specification)}
+    """Create app specfication"""
+    upload_file = {"def_file": io.StringIO(yaml.safe_dump(app.specification))}
     response = _perform_request(
-        f"knowledge/api/apps/argo/{app.basename}",
-        "put",
+        f"/api/knowledge/apps/argo/{app.name}",
+        "post",
         files=upload_file,
         params={"overwrite": overwrite},
     )
     if not response.ok:
-        message = f"Something went wrong uploading app with name `{app.basename}`: {response.text}"
+        message = f"Something went wrong uploading app with name `{app.name}`: {response.text}"
         raise RuntimeError(message)
     return response.text

@@ -1,20 +1,20 @@
 """DSMS apps models"""
-
 import logging
+import os
 import urllib.parse
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Dict, Union
+
+import yaml
 
 from pydantic import (  # isort:skip
     BaseModel,
     ConfigDict,
     Field,
     field_validator,
-    model_validator,
 )
 
 from dsms.apps.utils import (  # isort:skip
-    _get_app_specification,
-    _get_available_apps,
+    _app_exists,
 )
 
 
@@ -26,31 +26,22 @@ logger.addHandler(handler)
 logger.propagate = False
 
 if TYPE_CHECKING:
-    from typing import Any
-
     from dsms import DSMS, Context
 
 
 class App(BaseModel):
     """KItem app list"""
 
-    filename: Optional[str] = Field(
-        "", description="File name of the app in the DSMS."
-    )
-    basename: str = Field(..., description="Base name of the app in the DSMS.")
-    folder: Optional[str] = Field(
-        "", description="Directory of the app in the DSMS."
-    )
+    name: str = Field(..., description="File name of the app in the DSMS.")
 
-    specification: Optional[str] = Field(
-        None,
+    specification: Union[str, Dict[str, Any]] = Field(
+        ...,
         description="File path for content of YAML Specification of the app",
     )
 
     model_config = ConfigDict(
         extra="forbid",
         validate_assignment=True,
-        validate_default=True,
         arbitrary_types_allowed=True,
     )
 
@@ -70,14 +61,14 @@ class App(BaseModel):
         # add app to buffer
         if (
             not self.in_backend
-            and self.basename not in self.context.buffers.created
+            and self.name not in self.context.buffers.created
         ):
             logger.debug(
                 "Marking App with name `%s` as created and updated during App initialization.",
-                self.basename,
+                self.name,
             )
-            self.context.buffers.created.update({self.basename: self})
-            self.context.buffers.updated.update({self.basename: self})
+            self.context.buffers.created.update({self.name: self})
+            self.context.buffers.updated.update({self.name: self})
 
         logger.debug("App initialization successful.")
 
@@ -87,38 +78,47 @@ class App(BaseModel):
         logger.debug(
             "Setting property with key `%s` on KItem level: %s.", name, value
         )
-        if self.basename not in self.context.buffers.updated:
+        if self.name not in self.context.buffers.updated:
             logger.debug(
                 "Setting App with name `%s` as updated during App.__setattr__",
                 self.id,
             )
-            self.context.buffers.updated.update({self.basename: self})
+            self.context.buffers.updated.update({self.name: self})
 
-    @field_validator("basename")
+    @field_validator("name")
     @classmethod
-    def validate_basename(cls, value: str) -> str:
-        """Check whether the basename of the app contains invalid characters."""
+    def validate_name(cls, value: str) -> str:
+        """Check whether the name of the app contains invalid characters."""
         new_value = urllib.parse.quote_plus(value)
         if not new_value == value:
             raise ValueError(f"Basename contains invalid characters: {value}")
+        return value
 
-    @model_validator(mode="after")
+    @field_validator("specification")
     @classmethod
-    def validate_app(cls, self: "App") -> "App":
-        """Validate app definition."""
-        if self.in_backend and not self.specification:
-            self.specification = _get_app_specification(self.filename)
-            logger.info(
-                "App already exists in backend. Fetched the YAML specification."
-            )
-        return self
+    def validate_specification(cls, value: Union[str, Dict[str, Any]]) -> str:
+        """Check whether the specification to be uploaded"""
+        from dsms import Context
+
+        if isinstance(value, str):
+            try:
+                if os.path.exists(value):
+                    with open(
+                        value, encoding=Context.dsms.config.encoding
+                    ) as file:
+                        value = yaml.safe_load(file.read())
+                else:
+                    value = yaml.safe_load(value)
+            except Exception as error:
+                raise RuntimeError(
+                    "Invalid file path or YAML syntax."
+                ) from error
+        return value
 
     @property
     def in_backend(self) -> bool:
         """Checks whether the app already exists."""
-        return self.basename in [
-            app.get("basename") for app in _get_available_apps()
-        ]
+        return _app_exists(self.name)
 
     @property
     def context(cls) -> "Context":

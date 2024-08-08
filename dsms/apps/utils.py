@@ -1,6 +1,5 @@
 """KItem Apps utils"""
 
-import urllib.parse
 from typing import TYPE_CHECKING
 
 from dsms.core.utils import _perform_request
@@ -11,7 +10,7 @@ if TYPE_CHECKING:
 
 def _get_available_apps() -> "List[Dict[str, Any]]":
     """Get available KItem app."""
-    response = _perform_request("api/knowledge/apps", "get")
+    response = _perform_request("api/knowledge/apps/list/argo", "get")
     if not response.ok:
         message = f"""Something went wrong fetching the available app
         list in the DSMS: {response.text}"""
@@ -19,10 +18,15 @@ def _get_available_apps() -> "List[Dict[str, Any]]":
     return response.json()
 
 
+def _app_exists(name: str) -> bool:
+    """Check whether the specification of the app already exists."""
+    response = _perform_request(f"api/knowledge/apps/argo/{name}", "head")
+    return response.ok
+
+
 def _get_app_specification(appname) -> str:
-    safe_filename = urllib.parse.quote_plus(appname)
     response = _perform_request(
-        f"knowledge/api/apps/{safe_filename}",
+        f"knowledge/api/apps/argo/{appname}",
         "get",
     )
     if not response.ok:
