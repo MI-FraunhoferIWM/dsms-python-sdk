@@ -15,6 +15,7 @@ from pydantic import (  # isort:skip
 
 from dsms.apps.utils import (  # isort:skip
     _app_spec_exists,
+    _get_app_specification,
 )
 
 
@@ -141,6 +142,19 @@ class AppConfig(BaseModel):
                 raise RuntimeError(
                     f"Invalid yaml specification path: `{error.args[0]}`"
                 ) from error
+            self.context.buffers.updated.update({self.name: self})
+        elif isinstance(self.specification, dict) and self.in_backend:
+            spec = _get_app_specification(self.name)
+            if (
+                not yaml.safe_load(spec) == self.specification
+                and self.name not in self.context.buffers.updated
+            ):
+                self.context.buffers.updated.update({self.name: self})
+        elif (
+            isinstance(self.specification, dict)
+            and not self.in_backend
+            and self.name not in self.context.buffers.updated
+        ):
             self.context.buffers.updated.update({self.name: self})
         return self
 

@@ -372,6 +372,7 @@ def _upload_attachments(kitem: "KItem", attachment: "Attachment") -> None:
                 f"""Invalid content type of attachment with name
                 `{attachment.name}`: {type(attachment.content)}"""
             )
+        file.name = attachment.name
         upload_file = {"dataFile": file}
         response = _perform_request(
             f"api/knowledge/attachments/{kitem.id}",
@@ -610,9 +611,7 @@ def _commit_deleted(
             _delete_dataframe(obj.id)
             _delete_kitem(obj)
         elif isinstance(obj, AppConfig):
-            raise NotImplementedError(
-                "Deletion of AppConfigs not implemented yet."
-            )
+            _delete_app_spec(obj.name)
         elif isinstance(obj, KType):
             raise NotImplementedError(
                 "Deletion of KTypes not implemented yet."
@@ -814,12 +813,24 @@ def _create_or_update_app_spec(app: "AppConfig", overwrite=False) -> None:
     """Create app specfication"""
     upload_file = {"def_file": io.StringIO(yaml.safe_dump(app.specification))}
     response = _perform_request(
-        f"/api/knowledge/apps/argo/{app.name}",
+        f"/api/knowledge/apps/argo/spec/{app.name}",
         "post",
         files=upload_file,
         params={"overwrite": overwrite},
     )
     if not response.ok:
-        message = f"Something went wrong uploading app with name `{app.name}`: {response.text}"
+        message = f"Something went wrong uploading app spec with name `{app.name}`: {response.text}"
+        raise RuntimeError(message)
+    return response.text
+
+
+def _delete_app_spec(name: str) -> None:
+    """Delete app specfication"""
+    response = _perform_request(
+        f"/api/knowledge/apps/argo/spec/{name}",
+        "delete",
+    )
+    if not response.ok:
+        message = f"Something went wrong deleting app spec with name `{name}`: {response.text}"
         raise RuntimeError(message)
     return response.text

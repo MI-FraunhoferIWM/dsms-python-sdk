@@ -26,7 +26,7 @@ def _app_spec_exists(name: str) -> bool:
 
 def _get_app_specification(appname) -> str:
     response = _perform_request(
-        f"knowledge/api/apps/argo/spec/{appname}",
+        f"api/knowledge/apps/argo/spec/{appname}",
         "get",
     )
     if not response.ok:

@@ -100,20 +100,23 @@ class DSMS:
         """Get KItem from remote DSMS instance."""
         return _get_kitem(key)
 
-    def __delitem__(self, kitem) -> None:
-        """Stage an KItem for the deletion.
+    def __delitem__(self, obj) -> None:
+        """Stage an KItem, KType or AppConfig for the deletion.
         WARNING: Changes only will take place after executing the `commit`-method
         """
 
-        from dsms.knowledge.kitem import (  # isort:skip
-            KItem,
-        )
+        from dsms import KItem, AppConfig, KType  # isort:skip
 
-        if not isinstance(kitem, KItem):
+        if isinstance(obj, KItem):
+            self.context.buffers.deleted.update({obj.id: obj})
+        elif isinstance(obj, AppConfig):
+            self.context.buffers.deleted.update({obj.name: obj})
+        elif isinstance(obj, KType):
+            raise NotImplementedError("Deletion of KTypes not available yet.")
+        else:
             raise TypeError(
-                f"Object must be of type {KItem}, not {type(kitem)}. "
+                f"Object must be of type {KItem}, {AppConfig} or {KType}, not {type(obj)}. "
             )
-        kitem.context.buffers.deleted.update({kitem.id: kitem})
 
     def commit(self) -> None:
         """Commit and empty the buffers of the KItems to the DSMS backend."""
