@@ -57,6 +57,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _slugify,
     _inspect_dataframe,
     _make_annotation_schema,
+    _refresh_kitem,
 )
 
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
@@ -624,6 +625,10 @@ class KItem(BaseModel):
             self.ktype_id.value  # pylint: disable=no-member
             == to_be_compared.value
         )
+
+    def refresh(self) -> None:
+        """Refresh the KItem"""
+        _refresh_kitem(self)
 
     def _get_ktype_as_str(self) -> str:
         if isinstance(self.ktype_id, str):

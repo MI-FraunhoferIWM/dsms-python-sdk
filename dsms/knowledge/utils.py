@@ -590,14 +590,7 @@ def _commit_updated_kitem(new_kitem: "KItem") -> None:
         logger.debug(
             "Fetching updated KItem from remote backend: %s", new_kitem.id
         )
-        for key, value in _get_kitem(new_kitem.id, as_json=True).items():
-            logger.debug(
-                "Set updated property `%s` for KItem with id `%s` after commiting: %s",
-                key,
-                new_kitem.id,
-                value,
-            )
-            setattr(new_kitem, key, value)
+        new_kitem.refresh()
 
 
 def _commit_deleted(
@@ -620,6 +613,18 @@ def _commit_deleted(
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed or deleted."
             )
+
+
+def _refresh_kitem(kitem: "KItem") -> None:
+    """Refresh the KItem"""
+    for key, value in _get_kitem(kitem.id, as_json=True).items():
+        logger.debug(
+            "Set updated property `%s` for KItem with id `%s` after commiting: %s",
+            key,
+            kitem.id,
+            value,
+        )
+        setattr(kitem, key, value)
 
 
 def _split_iri(iri: str) -> List[str]:

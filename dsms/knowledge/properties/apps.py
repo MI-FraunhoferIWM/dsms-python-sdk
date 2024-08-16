@@ -127,6 +127,8 @@ class App(KItemProperty):
                 f"Submission was not successful: {response.text}"
             )
         submitted = response.json()
+        if wait:
+            self.kitem.refresh()
 
         return Job(name=submitted.get("name"), executable=self.executable)
 

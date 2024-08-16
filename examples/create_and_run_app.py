@@ -67,7 +67,7 @@ specification = {
 }
 
 print("\nCreate app specification")
-AppConfig(
+appspec = AppConfig(
     name=configname,
     specification=specification,  # this can also be a file path instead of a dict
 )
@@ -78,7 +78,7 @@ item = KItem(
     ktype_id=dsms.ktypes.Dataset,
     kitem_apps=[
         {
-            "executable": configname,
+            "executable": appspec.name,
             "title": "data2rdf",
             "additional_properties": {
                 "triggerUponUpload": True,
@@ -103,6 +103,12 @@ print(item)
 print("\nUpload attachment and trigger app")
 dsms.commit()
 
+print("\nGet dataframe")
+if not item.dataframe:
+    time.sleep(5)
+    item.refresh()
+print(item.dataframe.StandardForce.convert_to("N"))
+
 
 print(item)
 
@@ -110,6 +116,7 @@ print("\nRun pipeline manually")
 job = item.kitem_apps.by_title["data2rdf"].run(
     attachment_name=item.attachments[0].name, set_token=True, set_host_url=True
 )
+
 
 print("\nSee job status")
 print(job.status)
@@ -124,6 +131,9 @@ job = item.kitem_apps.by_title["data2rdf"].run(
     wait=False,
 )
 
+print("\nGet dataframe")
+print(item.dataframe.StandardForce.convert_to("N"))
+
 print("\nMonitor job status")
 while True:
     time.sleep(1)
@@ -134,6 +144,13 @@ while True:
     if job.status.phase != "Running":
         break
 
+item.refresh()
+
 print(item.url)
 
+print("\nGet dataframe")
 print(item.dataframe.StandardForce.convert_to("N"))
+
+print("\nCleanup")
+del dsms[item]
+del dsms[appspec]
