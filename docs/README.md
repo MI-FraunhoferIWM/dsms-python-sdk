@@ -1,6 +1,4 @@
 # DSMS-SDK Docs
-To access the documentation, please visit:
-<!-- [https://intersect.pages.fraunhofer.de/docs/](https://intersect.pages.fraunhofer.de/docs/). -->
 
 If you find any error or problem with the documentation, please create an issue [in this repository](https://github.com/MI-FraunhoferIWM/dsms-python-sdk/issues).
 
@@ -33,7 +31,7 @@ $ sudo apt-get install texlive-latex-recommended \
 ```
 The python dependencies:
 ```shell
-$ pip install -r requirements.txt
+$ pip install -e .[docs]
 ```
 
 Now you can start the server and render the docs:

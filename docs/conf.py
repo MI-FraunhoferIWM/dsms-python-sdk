@@ -80,3 +80,21 @@ html_theme_options = {
 }
 
 nbsphinx_allow_errors = True
+
+# -- Options for LaTeX output -------------------------------------------------
+latex_documents = [
+    (
+        "index",
+        "dsms_docs.tex",
+        "DSMS docs",
+        ("Materials Informatics team at Fraunhofer IWM"),
+        "manual",
+        "false",
+    )
+]
+latex_logo = "assets/images/DSMS_logo.png"
+latex_elements = {"figure_align": "H"}
+
+nbsphinx_allow_errors = True
+
+suppress_warnings = ["myst.mathjax"]

@@ -30,7 +30,6 @@ The SDK provides a general Python interface to a remote DSMS deployment, allowin
 
 For the basic usage, please have a look on the Jupyter Notebook under `examples/basic_usage.ipynb`. This tutorial provides a basic overview of using the dsms package to interact with Knowledge Items.
 
-
 ## Disclaimer
 
 Copyright (c) 2014-2024, Fraunhofer-Gesellschaft zur Förderung der angewandten Forschung e.V. acting on behalf of its Fraunhofer IWM.

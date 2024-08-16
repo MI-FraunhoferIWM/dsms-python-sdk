@@ -1,34 +1,22 @@
-# Use a base image with the latest available Python version (adjust as necessary)
-FROM python:3.9-buster
+FROM python:3.10
 
-# Ensure the package list is up-to-date and upgrade existing packages
-RUN apt-get update && apt-get upgrade -y
+RUN apt-get update && apt-get install -y \
+    pandoc default-jre graphviz \
+    texlive-latex-recommended \
+    texlive-latex-extra \
+    texlive-fonts-recommended \
+    latexmk
 
-# Install required packages, ensuring the latest versions are installed
-RUN apt-get install -y --no-install-recommends pandoc default-jre graphviz
-RUN apt-get install -y --no-install-recommends texlive-latex-recommended \
-                       texlive-latex-extra \
-                       texlive-fonts-recommended \
-                       latexmk
-
-# Clean up the apt cache to reduce image size
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Set the working directory
 WORKDIR /app
+ADD . .
 
-# Copy the requirements file for documentation
-COPY docs/requirements.txt /app/docs/requirements.txt
+RUN python -m pip install --upgrade pip
+RUN python -m pip install -e .[docs]
 
-# Install Python packages for documentation from requirements.txt, ensuring the latest versions are installed
-RUN pip install --upgrade pip
-RUN pip install --upgrade -r /app/docs/requirements.txt
+CMD sphinx-autobuild --host 0.0.0.0  docs/ docs/_build/html
 
-# Copy the entire repository to the container
-COPY . /app
+# Build:
+# $ docker build -f Dockerfile.docs -t dsms-sdk-docs .
 
-# Install the SDK in editable mode
-RUN pip install -e /app
-
-# Define the command to run the application
-CMD ["sphinx-autobuild", "--host", "0.0.0.0", "docs/source", "docs/build/html"]
+# Run:
+# $ docker run -it --rm -v $PWD:/app -p 8000:8000 dsms-sdk-docs
