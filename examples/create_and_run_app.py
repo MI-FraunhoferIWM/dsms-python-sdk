@@ -31,6 +31,7 @@ parameters = [
     {"name": "metadata_length", "value": 0},
     {"name": "metadata_sep", "value": ","},
     {"name": "time_series_sep", "value": ","},
+    {"name": "log_level", "value": "DEBUG"},
     {
         "name": "mapping",
         "value": """
@@ -98,6 +99,7 @@ print("\nAdd attachment")
 # e.g. item.attachments = ["path/to/my/file.csv"]
 item.attachments = [{"name": "dummy_data.csv", "content": data}]
 
+print("\nVerify that the attachment was added")
 print(item)
 
 print("\nUpload attachment and trigger app")
@@ -107,6 +109,9 @@ print("\nGet dataframe")
 print(item.dataframe.StandardForce.convert_to("N"))
 
 
+print("\nVerify that the dataframe was deleted")
+item.dataframe = {}
+dsms.commit()
 print(item)
 
 print("\nRun pipeline manually")
@@ -114,11 +119,20 @@ job = item.kitem_apps.by_title["data2rdf"].run(
     attachment_name=item.attachments[0].name, set_token=True, set_host_url=True
 )
 
-
 print("\nSee job status")
 print(job.status)
 print("\n See job logs:")
 print(job.logs)
+
+print("\nGet dataframe")
+print(item.dataframe.StandardForce.convert_to("N"))
+
+print("\nDelete dataframe")
+item.dataframe = {}
+dsms.commit()
+
+print("\nVerify that the dataframe was deleted")
+print(item)
 
 print("\nRun pipeline manually in the background")
 job = item.kitem_apps.by_title["data2rdf"].run(
@@ -128,8 +142,6 @@ job = item.kitem_apps.by_title["data2rdf"].run(
     wait=False,
 )
 
-print("\nGet dataframe")
-print(item.dataframe.StandardForce.convert_to("N"))
 
 print("\nMonitor job status")
 while True:
@@ -141,9 +153,8 @@ while True:
     if job.status.phase != "Running":
         break
 
+print("\nReload item")
 item.refresh()
-
-print(item.url)
 
 print("\nGet dataframe")
 print(item.dataframe.StandardForce.convert_to("N"))
@@ -151,3 +162,5 @@ print(item.dataframe.StandardForce.convert_to("N"))
 print("\nCleanup")
 del dsms[item]
 del dsms[appspec]
+
+dsms.commit()

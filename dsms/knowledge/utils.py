@@ -727,16 +727,19 @@ def _inspect_dataframe(kitem_id: str) -> Optional[List[Dict[str, Any]]]:
 
 
 def _update_dataframe(kitem_id: str, data: pd.DataFrame):
-    buffer = io.BytesIO()
-    data.to_json(buffer, indent=2)
-    buffer.seek(0)
-    response = _perform_request(
-        f"api/knowledge/data_api/{kitem_id}", "put", files={"data": buffer}
-    )
-    if not response.ok:
-        raise RuntimeError(
-            f"Could not put dataframe into kitem with id `{kitem_id}`: {response.text}"
+    if data.empty:
+        _delete_dataframe(kitem_id)
+    else:
+        buffer = io.BytesIO()
+        data.to_json(buffer, indent=2)
+        buffer.seek(0)
+        response = _perform_request(
+            f"api/knowledge/data_api/{kitem_id}", "put", files={"data": buffer}
         )
+        if not response.ok:
+            raise RuntimeError(
+                f"Could not put dataframe into kitem with id `{kitem_id}`: {response.text}"
+            )
 
 
 def _delete_dataframe(kitem_id: str) -> Response:

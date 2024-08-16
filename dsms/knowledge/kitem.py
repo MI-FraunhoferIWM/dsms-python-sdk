@@ -509,8 +509,8 @@ class KItem(BaseModel):
     @classmethod
     def validate_dataframe(
         cls,
-        value: Union[
-            List[Column], pd.DataFrame, Dict[str, Dict[Any, Any]]
+        value: Optional[
+            Union[List[Column], pd.DataFrame, Dict[str, Dict[Any, Any]]]
         ],  # pylint: disable=unused-argument
         info: ValidationInfo,
     ) -> DataFrameContainer:
@@ -519,12 +519,8 @@ class KItem(BaseModel):
         if isinstance(value, (pd.DataFrame, dict)):
             if isinstance(value, pd.DataFrame):
                 dataframe = value.copy(deep=True)
-            elif isinstance(value, dict):
-                dataframe = pd.DataFrame.from_dict(value)
             else:
-                raise TypeError(
-                    f"Data must be of type {dict} or {pd.DataFrame}, not {type(value)}"
-                )
+                dataframe = pd.DataFrame.from_dict(value)
         else:
             columns = _inspect_dataframe(kitem_id)
             if columns:
