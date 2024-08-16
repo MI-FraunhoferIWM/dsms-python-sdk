@@ -104,9 +104,6 @@ print("\nUpload attachment and trigger app")
 dsms.commit()
 
 print("\nGet dataframe")
-if not item.dataframe:
-    time.sleep(5)
-    item.refresh()
 print(item.dataframe.StandardForce.convert_to("N"))
 
 
