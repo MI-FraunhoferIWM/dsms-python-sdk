@@ -1,4 +1,4 @@
-"""HDF5 property of a KItem"""
+"""DataFrame property of a KItem"""
 import logging
 from typing import TYPE_CHECKING
 
@@ -6,7 +6,7 @@ import pandas as pd
 from pydantic import Field
 
 from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
-from dsms.knowledge.utils import _get_hdf5_column, _is_number
+from dsms.knowledge.utils import _get_dataframe_column, _is_number
 
 from dsms.knowledge.semantics.units import (  # isort:skip
     get_conversion_factor,
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 class Column(KItemProperty):
     """
-    Column of an HDF5 data frame.
+    Column of an DataFrame data frame.
 
     Attributes:
         column_id (int): Column ID in the data frame.
@@ -57,7 +57,7 @@ class Column(KItemProperty):
         Returns:
             List[Any]: List of data for the column.
         """
-        return _get_hdf5_column(self.id, self.column_id)
+        return _get_dataframe_column(self.id, self.column_id)
 
     def get_unit(self) -> "Dict[str, Any]":
         """
@@ -69,7 +69,7 @@ class Column(KItemProperty):
         return get_property_unit(
             self.id,
             self.name,
-            is_hdf5_column=True,
+            is_dataframe_column=True,
             autocomplete_symbol=self.kitem.dsms.config.autocomplete_units,
         )
 
@@ -105,8 +105,8 @@ class Column(KItemProperty):
         ]
 
 
-class HDF5Container(KItemPropertyList):
-    """HDF5 container of a data frame related to a KItem"""
+class DataFrameContainer(KItemPropertyList):
+    """DataFrame container of a data frame related to a KItem"""
 
     # OVERRIDE
     @property
@@ -116,10 +116,10 @@ class HDF5Container(KItemPropertyList):
     # OVERRIDE
     @property
     def k_property_helper(cls) -> None:
-        """Not defined for HDF5"""
+        """Not defined for DataFrame"""
 
     def to_df(self) -> pd.DataFrame:
-        """Return hdf5 as pandas DataFrame"""
+        """Return dataframe as pandas DataFrame"""
         data = {column.name: column.get() for column in self}
         return pd.DataFrame.from_dict(data)
 

@@ -13,7 +13,7 @@ from dsms.knowledge.properties.authors import Author, AuthorsProperty
 from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 from dsms.knowledge.properties.contacts import ContactInfo, ContactsProperty
 from dsms.knowledge.properties.custom_datatype import NumericalDataType
-from dsms.knowledge.properties.hdf5 import Column, HDF5Container
+from dsms.knowledge.properties.dataframe import Column, DataFrameContainer
 from dsms.knowledge.properties.summary import Summary
 from dsms.knowledge.properties.user_groups import UserGroup, UserGroupsProperty
 
@@ -58,7 +58,7 @@ __all__ = [
     "Summary",
     "KItemPropertyList",
     "KItemProperty",
-    "HDF5Container",
+    "DataFrameContainer",
     "Column",
     "NumericalDataType",
 ]

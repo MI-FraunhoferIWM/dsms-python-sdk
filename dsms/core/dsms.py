@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 
 from dotenv import load_dotenv
 
-from dsms.apps.utils import _get_available_apps
+from dsms.apps.utils import _get_available_apps_specs
 from dsms.core.configuration import Configuration
 from dsms.core.context import Context
 from dsms.core.utils import _ping_dsms
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from enum import Enum
     from typing import Optional
 
-    from dsms.apps import App
+    from dsms.apps import AppConfig
     from dsms.core.context import Buffers
     from dsms.knowledge.kitem import KItem
     from dsms.knowledge.ktype import KType
@@ -100,20 +100,23 @@ class DSMS:
         """Get KItem from remote DSMS instance."""
         return _get_kitem(key)
 
-    def __delitem__(self, kitem) -> None:
-        """Stage an KItem for the deletion.
+    def __delitem__(self, obj) -> None:
+        """Stage an KItem, KType or AppConfig for the deletion.
         WARNING: Changes only will take place after executing the `commit`-method
         """
 
-        from dsms.knowledge.kitem import (  # isort:skip
-            KItem,
-        )
+        from dsms import KItem, AppConfig, KType  # isort:skip
 
-        if not isinstance(kitem, KItem):
+        if isinstance(obj, KItem):
+            self.context.buffers.deleted.update({obj.id: obj})
+        elif isinstance(obj, AppConfig):
+            self.context.buffers.deleted.update({obj.name: obj})
+        elif isinstance(obj, KType):
+            raise NotImplementedError("Deletion of KTypes not available yet.")
+        else:
             raise TypeError(
-                f"Object must be of type {KItem}, not {type(kitem)}. "
+                f"Object must be of type {KItem}, {AppConfig} or {KType}, not {type(obj)}. "
             )
-        kitem.context.buffers.deleted.update({kitem.id: kitem})
 
     def commit(self) -> None:
         """Commit and empty the buffers of the KItems to the DSMS backend."""
@@ -180,9 +183,14 @@ class DSMS:
         return _get_kitem_list()
 
     @property
-    def apps(cls) -> "List[App]":
-        """Return available KItem apps in the DSMS"""
-        return _get_available_apps()
+    def app_configs(cls) -> "List[AppConfig]":
+        """Return available app configs in the DSMS"""
+        from dsms.apps import AppConfig
+
+        return [
+            AppConfig(**app_config)
+            for app_config in _get_available_apps_specs()
+        ]
 
     @property
     def buffers(cls) -> "Buffers":

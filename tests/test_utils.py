@@ -52,7 +52,7 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
     )
 
     user_group = {"name": "private", "group_id": "private_123"}
-    app = {"executable": "foo.exe"}
+    app = {"executable": "foo.exe", "title": "foo"}
 
     kitem_old = {
         "id": get_mock_kitem_ids[0],
@@ -84,7 +84,7 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 "id": get_mock_kitem_ids[0],
                 "kitem_app_id": 17,
                 "executable": "bar.exe",
-                "title": None,
+                "title": "bar",
                 "description": None,
                 "tags": None,
                 "additional_properties": None,
@@ -124,7 +124,7 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         "kitem_apps_to_update": [
             {
                 "executable": "foo.exe",
-                "title": None,
+                "title": "foo",
                 "description": None,
                 "tags": None,
                 "additional_properties": None,
@@ -145,7 +145,7 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         "kitem_apps_to_remove": [
             {
                 "executable": "bar.exe",
-                "title": None,
+                "title": "bar",
                 "description": None,
                 "tags": None,
                 "additional_properties": None,

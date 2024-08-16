@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 class BaseUnitSparqlQuery(BaseSparqlQuery):
     """
     Abstract class for defining sparql queries fetching
-    the units of a hdf5 column or custom property of
+    the units of a dataframe column or custom property of
     a kitem.
     """
 
@@ -20,13 +20,13 @@ class BaseUnitSparqlQuery(BaseSparqlQuery):
         self,
         kitem_id: "Union[str, UUID]",
         property_name: str,
-        is_hdf5_column: bool = False,
+        is_dataframe_column: bool = False,
         autocomplete_symbol: bool = True,
     ) -> None:
         super().__init__(
             kitem_id=kitem_id,
             property_name=property_name,
-            is_hdf5_column=is_hdf5_column,
+            is_dataframe_column=is_dataframe_column,
             autocomplete_symbol=autocomplete_symbol,
         )
 

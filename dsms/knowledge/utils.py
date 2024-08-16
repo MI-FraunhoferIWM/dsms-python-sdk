@@ -11,6 +11,7 @@ from uuid import UUID
 
 import pandas as pd
 import segno
+import yaml
 from PIL import Image
 from requests import Response
 
@@ -33,8 +34,10 @@ from dsms.knowledge.properties.custom_datatype import (  # isort:skip
 from dsms.knowledge.search import SearchResult  # isort:skip
 
 if TYPE_CHECKING:
+    from dsms.apps import AppConfig
     from dsms.core.context import Buffers
     from dsms.knowledge import KItem, KType
+    from dsms.knowledge.properties import Attachment
 
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
@@ -280,7 +283,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "kitem_apps",
             "created_at",
             "external_links",
-            "hdf5",
+            "dataframe",
         },
         exclude_none=True,
     )
@@ -340,11 +343,11 @@ def _update_attachments(
         _delete_attachments(new_kitem, remove)
 
 
-def _upload_attachments(kitem: "KItem", attachment: "str") -> None:
+def _upload_attachments(kitem: "KItem", attachment: "Attachment") -> None:
     """Upload the attachments of the KItem"""
-    path = Path(attachment)
+    path = Path(attachment.name)
 
-    if path.is_file():
+    if path.is_file() and not attachment.content:
         if not path.exists():
             raise FileNotFoundError(f"File {path} does not exist.")
 
@@ -359,6 +362,32 @@ def _upload_attachments(kitem: "KItem", attachment: "str") -> None:
             raise RuntimeError(
                 f"Could not upload attachment `{path}`: {response.text}"
             )
+    elif not path.is_file() and attachment.content:
+        if isinstance(attachment.content, str):
+            file = io.StringIO(attachment.content)
+        elif isinstance(attachment.content, bytes):
+            file = io.BytesIO(attachment.content)
+        else:
+            raise TypeError(
+                f"""Invalid content type of attachment with name
+                `{attachment.name}`: {type(attachment.content)}"""
+            )
+        file.name = attachment.name
+        upload_file = {"dataFile": file}
+        response = _perform_request(
+            f"api/knowledge/attachments/{kitem.id}",
+            "put",
+            files=upload_file,
+        )
+        if not response.ok:
+            raise RuntimeError(
+                f"Could not upload attachment `{path}`: {response.text}"
+            )
+    else:
+        raise RuntimeError(
+            f"""Invalid file path, attachment name or attachment content:
+            name={attachment.name},content={attachment.content}"""
+        )
 
 
 def _delete_attachments(kitem: "KItem", file_name: str) -> None:
@@ -428,16 +457,21 @@ def _get_linked_diffs(
 
 def _get_attachment_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     """Check which attachments should be removed and which should be added."""
+    old_attachments = [
+        attachment.get("name")
+        for attachment in kitem_old.get("attachments")
+        if attachment.get("name")
+    ]
     return {
         "remove": [
             attachment
-            for attachment in kitem_old.get("attachments")
+            for attachment in old_attachments
             if attachment not in kitem_new.attachments.by_name
         ],
         "add": [
-            attachment.name
+            attachment
             for name, attachment in kitem_new.attachments.by_name.items()
-            if name not in kitem_old.get("attachments")
+            if name not in old_attachments or attachment.content
         ],
     }
 
@@ -487,55 +521,111 @@ def _commit(buffers: "Buffers") -> None:
     logger.debug("Committing successful, clearing buffers.")
 
 
-def _commit_created(buffer: "Dict[str, KItem]") -> dict:
+def _commit_created(
+    buffer: "Dict[str, Union[KItem, KType, AppConfig]]",
+) -> dict:
     """Commit the buffer for the `created` buffers"""
-    for kitem in buffer.values():
-        _create_new_kitem(kitem)
+    from dsms import AppConfig, KItem, KType
 
-
-def _commit_updated(buffer: "Dict[str, KItem]") -> None:
-    """Commit the buffer for the `updated` buffers"""
-    for new_kitem in buffer.values():
-        old_kitem = _get_kitem(new_kitem.id, as_json=True)
-        logger.debug(
-            "Fetched data from old KItem with id `%s`: %s",
-            new_kitem.id,
-            old_kitem,
-        )
-        if old_kitem:
-            if isinstance(new_kitem.hdf5, pd.DataFrame):
-                logger.debug(
-                    "New KItem data has `pd.DataFrame`. Will push as hdf5."
-                )
-                _update_hdf5(new_kitem.id, new_kitem.hdf5)
-                new_kitem.hdf5 = _inspect_hdf5(new_kitem.id)
-            elif isinstance(new_kitem.hdf5, type(None)) and _inspect_hdf5(
-                new_kitem.id
-            ):
-                _delete_hdf5(new_kitem.id)
-            _update_kitem(new_kitem, old_kitem)
-            _update_attachments(new_kitem, old_kitem)
-            if new_kitem.avatar.file or new_kitem.avatar.include_qr:
-                _commit_avatar(new_kitem)
-            new_kitem.in_backend = True
-            logger.debug(
-                "Fetching updated KItem from remote backend: %s", new_kitem.id
+    for obj in buffer.values():
+        if isinstance(obj, KItem):
+            _create_new_kitem(obj)
+        elif isinstance(obj, AppConfig):
+            _create_or_update_app_spec(obj)
+        elif isinstance(obj, KType):
+            raise NotImplementedError(
+                "Committing of KTypes not implemented yet."
             )
-            for key, value in _get_kitem(new_kitem.id, as_json=True).items():
-                logger.debug(
-                    "Set updated property `%s` for KItem with id `%s` after commiting: %s",
-                    key,
-                    new_kitem.id,
-                    value,
-                )
-                setattr(new_kitem, key, value)
+        else:
+            raise TypeError(
+                f"Object `{obj}` of type {type(obj)} cannot be committed."
+            )
 
 
-def _commit_deleted(buffer: "Dict[str, KItem]") -> None:
+def _commit_updated(
+    buffer: "Dict[str, Union[KItem, AppConfig, KType]]",
+) -> None:
+    """Commit the buffer for the `updated` buffers"""
+    from dsms import AppConfig, KItem, KType
+
+    for obj in buffer.values():
+        if isinstance(obj, KItem):
+            _commit_updated_kitem(obj)
+        elif isinstance(obj, AppConfig):
+            _create_or_update_app_spec(obj, overwrite=True)
+        elif isinstance(obj, KType):
+            raise NotImplementedError(
+                "Committing of KTypes not implemented yet."
+            )
+        else:
+            raise TypeError(
+                f"Object `{obj}` of type {type(obj)} cannot be committed."
+            )
+
+
+def _commit_updated_kitem(new_kitem: "KItem") -> None:
+    """Commit the updated KItems"""
+    old_kitem = _get_kitem(new_kitem.id, as_json=True)
+    logger.debug(
+        "Fetched data from old KItem with id `%s`: %s",
+        new_kitem.id,
+        old_kitem,
+    )
+    if old_kitem:
+        if isinstance(new_kitem.dataframe, pd.DataFrame):
+            logger.debug(
+                "New KItem data has `pd.DataFrame`. Will push as dataframe."
+            )
+            _update_dataframe(new_kitem.id, new_kitem.dataframe)
+            new_kitem.dataframe = _inspect_dataframe(new_kitem.id)
+        elif isinstance(
+            new_kitem.dataframe, type(None)
+        ) and _inspect_dataframe(new_kitem.id):
+            _delete_dataframe(new_kitem.id)
+        _update_kitem(new_kitem, old_kitem)
+        _update_attachments(new_kitem, old_kitem)
+        if new_kitem.avatar.file or new_kitem.avatar.include_qr:
+            _commit_avatar(new_kitem)
+        new_kitem.in_backend = True
+        logger.debug(
+            "Fetching updated KItem from remote backend: %s", new_kitem.id
+        )
+        new_kitem.refresh()
+
+
+def _commit_deleted(
+    buffer: "Dict[str, Union[KItem, KType, AppConfig]]",
+) -> None:
     """Commit the buffer for the `deleted` buffers"""
-    for kitem in buffer.values():
-        _delete_hdf5(kitem.id)
-        _delete_kitem(kitem)
+    from dsms import AppConfig, KItem, KType
+
+    for obj in buffer.values():
+        if isinstance(obj, KItem):
+            _delete_dataframe(obj.id)
+            _delete_kitem(obj)
+        elif isinstance(obj, AppConfig):
+            _delete_app_spec(obj.name)
+        elif isinstance(obj, KType):
+            raise NotImplementedError(
+                "Deletion of KTypes not implemented yet."
+            )
+        else:
+            raise TypeError(
+                f"Object `{obj}` of type {type(obj)} cannot be committed or deleted."
+            )
+
+
+def _refresh_kitem(kitem: "KItem") -> None:
+    """Refresh the KItem"""
+    for key, value in _get_kitem(kitem.id, as_json=True).items():
+        logger.debug(
+            "Set updated property `%s` for KItem with id `%s` after commiting: %s",
+            key,
+            kitem.id,
+            value,
+        )
+        setattr(kitem, key, value)
+    kitem.dataframe = _inspect_dataframe(kitem.id)
 
 
 def _split_iri(iri: str) -> List[str]:
@@ -609,8 +699,8 @@ def _slug_is_available(ktype_id: Union[str, UUID], value: str) -> bool:
     return response.status_code == 404
 
 
-def _get_hdf5_column(kitem_id: str, column_id: int) -> List[Any]:
-    """Download the column of a hdf5 container of a certain kitem"""
+def _get_dataframe_column(kitem_id: str, column_id: int) -> List[Any]:
+    """Download the column of a dataframe container of a certain kitem"""
 
     response = _perform_request(
         f"api/knowledge/data_api/{kitem_id}/column-{column_id}", "get"
@@ -622,35 +712,38 @@ def _get_hdf5_column(kitem_id: str, column_id: int) -> List[Any]:
     return response.json().get("array")
 
 
-def _inspect_hdf5(kitem_id: str) -> Optional[List[Dict[str, Any]]]:
-    """Get column info for the hdf5 container of a certain kitem"""
+def _inspect_dataframe(kitem_id: str) -> Optional[List[Dict[str, Any]]]:
+    """Get column info for the dataframe container of a certain kitem"""
     response = _perform_request(f"api/knowledge/data_api/{kitem_id}", "get")
     if not response.ok and response.status_code == 404:
-        hdf5 = None
+        dataframe = None
     elif not response.ok and response.status_code != 404:
         message = f"""Something went wrong fetching intospection
         for kitem `{kitem_id}`: {response.text}"""
         raise ValueError(message)
     else:
-        hdf5 = response.json()
-    return hdf5
+        dataframe = response.json()
+    return dataframe
 
 
-def _update_hdf5(kitem_id: str, data: pd.DataFrame):
-    buffer = io.BytesIO()
-    data.to_json(buffer, indent=2)
-    buffer.seek(0)
-    response = _perform_request(
-        f"api/knowledge/data_api/{kitem_id}", "put", files={"data": buffer}
-    )
-    if not response.ok:
-        raise RuntimeError(
-            f"Could not put dataframe into kitem with id `{kitem_id}`: {response.text}"
+def _update_dataframe(kitem_id: str, data: pd.DataFrame):
+    if data.empty:
+        _delete_dataframe(kitem_id)
+    else:
+        buffer = io.BytesIO()
+        data.to_json(buffer, indent=2)
+        buffer.seek(0)
+        response = _perform_request(
+            f"api/knowledge/data_api/{kitem_id}", "put", files={"data": buffer}
         )
+        if not response.ok:
+            raise RuntimeError(
+                f"Could not put dataframe into kitem with id `{kitem_id}`: {response.text}"
+            )
 
 
-def _delete_hdf5(kitem_id: str) -> Response:
-    logger.debug("Delete HDF5 for kitem with id `%s`.", kitem_id)
+def _delete_dataframe(kitem_id: str) -> Response:
+    logger.debug("Delete DataFrame for kitem with id `%s`.", kitem_id)
     return _perform_request(f"api/knowledge/data_api/{kitem_id}", "delete")
 
 
@@ -723,3 +816,30 @@ def _get_avatar(kitem: "KItem") -> Image.Image:
     response = _perform_request(f"api/knowledge/avatar/{kitem.id}", "get")
     buffer = io.BytesIO(response.content)
     return Image.open(buffer)
+
+
+def _create_or_update_app_spec(app: "AppConfig", overwrite=False) -> None:
+    """Create app specfication"""
+    upload_file = {"def_file": io.StringIO(yaml.safe_dump(app.specification))}
+    response = _perform_request(
+        f"/api/knowledge/apps/argo/spec/{app.name}",
+        "post",
+        files=upload_file,
+        params={"overwrite": overwrite},
+    )
+    if not response.ok:
+        message = f"Something went wrong uploading app spec with name `{app.name}`: {response.text}"
+        raise RuntimeError(message)
+    return response.text
+
+
+def _delete_app_spec(name: str) -> None:
+    """Delete app specfication"""
+    response = _perform_request(
+        f"/api/knowledge/apps/argo/spec/{name}",
+        "delete",
+    )
+    if not response.ok:
+        message = f"Something went wrong deleting app spec with name `{name}`: {response.text}"
+        raise RuntimeError(message)
+    return response.text

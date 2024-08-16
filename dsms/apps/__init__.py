@@ -1,5 +1,5 @@
 """DSMS apps"""
 
-from .apps import App
+from .config import AppConfig
 
-__all__ = ["App"]
+__all__ = ["AppConfig"]
