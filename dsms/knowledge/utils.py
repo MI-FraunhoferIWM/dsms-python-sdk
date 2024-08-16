@@ -625,6 +625,7 @@ def _refresh_kitem(kitem: "KItem") -> None:
             value,
         )
         setattr(kitem, key, value)
+    kitem.dataframe = _inspect_dataframe(kitem.id)
 
 
 def _split_iri(iri: str) -> List[str]:
