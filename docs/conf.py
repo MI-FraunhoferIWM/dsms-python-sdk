@@ -45,14 +45,14 @@ extensions = [
 
 master_doc = "index"
 
-plantuml = "java -jar /path/to/plantuml.jar"
+plantuml = "java -jar lib/plantuml.jar"
 plantuml_output_format = "svg_img"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 templates_path = ["_templates"]
-exclude_patterns = ["build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 
 
 def setup(app):

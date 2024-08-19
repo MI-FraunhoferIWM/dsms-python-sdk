@@ -12,12 +12,12 @@ This can be done by using docker or installing the development environment direc
 #### Docker
 First, build the Docker image by running the following command:
 ```shell
-$ docker build -f Dockerfile.docs -t sphinx-docs .
+$ docker build -f Dockerfile.docs -t dsms-sdk-docs .
 ```
 
 Then, start the program by running:
 ```shell
-$ docker run --rm -v $PWD:/app -p 8000:8000 sphinx-docs
+$ docker run -it --rm -v $PWD:/app -p 8000:8000 dsms-sdk-docs
 ```
 
 #### Linux
