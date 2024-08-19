@@ -1,11 +1,11 @@
-## 4. DSMS Config Schema
+# DSMS Config Schema
 
 The `Configuration` class for the DSMS Python SDK is designed to handle various settings required to connect and interact with a DSMS instance. This documentation provides a detailed overview of the configurable properties, their types, defaults, and descriptions.
 
 
 This section describes the configuration properties for the DSMS Python SDK.
 
-### Configuration Object Properties
+## Configuration Fields
 
 | Field Name       | Description                                                                                  | Type                 | Default              | Property Namespace | Required/Optional |
 |:----------------:|:--------------------------------------------------------------------------------------------:|:--------------------:|:--------------------:|:------------------:|:-----------------:|
@@ -20,17 +20,17 @@ This section describes the configuration properties for the DSMS Python SDK.
 | datetime_format  | Datetime format used in the DSMS instance.                                                   | str                  | “%Y-%m-%dT%H:%M:%S.%f” | `datetime_format`    | Optional          |
 | kitem_repo       | Repository of the triplestore for KItems in the DSMS                                         | str                  | `knowledge`            | `kitem_repo`         | Optional          |
 
-#### Example Usage
+## Example Usage
 ```python
-from dsms.configuration import Configuration
-from pydantic import SecretStr
+from dsms import DSMS
 
-config = Configuration(
+
+config = DSMS(
     host_url="https://dsms.example.com",
     request_timeout=30,
     ssl_verify=True,
-    username=SecretStr("your_username"),
-    password=SecretStr("your_password"),
+    username="****",
+    password="****",
     token=None,
     ping_dsms=True,
     individual_slugs=True,
@@ -45,9 +45,5 @@ config = Configuration(
     hide_properties={"external_links"}
 )
 
-print(config)
+print(dsms.config)
 ```
-
-
-> **Reminder Tip :**
->  As discussed in previous section in DSMS SDK section (refer to the [Accessing DSMS Core](dsms_sdk.md#accessing-dsms-core)) for accessing DSMS core, you either need to pass during initialization : `token` or `username + password`.

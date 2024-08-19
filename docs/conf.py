@@ -77,7 +77,6 @@ html_logo = "assets/images/DSMS_logo.png"
 html_static_path = ["_static"]
 templates_path = ["_templates"]
 html_theme_options = {
-    "style_nav_header_background": "#4472c4",
     "use_download_button": True,
 }
 

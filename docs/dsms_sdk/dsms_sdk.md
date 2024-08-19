@@ -68,9 +68,9 @@ cd dsms-python-sdk
 pip install .
 ```
 
-### Accessing DSMS Core
+### Connecting to DSMS
 
-You need to authenticate yourself to connect with dsms-core using dsms-python-sdk which can be done by following one of the below given steps:
+You need to authenticate yourself to connect with dsms using the `dsms-sdk` Python package which can be done by following one of the below given steps:
 
 1. **Pick the DSMS host of your choice.**
 
@@ -89,7 +89,7 @@ You need to authenticate yourself to connect with dsms-core using dsms-python-sd
       Directly pass your credentials (stored in a .env file) as keyword arguments when initializing the SDK.
 
       ```python
-      from dsms_sdk import DSMS
+      from dsms import DSMS
       dsms = DSMS(env="../.env")
       ```
 
@@ -109,7 +109,7 @@ You need to authenticate yourself to connect with dsms-core using dsms-python-sd
 
       ```python
        import getpass
-       from dsms_sdk import DSMS
+       from dsms import DSMS
        dsms_host = "https://stahldigital.materials-data.space"
        dsms_username = input("Enter your username: ")
        dsms_password = getpass.getpass("Enter your password: ")
@@ -151,13 +151,4 @@ Now you are ready to use dsms-sdk. Do check out the tutorials section to try out
 
 The next sections covers about the schema of fundamental classes crucial for users to know about DSMS when using the platform. Below given explains about the Schema of `KItem` and its associated properties in DSMS.
 
-
-
-```{include} dsms_kitem_schema.md
-```
-
 Now the next section gives a brief explanation about the Schema of `Config` class of DSMS and its associated properties in DSMS.
-
-
-```{include} dsms_config_schema.md
-```

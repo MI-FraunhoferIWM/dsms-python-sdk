@@ -27,24 +27,6 @@ Introduction to DSMS
 :classes: btn-outline-primary stretched-link
 
 ---
-**DSMS KITEM SCHEMA**
-
-Overview of DSMS KItem Schema
-
-```{link-button} dsms_kitem_schema.html
-:text: DSMS KItem Schema
-:classes: btn-outline-primary stretched-link
-
----
-**DSMS CONFIG SCHEMA**
-
-Overview of DSMS Config Schema
-
-```{link-button} dsms_config_schema.html
-:text: DSMS Config Schema
-:classes: btn-outline-primary stretched-link
-
----
 **Tutorials**
 
 Get Started with using DSMS-SDK.
@@ -61,23 +43,32 @@ Feel free to report any issues/missing information so we can take a look into it
 
 ```{toctree}
 :hidden: true
-:caption: Table of contents
-:maxdepth: 1
+:caption: Introduction
+:maxdepth: 4
+:glob:
 
-dsms
-dsms_sdk
-Tutorials
+The Data Space Management System<dsms>
+```
+
+
+```{toctree}
+:hidden: true
+:caption: DSMS Python SDK
+:maxdepth: 4
+:glob:
+
+dsms_sdk/dsms_sdk
+dsms_sdk/dsms_config_schema
+dsms_sdk/dsms_kitem_schema
+
 ```
 
 ```{toctree}
 :hidden: true
 :caption: Tutorials
-:maxdepth: 2
+:maxdepth: 4
+:glob:
 
-1. Introduction <tutorials/1_introduction>
-2. Creation <tutorials/2_creation>
-3. Updation <tutorials/3_updation>
-4. Deletion <tutorials/4_deletion>
-5. Search <tutorials/5_search>
-6. App Availability <tutorials/6_app_HDF5>
+dsms_sdk/tutorials/*
+
 ```

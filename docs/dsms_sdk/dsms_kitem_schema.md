@@ -1,12 +1,11 @@
-## 3. DSMS KItem Schema
+# DSMS KItem Schema
 
-A Kitem has several properties which enable it to handle data effectively. This section briefly describes the properties a Kitem can consist of, or in simple words, the schema of a KItem.
+A Kitem has several properties (pydantic [`Fields`](https://docs.pydantic.dev/latest/concepts/fields/), simply referenced as `Fields` in the following) which enable it to handle data effectively. This section briefly describes the properties a Kitem can consist of, or in simple words, the schema of a KItem.
 
 The schema contains complex types and references, indicating an advanced usage scenario where various objects (like KItems and their properties) are interconnected. It also includes customizations like optional and default values, arrays of references, and conditional formats (e.g., UUID formats).
 
-The KItem object has the following properties
 
-### Kitem Object Properties
+## KItem Fields
 
 ![kitem_schema_uml](assets/images/UML_KItem_schema.jpg)
 
@@ -31,7 +30,7 @@ The KItem object has the following properties
 | Linked KItems     | List of other KItems linked to this KItem                                                               | List[Union[[LinkedKItem](#linkedkitem-properties), "KItem"]]                 | `None`   | `linked_kitems`    | Optional          |
 | User Groups       | User groups with access to this KItem                                                                   | List[[UserGroup](#usergroup-properties)]                                   | `[ ]`    | `user_groups`      | Optional          |
 
-#### Example Usage
+### Example Usage
 ```python
 
 item = KItem(
@@ -52,31 +51,31 @@ item = KItem(
 )
 ```
 
-### Summary Properties
+## Summary 
 
 | Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
 | Text              | Summary                           | string      | `None`  | `text`             | Required          |
 | Author            | Author of the summary             | string      | `None`  | `author`           | Required          |
 
-#### Example Usage
+### Example Usage
 ```python
 sample_kitem.summary = {"text": "This is a summary", "author": "John Doe"}
 ```
 
-### App Properties
+## App Fields
 
 | Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
 | Executable        | Name of the executable            | string      | `None`  | `executable`       | Required          |
 | Description       | Description of the application    | string      | `None`  | `description`     |Required          |
 
-#### Example Usage
+### Example Usage
 ```python
 sample_kitem.summary = {"executable": "unit_conversion.py", "description": "converting input to different units"}
 ```
 
-### Annotation Properties
+## Annotation Fields
 
 | Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
@@ -84,34 +83,34 @@ sample_kitem.summary = {"executable": "unit_conversion.py", "description": "conv
 | Name              | Name of the annotation            | string      | `None`  | `name`             | Required          |
 | Namespace         | Namespace of the annotation       | string      | `None`  | `namespace`        | Required          |
 
-#### Example Usage
+### Example Usage
 ```python
 sample_kitem.annotation = {"iri": "1238.py", "name": "","namespace":""}
 ```
 
-### Affiliation Properties
+## Affiliation Fields
 
 | Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
 | Name              | Name of the affiliation           | string      | `None`  | `name`             | Required          |
 
-#### Example Usage
+### Example Usage
 ```python
 sample_kitem.affiliation = {"name": "Research BAC"}
 ```
 
-### Author Properties
+## Author Fields
 
 | Sub-Property Name | Description                       | Type          | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:-------------:|:-------:|:------------------:|:-----------------:|
 | User Id           | ID of the DSMS User               | string (UUID)     | `None`  | `user_id`          | Required          |
 
-#### Example Usage
+### Example Usage
 ```python
 sample_kitem.author = {"user_id": "1238"}
 ```
 
-### ContactInfo Properties
+## ContactInfo Fields
 
 | Sub-Property Name | Description                       | Type          | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:-------------:|:-------:|:------------------:|:-----------------:|
@@ -119,61 +118,61 @@ sample_kitem.author = {"user_id": "1238"}
 | Name              | Name of the contact person        | string           | `None`  | `name`             | Required          |
 | User Id           | User ID of the contact person     | string (UUID)     | `None`  | `user_id`          | Optional          |
 
-#### Example Usage
+### Example Usage
 ```python
 sample_kitem.contactinfo = {"email": "research.abc@gmail.com","name": "project01@research.abc.de","user_id":"33f24ee5-2f03-4874-854d-388af782c4c3"}
 ```
 
-### ExternalLink Properties
+## ExternalLink Fields
 
 | Sub-Property Name | Description                       | Type                       | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------------------------:|:-------:|:------------------:|:-----------------:|
 | Label             | Label of the external link        | string                        | `None`  | `label`            | Required          |
 | Url               | URL of the external link          | string , format: URI, minLength: 1 | `None`  | `url`              | Required          |
 
-#### Example Usage
+### Example Usage
 ```python
 sample_kitem.externallink = {"label": "project link","url": "www.projectmachine01.com"}
 ```
 
 
-### Attachment Properties
+## Attachment Fields
 
 | Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
 | Name              | File name of the attachment       | string      | `None`  | `name`             | Required          |
 
-#### Example Usage
+### Example Usage
 ```python
 sample_kitem.attachment = {"strength.csv": "strength test results data"}
 ```
 
 
-### Column Properties
+## Column Fields
 
 | Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
 | Name              | File name of the attachment       | string      | `None`  | `name`             | Required          |
 
-#### Example Usage
+### Example Usage
 ```python
 sample_kitem.contactinfo = {"email": "research.abc@gmail.com","name": "project01@research.abc.de","user_id":"33f24ee5-2f03-4874-854d-388af782c4c3"}
 ```
 
 
-### LinkedKItem Properties
+## LinkedKItem Fields
 
 | Sub-Property Name | Description                       | Type          | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:-------------:|:-------:|:------------------:|:-----------------:|
 | Id                | ID of the KItem to be linked      | string (UUID)     | `None`  | `id`               | Required          |
 | Source Id         | Source Id of the KItem which has been linked | string (UUID)     | `None`  | `source_id`        | Required          |
 
-#### Example Usage
+### Example Usage
 ```python
 sample_kitem.linkedKItem = {"id": "33305","source_id": "22205"}
 ```
 
-### UserGroup Properties
+## UserGroup Fields
 
 | Sub-Property Name | Description                       | Type          | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:-------------:|:-------:|:------------------:|:-----------------:|
@@ -181,7 +180,7 @@ sample_kitem.linkedKItem = {"id": "33305","source_id": "22205"}
 | Group Id          | ID of the user group              | string           | `None`  | `group_id`         | Required          |
 | Name              | Name of the user group            | string           | `None`  | `name`             | Required          |
 
-#### Example Usage
+### Example Usage
 ```python
 sample_kitem.linkedKItem = {"id": "33305","source_id": "22205"}
 ```
