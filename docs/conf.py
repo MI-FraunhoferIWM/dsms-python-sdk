@@ -44,6 +44,7 @@ extensions = [
 ]
 
 master_doc = "index"
+myst_enable_extensions = ["colon_fence"]
 
 plantuml = "java -jar lib/plantuml.jar"
 plantuml_output_format = "svg_img"
@@ -53,6 +54,7 @@ plantuml_output_format = "svg_img"
 # This pattern also affects html_static_path and html_extra_path.
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
+html_static_path = ["assets"]
 
 
 def setup(app):
@@ -64,7 +66,7 @@ def setup(app):
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 
-html_theme = "sphinx_rtd_theme"
+html_theme = "sphinx_book_theme"
 html_logo = "assets/images/DSMS_logo.png"
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -80,6 +82,7 @@ html_theme_options = {
 }
 
 nbsphinx_allow_errors = True
+nbsphinx_execute = "never"
 
 # -- Options for LaTeX output -------------------------------------------------
 latex_documents = [
