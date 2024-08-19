@@ -33,7 +33,7 @@ The SDK functionalities are listed below:
 
 Click on the link to go to the Github repository of the Python based DSMS-SDK : [Git repo](https://github.com/MI-FraunhoferIWM/dsms-python-sdk)
 
-![dsms-sdk](assets/images/DSMS_SDK.jpg)
+![dsms-sdk](../assets/images/DSMS_SDK.jpg)
 
 ## 2. Installation
 
@@ -123,23 +123,23 @@ You need to authenticate yourself to connect with dsms using the `dsms-sdk` Pyth
 
       Step 1: Login into the selected dataspace instance of your choice.
 
-      ![copy_token_1](assets/images/copy_token_1.jpg)
+      ![copy_token_1](../assets/images/copy_token_1.jpg)
 
       Step 2: Enter your credentials
 
-      ![copy_token_2](assets/images/copy_token_2.jpg)
+      ![copy_token_2](../assets/images/copy_token_2.jpg)
 
       Step 3: After logging in you will land up on the home page. Now proceed to the my profile option
 
-      ![copy_token_3](assets/images/copy_token_3.jpg)
+      ![copy_token_3](../assets/images/copy_token_3.jpg)
 
       Step 4: The my profile option should look something like below. Now click on Advanced.
 
-      ![copy_token_4](assets/images/copy_token_4.jpg)
+      ![copy_token_4](../assets/images/copy_token_4.jpg)
 
       Step 5: After landing up on Advanced section, click on the copy token to clipboard
 
-      ![copy_token_6](assets/images/copy_token_5.jpg)
+      ![copy_token_6](../assets/images/copy_token_5.jpg)
 
       Step 6: Now the login token is in the clipboard. Now paste the copied login token from the frontend in the DSMS_TOKEN attribute of the .env file
       ```
