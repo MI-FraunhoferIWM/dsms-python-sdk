@@ -12,21 +12,23 @@ The schema contains complex types and references, indicating an advanced usage s
 | Field Name        | Description                                                                                              | Type                                              | Default  | Property Namespace | Required / Optional |
 |:-----------------:|:--------------------------------------------------------------------------------------------------------:|:-------------------------------------------------:|:--------:|:------------------:|:-----------------:|
 | Name              | Human-readable name of the KItem.                                                                       | string                                               | Not Applicable | `name`             | Required          |
+| ID  | ID of the KItem | Union[UUID, string]                                                                                   | Not Applicable | `id`               | Optional          |
 | Slug              | A unique slug identifier for the KItem, minimum of 4 characters.                                        | string                                               | `None`   | `slug`             | Optional          |
 | Ktype ID          | The type ID of the KItem                                                                                | Union[Enum, string]                                  | Not Applicable | `ktype_id`         | Required          |
 | Created At        | Timestamp of when the KItem was created.                                                                | Union[string, datetime]                              | `None`   | `created_at`       | Automatically generated          |
 | Updated At        | Timestamp of when the KItem was updated.                                                                | Union[string, datetime]                              | `None`   | `updated_at`       | Automatically generated          |
+| Avatar | The avatar of the KItem. | Union[[Avatar](#avatar-fields), Dict[str, Any]] | `None`   | `avatar`           | Optional          |
 | Avatar Exists     | Whether the KItem holds an avatar or not.                                                               | boolean                                              | `False`  | `avatar_exists`    | Automatically generated          |
-| Custom Properties | A set of custom properties related to the KItem.                                                        | Any                                               | `{}`     | `custom_properties`| Optional          |
-| Summary           | A brief human-readable summary of the KItem                                                             | string]                               | `None`   | `summary`          | Optional          |
+| Custom Properties | A set of custom properties related to the KItem.                                                        | Any                                               | `None`     | `custom_properties`| Optional          |
+| Summary           | A brief human-readable summary of the KItem                                                             | string                              | `None`   | `summary`          | Optional          |
 | KItem Apps        | A list of applications associated with the KItem                                                        | List[[App](#app-fields)]                                         | `[ ]`    | `kitem_apps`       | Optional          |
 | Annotations       | A list of annotations related to the KItem                                                              | List[[Annotation](#annotation-fields)]                                  | `[ ]`    | `annotations`      | Optional          |
 | Affiliations      | A list of affiliations associated with the KItem                                                        | List[[Affiliation](#affiliation-fields)]                                 | `[ ]`    | `affiliations`     | Optional          |
 | Contacts          | Contact information related to the KItem                                                                | List[[ContactInfo](#contactinfo-fields)]                                 | `[ ]`    | `contacts`         | Optional          |
 | External Links    | A list of external links related to the KItem                                                           | List[[ExternalLink](#externallink-fields)]                                | `[ ]`    | `external_links`   | Optional          |
-| Attachments       | A list of file attachments associated with the KItem                                                    | List [ Union [[Attachment ](#attachment-fields)], string]                      | `[ ]`    | `attachments`      | Optional          |
+| Attachments       | A list of file attachments associated with the KItem                                                    | List [Union [[Attachment](#attachment-fields)], string]                      | `[ ]`    | `attachments`      | Optional          |
 | Dataframe             | Dataframe associated with the KItem, e.g. a time series                                                           | Union[List[[Column](#column-fields)], pd.DataFrame, Dictionary[string, Union[List, Dictionary]]] | `None`   | `dataframe`             | Optional          |
-| Linked KItems     | List of other KItems linked to this KItem                                                               | List[Union[[LinkedKItem](#linkedkitem-fields), "KItem"]]                 | `None`   | `linked_kitems`    | Optional          |
+| Linked KItems     | List of other KItems linked to this KItem                                                               | List[Union[[LinkedKItem](#linkedkitem-fields), "KItem"]]                 | `[ ]` | `linked_kitems`    | Optional          |
 | User Groups       | User groups with access to this KItem                                                                   | List[[UserGroup](#usergroup-fields)]                                   | `[ ]`    | `user_groups`      | Optional          |
 
 ### Example Usage
@@ -38,14 +40,26 @@ item = KItem(
     ktype_id="Testing Machine",
     custom_properties={"location": "Room01", "max_force": "100Pa"},
     summary="This is a summary",
-    kitem_apps=[{"executable": "my_analysis", "title": "Analysis", "description": "analysis the tensile strength from machine data"}],
+    kitem_apps=[
+        {"executable": "my_analysis_file",
+        "title": "Analysis",
+        "description": "Analysis the tensile strength from machine data"}
+    ],
     annotations=["http://example.org/sample_kitem/annotation"],
-    affiliations=[{"name": "Institute ABC"}],
-    contacts=[{"name": "John Doe", "email": "john.doe@example.com"}],
-    external_links=[{"label": "Project Website", "url": "https://example.com"}],
+    affiliations=[
+        {"name": "Institute ABC"}
+    ],
+    contacts=[
+        {"name": "John Doe", "email": "john.doe@example.com"}
+    ],
+    external_links=[
+        {"label": "Project Website", "url": "https://example.com"}
+    ],
     attachments=["research_data.csv"],
-    linked_kitems=[{"id": "{kitem_id_of_present}", "source_id": "{kitem_id_of_source}"}],
-    user_groups=[{"group_id": "{other_kitem_id}", "name": "DigiMaterials"}]
+    linked_kitems=[another_kitem],
+    user_groups=[
+        {"group_id": "33305", "name": "DigiMaterials"}
+    ]
 )
 ```
 
@@ -54,26 +68,50 @@ item = KItem(
 
 | Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
+| KItem App ID | ID of the KItem App               | integer    | `None`  | `kitem_app_id`     | Automatically generated |
 | Executable        | Name of the executable            | string      | `None`  | `executable`       | Required          |
 | Title             | Title of the application          | string      | `None`  | `title`            | Required          |
 | Description       | Description of the application    | string      | `None`  | `description`     |Required          |
+| Tags | Tags related to the application | Dict | `None` | `tags` | `tags` | Optional |
+| Additional properties | Additional properties related to the application | [Additional Properties](#additional-properties-fields) | `None` | `additional_properties` | Optional |
 
 ### Example Usage
 ```python
-sample_kitem.kitem_apps = {
+sample_kitem.kitem_apps = [{
     "executable": "my_application",
     "title": "My Application",
     "description": "My Application for analysis.",
-}
+}]
+```
+
+## Additional Properties Fields
+
+| Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
+|:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
+| Trigger Upon Upload | Whether the application is triggered when an attachment is uploaded | boolean      | `False` | `triggerUponUpload` | Optional          |
+| Trigger Upon Extension | File extensions for which the upload shall be triggered | List[string] | `None`  | `triggerUponUploadFileExtensions` | Optional          |
+
+### Example Usage
+```python
+item.kitem_apps = [
+        {
+            "executable": "my_yaml_file",
+            "title": "Data2RDF",
+            "additional_properties": {
+                "triggerUponUpload": True,
+                "triggerUponUploadFileExtensions": [".csv"],
+            },
+        }
+    ]
 ```
 
 ## Annotation Fields
 
 | Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
-| IRI               | IRI of the annotation             | string      | `None`  | `iri`              | Required          |
-| Name              | Name of the annotation            | string      | `None`  | `name`             | Required          |
-| Namespace         | Namespace of the annotation       | string      | `None`  | `namespace`        | Required          |
+| IRI               | IRI of the annotation             | string      | Not Applicable  | `iri`              | Required          |
+| Name              | Name of the annotation            | string      | Not Applicable | `name`             | Required          |
+| Namespace         | Namespace of the annotation       | string      | Not Applicable  | `namespace`        | Required          |
 
 ### Example Usage
 ```python
@@ -95,43 +133,64 @@ sample_kitem.annotations = [
 
 | Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
-| Name              | Name of the affiliation           | string      | `None`  | `name`             | Required          |
+| Name              | Name of the affiliation           | string      | Not Applicable | `name`             | Required          |
 
 ### Example Usage
 ```python
-sample_kitem.affiliations = {"name": "Research BAC"}
+sample_kitem.affiliations = [{"name": "Research BAC"}]
 ```
 
+## Avatar Fields
+
+| Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
+| :-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
+| File | The file path to the image or PIL.Image object when setting a new avatar is set | Union[string, PIL.Image] | `None`  | `file` | Optional |
+| Include QR code | Include QR code in the image | bool | `False` | `include_qr` | Optional |
+
+### Example Usage
+```python
+sample_kitem.avatars = [
+    {
+        "file": "my_avatar.jpg",
+        "include_qr": True
+    }
+]
+```
 
 ## ContactInfo Fields
 
 | Sub-Property Name | Description                       | Type          | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:-------------:|:-------:|:------------------:|:-----------------:|
-| Email             | Email of the contact person       | string           | `None`  | `email`            | Required          |
-| Name              | Name of the contact person        | string           | `None`  | `name`             | Required          |
+| Email             | Email of the contact person       | string           | Not Applicable  | `email`            | Required          |
+| Name              | Name of the contact person        | string           | Not Applicable  | `name`             | Required          |
 | User Id           | User ID of the contact person     | string (UUID)     | `None`  | `user_id`          | Optional          |
 
 ### Example Usage
 ```python
-sample_kitem.contacts = {
-    "email": "research.abc@gmail.com",
-    "name": "project01@research.abc.de","user_id":"33f24ee5-2f03-4874-854d-388af782c4c3"
-}
+sample_kitem.contacts = [
+    {
+        "email": "research.abc@gmail.com",
+        "name": "project01@research.abc.de",
+        "user_id":"33f24ee5-2f03-4874-854d-388af782c4c3"
+    }
+]
 ```
 
 ## ExternalLink Fields
 
 | Sub-Property Name | Description                       | Type                       | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------------------------:|:-------:|:------------------:|:-----------------:|
-| Label             | Label of the external link        | string                        | `None`  | `label`            | Required          |
-| Url               | URL of the external link          | string , format: URI, minLength: 1 | `None`  | `url`              | Required          |
+| Label             | Label of the external link        | string                        | Not Applicable | `label`            | Required          |
+| Url               | URL of the external link          | string , format: URI, minLength: 1 | Not Applicable  | `url`              | Required          |
 
 ### Example Usage
 ```python
-sample_kitem.external_links = [{
-    "label": "project link",
-    "url": "www.projectmachine01.com"
-}]
+sample_kitem.external_links = [
+    {
+        "label": "project link",
+        "url": "www.projectmachine01.com"
+    }
+]
 ```
 
 
@@ -139,7 +198,7 @@ sample_kitem.external_links = [{
 
 | Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
-| Name              | File name of the attachment       | string      | `None`  | `name`             | Required          |
+| Name              | File name of the attachment       | string      | Not Applicable  | `name`             | Required          |
 | Content | Content of the attachment           | string      | `None`  | `content`          | Optional          |
 
 ### Example Usage
@@ -160,7 +219,8 @@ sample_kitem.attachments = [
 
 | Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
-| Name              | File name of the attachment       | string      | `None`  | `name`             | Required          |
+| Name              | Name of the column                | string      | Not Applicable | `name`             | Required          |
+| Column ID         | ID of the column                  | integer     | Not Applicable  | `column_id`        | Required          |
 
 ### Example Usage
 ```python
@@ -183,9 +243,13 @@ sample_kitem.dataframe = {
 ```python
 sample_kitem.linked_kitems = [
     {
-        "id": "33305",
-        "source_id": "22205"
+        "id": "3e894d2c-d1a5-42ca-b6e2-cbbc09e0e686", # id of the target KItem
     }
+]
+```
+```python
+sample_kitem.linked_kitems = [
+    another_kitem
 ]
 ```
 
