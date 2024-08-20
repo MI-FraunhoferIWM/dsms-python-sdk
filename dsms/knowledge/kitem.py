@@ -129,7 +129,7 @@ class KItem(BaseModel):
     slug: Optional[str] = Field(
         None, description="Slug of the KContext.dsms", min_length=4
     )
-    annotations: List[Annotation] = Field(
+    annotations: List[Union[str, Annotation]] = Field(
         [], description="Annotations of the KItem"
     )
     attachments: List[Union[Attachment, str]] = Field(

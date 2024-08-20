@@ -1,15 +1,18 @@
-"""Example of creating and running apps"""
+"""Tutorial for creating and running apps"""
 
 import time
 
 from dsms import DSMS, AppConfig, KItem
 
+# Connect to DSMS
 print("\nConnect to DSMS")
 dsms = DSMS(env="../.env")
 
+# Define app name and item name
 configname = "testapp2"
 kitem_name = "test item"
 
+# Define data
 data = """A,B,C
 1.2,1.3,1.5
 1.7,1.8,1.9
@@ -25,6 +28,7 @@ data = """A,B,C
 
 extension = ".csv"
 
+# Define app parameters
 parameters = [
     {"name": "parser", "value": "csv"},
     {"name": "time_series_header_length", "value": 1},
@@ -56,6 +60,7 @@ parameters = [
     },
 ]
 
+# Define app specification
 specification = {
     "apiVersion": "argoproj.io/v1alpha1",
     "kind": "Workflow",
@@ -67,12 +72,14 @@ specification = {
     },
 }
 
+# Create app specification
 print("\nCreate app specification")
 appspec = AppConfig(
     name=configname,
     specification=specification,  # this can also be a file path instead of a dict
 )
 
+# Create kitem
 print("\nCreate kitem")
 item = KItem(
     name=kitem_name,
@@ -90,50 +97,61 @@ item = KItem(
     avatar={"include_qr": True},
 )
 
+# Commit KItem
 print("\nCommit KItem")
 dsms.commit()
 
-print("\nAdd attachment")
-# here we are setting the content directly,
-# but `item.attachments` can also be a list with a filepath
+# Add attachment
+# Here we are setting the content directly,
+# but item.attachments can also be a list with a filepath
 # e.g. item.attachments = ["path/to/my/file.csv"]
+print("\nAdd attachment")
 item.attachments = [{"name": "dummy_data.csv", "content": data}]
 
+# Verify that the attachment was added
 print("\nVerify that the attachment was added")
 print(item)
 
+# Upload attachment and trigger app
 print("\nUpload attachment and trigger app")
 dsms.commit()
 
+# Get dataframe
 print("\nGet dataframe")
 print(item.dataframe.StandardForce.convert_to("N"))
 
-
-print("\nVerify that the dataframe was deleted")
+# Verify that the dataframe was deleted
 item.dataframe = {}
 dsms.commit()
+print("\nVerify that the dataframe was deleted")
 print(item)
 
+# Run pipeline manually
 print("\nRun pipeline manually")
 job = item.kitem_apps.by_title["data2rdf"].run(
     attachment_name=item.attachments[0].name, set_token=True, set_host_url=True
 )
 
+# See job status
 print("\nSee job status")
 print(job.status)
 print("\n See job logs:")
 print(job.logs)
 
-print("\nGet dataframe")
+# Get dataframe again
+print("\nGet dataframe again")
 print(item.dataframe.StandardForce.convert_to("N"))
 
+# Delete dataframe
 print("\nDelete dataframe")
 item.dataframe = {}
 dsms.commit()
 
-print("\nVerify that the dataframe was deleted")
+# Verify that the dataframe was deleted again
+print("\nVerify that the dataframe was deleted again")
 print(item)
 
+# Run pipeline manually in the background
 print("\nRun pipeline manually in the background")
 job = item.kitem_apps.by_title["data2rdf"].run(
     attachment_name=item.attachments[0].name,
@@ -142,7 +160,7 @@ job = item.kitem_apps.by_title["data2rdf"].run(
     wait=False,
 )
 
-
+# Monitor job status
 print("\nMonitor job status")
 while True:
     time.sleep(1)
@@ -153,12 +171,15 @@ while True:
     if job.status.phase != "Running":
         break
 
+# Reload item
 print("\nReload item")
 item.refresh()
 
-print("\nGet dataframe")
+# Get dataframe again
+print("\nGet dataframe again")
 print(item.dataframe.StandardForce.convert_to("N"))
 
+# Cleanup
 print("\nCleanup")
 del dsms[item]
 del dsms[appspec]

@@ -160,3 +160,4 @@ cython_debug/
 #.idea/
 
 .vscode/
+examples/basic_usage.ipynb

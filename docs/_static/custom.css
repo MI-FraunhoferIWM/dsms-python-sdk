@@ -1,0 +1,5 @@
+/* Custom CSS for wrapping text in table cells */
+table td {
+    word-wrap: break-word;
+    white-space: normal !important;
+}
