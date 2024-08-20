@@ -2,6 +2,7 @@
 
 from typing import TYPE_CHECKING
 
+from dsms.core.configuration import DEFAULT_REPO
 from dsms.knowledge.sparql_interface.subgraph import Subgraph
 from dsms.knowledge.sparql_interface.utils import (
     _add_rdf,
@@ -25,7 +26,7 @@ class SparqlInterface:
         self._subgraph = Subgraph(dsms)
 
     def query(
-        self, query: str, repository: str = "knowledge"
+        self, query: str, repository: str = DEFAULT_REPO
     ) -> "Dict[str, Any]":
         """Perform Sparql Query"""
         return _sparql_query(query, repository)
@@ -33,7 +34,7 @@ class SparqlInterface:
     def update(
         self,
         file_or_pathlike: "Union[str, TextIO]",
-        repository: str = "knowledge",
+        repository: str = DEFAULT_REPO,
     ) -> None:
         """Perform update query from local file"""
         _sparql_update(
@@ -43,7 +44,7 @@ class SparqlInterface:
     def insert(
         self,
         file_or_pathlike: "Union[str, TextIO]",
-        repository: str = "knowledge",
+        repository: str = DEFAULT_REPO,
     ) -> None:
         """Upload RDF to triplestore from local file"""
         _add_rdf(file_or_pathlike, self._dsms.config.encoding, repository)

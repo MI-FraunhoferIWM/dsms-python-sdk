@@ -1,22 +1,23 @@
-"""Affiliation KProperty"""
+"""Affiliation property of a KItem"""
 
 from typing import TYPE_CHECKING
 
 from pydantic import Field
 
-from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
+from dsms.knowledge.properties.utils import _str_to_dict
 
 if TYPE_CHECKING:
     from typing import Callable
 
 
-class Affiliation(KPropertyItem):
+class Affiliation(KItemProperty):
     """Affiliation of a KItem."""
 
     name: str = Field(..., description="Name of the affiliation")
 
 
-class AffiliationsProperty(KProperty):
+class AffiliationsProperty(KItemPropertyList):
     """Affiliations property"""
 
     # OVERRIDE
@@ -24,21 +25,7 @@ class AffiliationsProperty(KProperty):
     def k_property_item(cls) -> "Callable":
         return Affiliation
 
-    # OVERRIDE
-    def _add(self, item: Affiliation) -> Affiliation:
-        """Side effect when an affiliation is added to the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _update(self, item: Affiliation) -> Affiliation:
-        """Side effect when an affiliation is updated at the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _get(self, item: Affiliation) -> Affiliation:
-        """Side effect when getting the affiliation for a specfic kitem"""
-        return item
-
-    # OVERRIDE
-    def _delete(self, item: Affiliation) -> None:
-        """Side effect when deleting the affiliation of a KItem"""
+    @property
+    def k_property_helper(cls) -> "Callable":
+        """Affiliation property helper"""
+        return _str_to_dict

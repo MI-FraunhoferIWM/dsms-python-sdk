@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_serializer
 
-from dsms.knowledge.utils import _parse_model
+from dsms.knowledge.utils import _create_custom_properties_model
 
 
 class KType(BaseModel):
@@ -15,22 +15,16 @@ class KType(BaseModel):
     name: Optional[str] = Field(
         None, description="Human readable name of the KType."
     )
-    form_data: Optional[Any] = Field(
-        None, description="Form data of the KItem."
-    )
-    data_schema: Optional[Any] = Field(
+    webform: Optional[Any] = Field(None, description="Form data of the KItem.")
+    json_schema: Optional[Any] = Field(
         None, description="OpenAPI schema of the KItem."
     )
 
-    @field_validator("data_schema")
+    @field_validator("webform")
     @classmethod
-    def validate_data_schema(cls, value) -> Dict[str, Any]:
-        """Validate the data schema of the ktype"""
-        if isinstance(value, dict):
-            value = _parse_model(value)
-        elif not isinstance(value, BaseModel):
-            raise TypeError(f"Invalid type for `data_schema`: {type(value)}")
-        return value
+    def create_model(cls, value: Optional[Dict[str, Any]]) -> Any:
+        """Create the datamodel for the ktype"""
+        return _create_custom_properties_model(value)
 
     @model_serializer
     def serialize(self):

@@ -51,35 +51,58 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         name="bar123",
     )
 
-    annotation = {
-        "iri": "http://example.org/",
-        "name": "foo",
-        "namespace": "example",
-    }
-    annotation2 = {
-        "iri": "http://example.org/",
-        "name": "bar",
-        "namespace": "example",
-    }
     user_group = {"name": "private", "group_id": "private_123"}
-    app = {"executable": "foo.exe"}
-    app2 = {"executable": "bar.exe"}
+    app = {"executable": "foo.exe", "title": "foo"}
 
-    kitem_old = KItem(
-        id=get_mock_kitem_ids[0],
-        name="foo123",
-        ktype_id=dsms.ktypes.Organization,
-        annotations=[annotation2],
-        linked_kitems=[linked_kitem1, linked_kitem2],
-        user_groups=[user_group],
-        kitem_apps=[app2],
-    )
+    kitem_old = {
+        "id": get_mock_kitem_ids[0],
+        "name": "foo123",
+        "ktype_id": dsms.ktypes.Organization.value,
+        "annotations": [
+            {
+                "iri": "http://example.org/",
+                "name": "bar",
+                "namespace": "example",
+                "description": None,
+            }
+        ],
+        "linked_kitems": [
+            {
+                "id": str(get_mock_kitem_ids[1]),
+                "ktype_id": dsms.ktypes.Organization.value,
+                "name": "foo456",
+            },
+            {
+                "id": str(get_mock_kitem_ids[2]),
+                "ktype_id": dsms.ktypes.Organization.value,
+                "name": "foo789",
+            },
+        ],
+        "user_groups": [user_group],
+        "kitem_apps": [
+            {
+                "id": get_mock_kitem_ids[0],
+                "kitem_app_id": 17,
+                "executable": "bar.exe",
+                "title": "bar",
+                "description": None,
+                "tags": None,
+                "additional_properties": None,
+            }
+        ],
+    }
 
     kitem_new = KItem(
         id=get_mock_kitem_ids[0],
         name="foo123",
         ktype_id=dsms.ktypes.Organization,
-        annotations=[annotation],
+        annotations=[
+            {
+                "iri": "http://example.org/",
+                "name": "foo",
+                "namespace": "example",
+            }
+        ],
         linked_kitems=[linked_kitem3],
         user_groups=[user_group],
         kitem_apps=[app],
@@ -87,25 +110,78 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
 
     expected = {
         "kitems_to_link": [
-            obj.model_dump() for obj in kitem_new.linked_kitems
+            {"id": str(obj.id)} for obj in kitem_new.linked_kitems
         ],
         "annotations_to_link": [
-            obj.model_dump() for obj in kitem_new.annotations
+            {
+                "iri": "http://example.org/",
+                "name": "foo",
+                "namespace": "example",
+                "description": None,
+            }
         ],
         "user_groups_to_add": [],
         "kitem_apps_to_update": [
-            obj.model_dump() for obj in kitem_new.kitem_apps
+            {
+                "executable": "foo.exe",
+                "title": "foo",
+                "description": None,
+                "tags": None,
+                "additional_properties": None,
+            }
         ],
         "kitems_to_unlink": [
-            obj.model_dump() for obj in kitem_old.linked_kitems
+            {"id": str(linked.id)} for linked in [linked_kitem1, linked_kitem2]
         ],
         "annotations_to_unlink": [
-            obj.model_dump() for obj in kitem_old.annotations
+            {
+                "iri": "http://example.org/",
+                "name": "bar",
+                "namespace": "example",
+                "description": None,
+            }
         ],
         "user_groups_to_remove": [],
         "kitem_apps_to_remove": [
-            obj.model_dump() for obj in kitem_old.kitem_apps
+            {
+                "executable": "bar.exe",
+                "title": "bar",
+                "description": None,
+                "tags": None,
+                "additional_properties": None,
+            }
         ],
     }
     diffs = _get_kitems_diffs(kitem_old, kitem_new)
-    assert sorted(diffs) == sorted(expected)
+
+    for key, value in diffs.items():
+        assert value == expected.pop(key)
+    assert len(expected) == 0
+
+
+@responses.activate
+def test_unit_conversion(custom_address):
+    """Test unit conversion test"""
+    from dsms import DSMS
+    from dsms.knowledge.semantics.units import get_conversion_factor
+
+    with pytest.warns(UserWarning, match="No authentication details"):
+        DSMS(host_url=custom_address)
+
+    assert get_conversion_factor("mm", "m", decimals=3) == 0.001
+
+    assert get_conversion_factor("km", "in", decimals=1) == 39370.1
+
+    assert get_conversion_factor("GPa", "MPa") == 1000
+
+    assert (
+        get_conversion_factor(
+            "http://qudt.org/vocab/unit/M",
+            "http://qudt.org/vocab/unit/IN",
+            decimals=1,
+        )
+        == 39.4
+    )
+
+    with pytest.raises(ValueError, match="Unit "):
+        get_conversion_factor("kPa", "cm")

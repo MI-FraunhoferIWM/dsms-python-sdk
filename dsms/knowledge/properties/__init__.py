@@ -10,10 +10,10 @@ from dsms.knowledge.properties.annotations import (  # isort:skip
 )
 from dsms.knowledge.properties.apps import App, AppsProperty
 from dsms.knowledge.properties.authors import Author, AuthorsProperty
-from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 from dsms.knowledge.properties.contacts import ContactInfo, ContactsProperty
-from dsms.knowledge.properties.custom_properties import CustomProperties
-from dsms.knowledge.properties.hdf5 import Column, HDF5Container
+from dsms.knowledge.properties.custom_datatype import NumericalDataType
+from dsms.knowledge.properties.dataframe import Column, DataFrameContainer
 from dsms.knowledge.properties.summary import Summary
 from dsms.knowledge.properties.user_groups import UserGroup, UserGroupsProperty
 
@@ -33,6 +33,7 @@ from dsms.knowledge.properties.external_links import (  # isort:skip
     ExternalLinksProperty,
 )
 
+from dsms.knowledge.properties.avatar import Avatar  # isort:skip
 
 __all__ = [
     "Annotation",
@@ -41,7 +42,7 @@ __all__ = [
     "AttachmentsProperty",
     "Author",
     "AuthorsProperty",
-    "CustomProperties",
+    "Avatar",
     "LinkedKItem",
     "LinkedKItemsProperty",
     "ContactInfo",
@@ -55,8 +56,9 @@ __all__ = [
     "UserGroupsProperty",
     "UserGroup",
     "Summary",
-    "KProperty",
-    "KPropertyItem",
-    "HDF5Container",
+    "KItemPropertyList",
+    "KItemProperty",
+    "DataFrameContainer",
     "Column",
+    "NumericalDataType",
 ]

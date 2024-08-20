@@ -7,7 +7,7 @@ import pytest
 import responses
 
 if TYPE_CHECKING:
-    from typing import Any, Dict
+    from typing import Any, Dict, List
 
 
 class MockDB:
@@ -30,9 +30,17 @@ class MockDB:
             "name": "bar123",
             "id": "698acdc5-dd97-4217-906e-2c0b44248c17",
         },
+        "cc834fb6-d4cd-43c1-b4b8-4c720ac6f038": {
+            "name": "bar456",
+            "id": "cc834fb6-d4cd-43c1-b4b8-4c720ac6f038",
+        },
     }
 
-    hdf5 = {
+    slugs = [
+        value.get("name") + "-" + key[:8] for key, value in kitems.items()
+    ]
+
+    dataframe = {
         "698acdc5-dd97-4217-906e-2c0b44248c17": [
             {
                 "column_id": 0,
@@ -67,6 +75,16 @@ def mock_responses(custom_address) -> "Dict[str, Any]":
 
 
 @pytest.fixture(scope="function")
+def passthru() -> "List[str]":
+    return [
+        "https://qudt.org/2.1/vocab/unit",
+        "http://qudt.org/2.1/vocab/unit",
+        "http://qudt.org/vocab/quantitykind",
+        "https://qudt.org/vocab/quantitykind",
+    ]
+
+
+@pytest.fixture(scope="function")
 def mock_callbacks(custom_address) -> "Dict[str, Any]":
     ktypes = urljoin(custom_address, "api/knowledge-type/")
 
@@ -75,11 +93,10 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
             {
                 "name": "organization",
                 "id": "organization",
-                "data_schema": {
-                    "title": "Organization",
-                    "type": "object",
-                    "properties": {},
-                },
+            },
+            {
+                "name": "dataset",
+                "id": "dataset",
             },
         ]
         header = {"content_type": "application/json"}
@@ -97,17 +114,25 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
         else:
             return 200, {}, json.dumps(MockDB.kitems[item_id])
 
-    def return_hdf5(request):
+    def return_dataframe(request):
         # Extract 'id' parameter from the URL
         url_parts = request.url.split("/")
         item_id = url_parts[-1]
 
         # Your logic to generate a dynamic response based on 'item_id'
         # This is just a placeholder; you should replace it with your actual logic
-        if item_id not in MockDB.hdf5:
+        if item_id not in MockDB.dataframe:
             return 404, {}, "KItem does not exist"
         else:
-            return 200, {}, json.dumps(MockDB.hdf5[item_id])
+            return 200, {}, json.dumps(MockDB.dataframe[item_id])
+
+    def return_slugs(request):
+        url_parts = request.url.split("/")
+        slug = url_parts[-1]
+        if slug not in MockDB.slugs:
+            return 404, {}, "Slug does not exist"
+        else:
+            return 200, {}, "Slug exists"
 
     def _get_kitems() -> "Dict[str, Any]":
         return {
@@ -123,18 +148,34 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
             for uid in MockDB.kitems
         }
 
-    def _get_hdf5() -> "Dict[str, Any]":
+    def _get_dataframe() -> "Dict[str, Any]":
         return {
             urljoin(custom_address, f"api/knowledge/data_api/{uid}"): [
                 {
                     "method": responses.GET,
                     "returns": {
                         "content_type": "application/json",
-                        "callback": return_hdf5,
+                        "callback": return_dataframe,
                     },
                 }
             ]
             for uid in MockDB.kitems
+        }
+
+    def _get_slugs() -> "Dict[str, Any]":
+        return {
+            urljoin(
+                custom_address, f"api/knowledge/kitems/organization/{slug}"
+            ): [
+                {
+                    "method": responses.HEAD,
+                    "returns": {
+                        "content_type": "application/json",
+                        "callback": return_slugs,
+                    },
+                }
+            ]
+            for slug in MockDB.slugs
         }
 
     return {
@@ -148,12 +189,17 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
             }
         ],
         **_get_kitems(),
-        **_get_hdf5(),
+        **_get_dataframe(),
+        **_get_slugs(),
     }
 
 
 @pytest.fixture(autouse=True, scope="function")
-def register_mocks(mock_responses, mock_callbacks, custom_address) -> str:
+def register_mocks(
+    mock_responses, mock_callbacks, passthru, custom_address
+) -> str:
+    for url in passthru:
+        responses.add_passthru(url)
     for url, endpoints in mock_responses.items():
         for response in endpoints:
             responses.add(

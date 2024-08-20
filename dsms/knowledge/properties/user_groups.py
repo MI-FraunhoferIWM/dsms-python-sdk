@@ -1,45 +1,30 @@
-"""UserGroup KProperty"""
+"""UserGroup property of a KItem"""
 
 from typing import TYPE_CHECKING
 
 from pydantic import Field
 
-from dsms.knowledge.properties.base import KProperty, KPropertyItem
+from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 
 if TYPE_CHECKING:
     from typing import Callable
 
 
-class UserGroup(KPropertyItem):
+class UserGroup(KItemProperty):
     """Users groups related to a KItem."""
 
     name: str = Field(..., description="Name of the user group")
     group_id: str = Field(..., description="ID of the user group")
 
 
-class UserGroupsProperty(KProperty):
-    """KProperty for user_groups"""
+class UserGroupsProperty(KItemPropertyList):
+    """KItemPropertyList for user_groups"""
 
     @property
     def k_property_item(cls) -> "Callable":
         """UserGroup data model"""
         return UserGroup
 
-    # OVERRIDE
-    def _add(self, item: UserGroup) -> UserGroup:
-        """Side effect when an UserGroup is added to the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _update(self, item: UserGroup) -> UserGroup:
-        """Side effect when an UserGroup is updated at the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _get(self, item: UserGroup) -> UserGroup:
-        """Side effect when getting the UserGroup for a specfic kitem"""
-        return item
-
-    # OVERRIDE
-    def _delete(self, item: UserGroup) -> None:
-        """Side effect when deleting the UserGroup of a KItem"""
+    @property
+    def k_property_helper(cls) -> None:
+        """Not defined for User groups"""

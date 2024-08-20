@@ -23,6 +23,8 @@ def test_kitem_basic(custom_address, get_mock_kitem_ids):
         ktype_id=dsms.ktypes.Organization,
     )
 
+    assert instance.is_a(dsms.ktypes.Organization)
+
     assert isinstance(instance.dsms, DSMS)
     assert isinstance(instance.dsms.config, Configuration)
     assert Context.dsms == instance.dsms
@@ -48,6 +50,8 @@ def test_kitem_config_class(custom_address, get_mock_kitem_ids):
         name="foo123",
         ktype_id=dsms.ktypes.Organization,
     )
+
+    assert instance.is_a(dsms.ktypes.Organization)
 
     assert isinstance(instance.dsms, DSMS)
     assert config == instance.dsms.config
@@ -82,8 +86,10 @@ def test_kitem_custom_config_env(custom_address, get_mock_kitem_ids):
     custom_instance = KItem(
         id=get_mock_kitem_ids[0],
         name="foo123",
-        ktype_id=dsms.ktypes.Organization,
+        ktype_id=dsms.ktypes.Dataset,
     )
+
+    assert custom_instance.is_a(dsms.ktypes.Dataset)
 
     assert str(custom_instance.dsms.config.host_url) == custom_address
 
@@ -140,7 +146,7 @@ def test_kitem_default_ktypes(custom_address):
     with pytest.warns(UserWarning, match="No authentication details"):
         dsms = DSMS(host_url=custom_address)
 
-    assert len(dsms.ktypes) == 1
+    assert len(dsms.ktypes) == 2
 
 
 @responses.activate
@@ -159,3 +165,34 @@ def test_ktype_property(get_mock_kitem_ids, custom_address):
     )
 
     assert kitem.ktype == Context.ktypes.get(dsms.ktypes.Organization.value)
+
+
+# @responses.activate
+# def test_ktype_custom_property_assignment(get_mock_kitem_ids, custom_address):
+#     from dsms.knowledge.properties.custom_datatype.numerical import NumericalDataType
+#     from dsms.core.dsms import DSMS
+#     from dsms.knowledge.kitem import KItem
+
+#     with pytest.warns(UserWarning, match="No authentication details"):
+#         dsms = DSMS(host_url=custom_address)
+
+#     kitem = KItem(
+#         id=get_mock_kitem_ids[0],
+#         name="foo123",
+#         ktype_id=dsms.ktypes.Organization,
+#         custom_properties={"material": "abcd", "tester": 123}
+#     )
+
+#     assert kitem.custom_properties.material == "abcd"
+#     assert kitem.custom_properties.tester == 123
+#     assert isinstance(kitem.custom_properties.tester, NumericalDataType)
+
+#     kitem.custom_properties = {"material": "def", "tester2": 123}
+
+#     assert kitem.custom_properties.material == "def"
+#     assert kitem.custom_properties.tester2 == 123
+#     assert isinstance(kitem.custom_properties.tester2, NumericalDataType)
+
+#     kitem.custom_properties.tester2 = 456
+#     assert kitem.custom_properties.tester2 == 456
+#     assert isinstance(kitem.custom_properties.tester2, NumericalDataType)

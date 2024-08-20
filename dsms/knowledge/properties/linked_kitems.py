@@ -1,21 +1,75 @@
-"""Linked KItems KProperty"""
+"""Linked KItems of a KItem"""
 
-
-from typing import TYPE_CHECKING, Optional
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
-from pydantic import ConfigDict, Field, model_serializer
+from pydantic import (  # isort:skip
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    model_serializer,
+    field_validator,
+)
 
-from dsms.knowledge.properties.base import KProperty, KPropertyItem
-from dsms.knowledge.utils import _get_kitem
+from dsms.knowledge.properties.base import (  # isort:skip
+    KItemProperty,
+    KItemPropertyList,
+)
+
+from dsms.knowledge.properties.affiliations import Affiliation  # isort:skip
+from dsms.knowledge.properties.annotations import Annotation  # isort:skip
+from dsms.knowledge.properties.attachments import Attachment  # isort:skip
+from dsms.knowledge.properties.authors import Author  # isort:skip
+from dsms.knowledge.properties.contacts import ContactInfo  # isort:skip
+from dsms.knowledge.properties.external_links import ExternalLink  # isort:skip
+from dsms.knowledge.properties.user_groups import UserGroup  # isort:skip
+from dsms.knowledge.utils import _get_kitem  # isort:skip
+
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Union
+    from typing import Callable
 
     from dsms import KItem
 
 
-class LinkedKItem(KPropertyItem):
+def _linked_kitem_helper(kitem: "KItem"):
+    from dsms import KItem
+
+    if not isinstance(kitem, KItem):
+        raise TypeError(f"{kitem} is not of type {KItem}")
+    return {"id": kitem.id}
+
+
+class LinkedLinkedKItem(BaseModel):
+    """Linked KItem of linked KItems"""
+
+    id: str = Field(..., description="ID of a linked KItem of a linked KItem")
+
+    def __str__(self) -> str:
+        """Pretty print the linked KItems of the linked KItem"""
+        values = ",\n\t\t\t".join(
+            [f"{key}: {value}" for key, value in self.__dict__.items()]
+        )
+        return f"{{\n\t\t\t{values}\n\t\t}}"
+
+    def __repr__(self) -> str:
+        """Pretty print the linked KItems of the linked KItem"""
+        return str(self)
+
+
+class LinkedKItemSummary(BaseModel):
+    """Summary of a linked KItem"""
+
+    id: str = Field(..., description="ID of the linked KItem")
+
+    text: str = Field(
+        ..., description="Text for the summary of the linked KItem"
+    )
+
+
+class LinkedKItem(KItemProperty):
     """Data model of a linked KItem"""
 
     # OVERRIDE
@@ -23,37 +77,147 @@ class LinkedKItem(KPropertyItem):
         None,
         description="ID of the KItem to be linked",
     )
-    source_id: Optional[UUID] = Field(
-        None, description="Source ID of the KItem"
+
+    name: str = Field(..., description="Name of the linked KItem")
+
+    slug: str = Field(..., description="Slug of the linked KItem")
+
+    ktype_id: str = Field(..., description="Ktype ID of the linked KItem")
+
+    summary: Optional[Union[str, LinkedKItemSummary]] = Field(
+        None, description="Summary of the linked KItem."
     )
 
-    # OVERRIDE
-    model_config = ConfigDict(exclude={})
+    avatar_exists: bool = Field(
+        False, description="Wether the linked KItem has an avatar."
+    )
+
+    annotations: List[Optional[Annotation]] = Field(
+        [], description="Annotations of the linked KItem"
+    )
+
+    linked_kitems: List[Optional[LinkedLinkedKItem]] = Field(
+        [], description="Linked KItems of the linked KItem"
+    )
+
+    external_links: List[Optional[ExternalLink]] = Field(
+        [], description="External links of the linked KItem"
+    )
+
+    contacts: List[Optional[ContactInfo]] = Field(
+        [], description="Contact info of the linked KItem"
+    )
+
+    authors: List[Optional[Author]] = Field(
+        [], description="Authors of the linked KItem"
+    )
+
+    linked_affiliations: List[Optional[Affiliation]] = Field(
+        [], description="Linked affiliations of the linked KItem"
+    )
+
+    attachments: List[Union[str, Optional[Attachment]]] = Field(
+        [], description="Attachment of the linked KItem"
+    )
+
+    user_groups: List[Optional[UserGroup]] = Field(
+        [], description="User groups of the linked KItem"
+    )
+
+    custom_properties: Optional[Any] = Field(
+        None, description="Custom properies of the linked KItem"
+    )
+
+    created_at: Optional[Union[str, datetime]] = Field(
+        None, description="Time and date when the KItem was created."
+    )
+    updated_at: Optional[Union[str, datetime]] = Field(
+        None, description="Time and date when the KItem was updated."
+    )
+
+    _kitem = PrivateAttr(default=None)
 
     # OVERRIDE
-    def __setattr__(self, index: int, item: "Any") -> None:
-        """Add KItem to updated buffer."""
-        if self._kitem and self.source_id not in self.context.buffers.updated:
-            self.context.buffers.updated.update({self.source_id: self._kitem})
-        super().__setattr__(index, item)
+    model_config = ConfigDict(exclude={}, arbitrary_types_allowed=True)
+
+    # OVERRIDE
+    def __str__(self) -> str:
+        """Pretty print the linked KItem"""
+        values = "\n\t\t\t".join(
+            [
+                f"{key}: {value}"
+                for key, value in self.__dict__.items()
+                if key not in self.exclude
+            ]
+        )
+        return f"\n\t\t\t{values}\n\t\t"
+
+    # OVERRIDE
+    def __repr__(self) -> str:
+        """Pretty print the linked KItem"""
+        return str(self)
 
     # OVERRIDE
     @property
     def kitem(cls) -> "KItem":
-        """KItem related to the KPropertyItem"""
-        if not cls.id:
-            raise ValueError("KItem not defined yet for KProperty")
-        return _get_kitem(cls.source_id)
+        """KItem related to the linked KItem"""
+        return cls._kitem
+
+    # OVERRIDE
+    @kitem.setter
+    def kitem(cls, value: "KItem") -> None:
+        """Set KItem related to the linked KItem"""
+        cls._kitem = value
+
+    @field_validator("attachments", mode="before")
+    @classmethod
+    def validate_attachments_before(
+        cls, value: List[Union[str, Attachment]]
+    ) -> List[Attachment]:
+        """Validate attachments Field"""
+        return [
+            Attachment(name=attachment)
+            if isinstance(attachment, str)
+            else attachment
+            for attachment in value
+        ]
+
+    @field_validator("summary", mode="after")
+    @classmethod
+    def validate_summary_before(
+        cls, value: Union[str, LinkedKItemSummary]
+    ) -> str:
+        """Validate summary Field"""
+        if isinstance(value, LinkedKItemSummary):
+            value = value.text
+        return value
 
     # OVERRIDE
     @model_serializer
-    def serialize(self):
-        """Serialize KPropertItem"""
-        return {key: str(value) for key, value in self.__dict__.items()}
+    def serialize_author(self) -> Dict[str, Any]:
+        """Serialize linked kitems model"""
+        return {
+            key: (
+                str(value)
+                if key in ["updated_at", "created_at", "id"]
+                else value
+            )
+            for key, value in self.__dict__.items()
+        }
+
+    @field_validator("custom_properties")
+    @classmethod
+    def validate_custom_properties(
+        cls, value: "Optional[Dict[str, Any]]"
+    ) -> "Optional[Dict[str, Any]]":
+        """Validate the custom properties of the linked KItem"""
+        if value:
+            value = value.get("content") or value
+        return value
 
 
-class LinkedKItemsProperty(KProperty):
-    """KProperty for linked KItems"""
+class LinkedKItemsProperty(KItemPropertyList):
+    """KItemPropertyList for linked KItems"""
 
     # OVERRIDE
     @property
@@ -61,62 +225,13 @@ class LinkedKItemsProperty(KProperty):
         return LinkedKItem
 
     # OVERRIDE
-    def _add(self, item: LinkedKItem) -> LinkedKItem:
-        """Side effect when an LinkedKItem is added to the KProperty"""
-        if self.kitem:
-            item = self.k_property_item(id=item.id, source_id=self.kitem.id)
-        else:
-            item = self.k_property_item(id=item.id)
-        return item
-
-    # OVERRIDE
-    def _update(self, item: LinkedKItem) -> LinkedKItem:
-        """Side effect when an LinkedKItem is updated at the KProperty"""
-        return item
-
-    # OVERRIDE
-    def _get(self, item: LinkedKItem) -> LinkedKItem:
-        """Side effect when getting the LinkedKItem for a specfic kitem"""
-        return _get_kitem(item.id)
-
-    # OVERRIDE
-    def _delete(self, item: LinkedKItem) -> None:
-        """Side effect when deleting the LinkedKItem of a KItem"""
-
-    # OVERRIDE
-    def __setitem__(
-        self, index: int, item: "Union[Dict, KPropertyItem]"
-    ) -> None:
-        """Add or Update KPropertyItem and add it to the updated-buffer."""
-
-        self._mark_as_updated()
-        item = self._check_k_property_item(item)
-        if self.kitem:
-            item.source_id = self.kitem.id
-        try:
-            if self[index] != item:
-                item = self._update(item)
-        except IndexError:
-            item = self._add(item)
-        super().super().__setitem__(index, item)  # pylint: disable=no-member
-
-    # OVERRIDE
-    def _check_and_add_item(self, item: "Union[Dict, Any]") -> KPropertyItem:
-        item = self._check_k_property_item(item)
-        if self.kitem:
-            item.source_id = self.kitem.id
-        return self._add(item)
-
-    # OVERRIDE
     @property
-    def kitem(cls) -> "KItem":
-        """KItem context of the field"""
-        return cls._kitem
+    def k_property_helper(cls) -> "Callable":
+        """Linked KItem helper function"""
+        return _linked_kitem_helper
 
-    # OVERRIDE
-    @kitem.setter
-    def kitem(cls, value: "KItem") -> None:
-        """KItem setter"""
-        cls._kitem = value
-        for item in cls:
-            item.source_id = cls.kitem.id
+    def get(self, kitem_id: "Union[str, UUID]") -> "KItem":
+        """Get the kitem with a certain id which is linked to the source KItem."""
+        if not str(kitem_id) in [str(item.id) for item in self]:
+            raise KeyError(f"A KItem with ID `{kitem_id} is not linked.")
+        return _get_kitem(kitem_id)
