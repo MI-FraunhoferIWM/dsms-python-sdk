@@ -39,4 +39,4 @@ class AnnotationsProperty(KItemPropertyList):
     @property
     def by_iri(cls) -> "Dict[str, Any]":
         """Return dict of annotations per IRI"""
-        return {annotation.iri for annotation in cls}
+        return {annotation.iri: annotation for annotation in cls}
