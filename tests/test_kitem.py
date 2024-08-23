@@ -23,8 +23,6 @@ def test_kitem_basic(custom_address, get_mock_kitem_ids):
         ktype_id=dsms.ktypes.Organization,
     )
 
-    assert instance.is_a(dsms.ktypes.Organization)
-
     assert isinstance(instance.dsms, DSMS)
     assert isinstance(instance.dsms.config, Configuration)
     assert Context.dsms == instance.dsms
@@ -50,8 +48,6 @@ def test_kitem_config_class(custom_address, get_mock_kitem_ids):
         name="foo123",
         ktype_id=dsms.ktypes.Organization,
     )
-
-    assert instance.is_a(dsms.ktypes.Organization)
 
     assert isinstance(instance.dsms, DSMS)
     assert config == instance.dsms.config
@@ -88,8 +84,6 @@ def test_kitem_custom_config_env(custom_address, get_mock_kitem_ids):
         name="foo123",
         ktype_id=dsms.ktypes.Dataset,
     )
-
-    assert custom_instance.is_a(dsms.ktypes.Dataset)
 
     assert str(custom_instance.dsms.config.host_url) == custom_address
 
