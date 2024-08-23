@@ -13,11 +13,12 @@ from pydantic import (  # isort:skip
     field_validator,
 )
 
+from dsms.core.utils import _name_to_camel  # isort:skip
 from dsms.knowledge.properties.base import (  # isort:skip
     KItemProperty,
     KItemPropertyList,
 )
-
+from dsms.knowledge.ktype import KType  # isort:skip
 from dsms.knowledge.properties.affiliations import Affiliation  # isort:skip
 from dsms.knowledge.properties.annotations import Annotation  # isort:skip
 from dsms.knowledge.properties.attachments import Attachment  # isort:skip
@@ -144,6 +145,13 @@ class LinkedKItem(KItemProperty):
         """Fetch the linked KItem"""
         return _get_kitem(self.id)
 
+    def is_a(self, to_be_compared: KType) -> bool:
+        """Check the KType of the KItem"""
+        return (
+            self.ktype_id.value  # pylint: disable=no-member
+            == to_be_compared.value
+        )
+
     # OVERRIDE
     def __str__(self) -> str:
         """Pretty print the linked KItem"""
@@ -250,4 +258,18 @@ class LinkedKItemsProperty(KItemPropertyList):
                     grouped[annotation.iri] = []
                 if not linked in grouped[annotation.iri]:
                     grouped[annotation.iri].append(linked)
+        return grouped
+
+    @property
+    def by_ktype(self) -> "Dict[KType, List[KItem]]":
+        """Get the kitems grouped by ktype"""
+        from dsms import Context
+
+        grouped = {}
+        for linked in self:
+            ktype = Context.dsms.ktypes[_name_to_camel(linked.ktype_id)]
+            if not ktype in grouped:
+                grouped[ktype] = []
+            if not linked in grouped[ktype]:
+                grouped[ktype].append(linked)
         return grouped

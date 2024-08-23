@@ -618,8 +618,7 @@ class KItem(BaseModel):
     def is_a(self, to_be_compared: KType) -> bool:
         """Check the KType of the KItem"""
         return (
-            self.ktype_id.value  # pylint: disable=no-member
-            == to_be_compared.value
+            self.ktype_id == to_be_compared.value  # pylint: disable=no-member
         )
 
     def refresh(self) -> None:

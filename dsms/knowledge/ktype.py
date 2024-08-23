@@ -20,6 +20,9 @@ class KType(BaseModel):
         None, description="OpenAPI schema of the KItem."
     )
 
+    def __hash__(self) -> int:
+        return hash(str(self))
+
     @field_validator("webform")
     @classmethod
     def create_model(cls, value: Optional[Dict[str, Any]]) -> Any:
