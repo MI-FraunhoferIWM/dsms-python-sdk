@@ -140,6 +140,10 @@ class LinkedKItem(KItemProperty):
     # OVERRIDE
     model_config = ConfigDict(exclude={}, arbitrary_types_allowed=True)
 
+    def fetch(self) -> "KItem":
+        """Fetch the linked KItem"""
+        return _get_kitem(self.id)
+
     # OVERRIDE
     def __str__(self) -> str:
         """Pretty print the linked KItem"""
@@ -235,3 +239,15 @@ class LinkedKItemsProperty(KItemPropertyList):
         if not str(kitem_id) in [str(item.id) for item in self]:
             raise KeyError(f"A KItem with ID `{kitem_id} is not linked.")
         return _get_kitem(kitem_id)
+
+    @property
+    def by_annotation(self) -> "Dict[str, List[KItem]]":
+        """Get the kitems grouped by annotation"""
+        grouped = {}
+        for linked in self:
+            for annotation in linked.annotations:
+                if not annotation.iri in grouped:
+                    grouped[annotation.iri] = []
+                if not linked in grouped[annotation.iri]:
+                    grouped[annotation.iri].append(linked)
+        return grouped
