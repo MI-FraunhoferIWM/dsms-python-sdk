@@ -40,6 +40,14 @@ class AppConfig(BaseModel):
         description="File path for YAML Specification of the app",
     )
 
+    use_sdk: bool = Field(
+        False,
+        description="""Whether the app is using the SDK internally.
+        This will pass the parameters like `request_timeout`, `pink_dsms`,
+        `host_url`, `ssl_verify`, `encoding` and `kitem_repo` to the
+        config of the app. The `token` will be set during runtime of the app.""",
+    )
+
     model_config = ConfigDict(
         extra="forbid",
         validate_assignment=True,
@@ -156,6 +164,14 @@ class AppConfig(BaseModel):
             and self.name not in self.context.buffers.updated
         ):
             self.context.buffers.updated.update({self.name: self})
+        if self.use_sdk:
+            parameters = self.specification["spec"]["arguments"]["parameters"]
+            parameters["request_timeout"] = self.dsms.config.request_timeout
+            parameters["ping"] = self.dsms.config.ping_dsms
+            parameters["host_url"] = str(self.dsms.config.host_url)
+            parameters["verify_ssl"] = self.dsms.config.ssl_verify
+            parameters["kitem_repo"] = self.dsms.config.kitem_repo
+            parameters["encoding"] = self.dsms.config.encoding
         return self
 
     @property

@@ -90,8 +90,7 @@ class App(KItemProperty):
     def run(
         self,
         wait=True,
-        set_token: bool = False,
-        set_host_url: bool = False,
+        use_sdk=False,
         **kwargs,
     ) -> None:
         """Run application.
@@ -101,20 +100,20 @@ class App(KItemProperty):
                 (not in the background), but the object should wait until the job finished.
                 Warning: this may lead to a request timeout for long running jobs!
                     Job details may not be associated anymore when this occurs.
-            token (bool, optional): Whether the job also should receive the access
-                 token as paramter.If `True`, the JWT will be set as parameter with
-                 the name ´access_token`.
+            use_sdk (bool, optional): Whether the job is using the SDK internally
+                and hence should receive parameters from the current the SDK session.
+                If set to True, the `token`, `host_url`, `ping_dsms`, `verify_ssl`,
+                `request_timeout`, `encoding` and `kitem_repo` will be set as parameters.
+                Defaults to False.
             **kwargs (Any, optional): Additional arguments to be passed to the workflow.
                 KItem ID is passed automatically
 
         """
         kwargs["kitem_id"] = str(self.id)
-        if set_token:
+        if use_sdk:
             kwargs[
                 "access_token"
             ] = self.context.dsms.config.token.get_secret_value()
-        if set_host_url:
-            kwargs["host_url"] = str(self.context.dsms.config.host_url)
 
         response = _perform_request(
             f"api/knowledge/apps/argo/job/{self.executable}",
