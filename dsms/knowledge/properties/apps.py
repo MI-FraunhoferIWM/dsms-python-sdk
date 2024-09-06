@@ -90,7 +90,7 @@ class App(KItemProperty):
     def run(
         self,
         wait=True,
-        use_sdk=False,
+        expose_sdk_config=False,
         **kwargs,
     ) -> None:
         """Run application.
@@ -100,17 +100,20 @@ class App(KItemProperty):
                 (not in the background), but the object should wait until the job finished.
                 Warning: this may lead to a request timeout for long running jobs!
                     Job details may not be associated anymore when this occurs.
-            use_sdk (bool, optional): Whether the job is using the SDK internally
-                and hence should receive parameters from the current the SDK session.
-                If set to True, the `token`, `host_url`, `ping_dsms`, `verify_ssl`,
-                `request_timeout`, `encoding` and `kitem_repo` will be set as parameters.
+            expose_sdk_config (bool, optional):
+                Determines whether SDK parameters (such as host URL, SSL verification, etc.)
+                should be passed through or propagated to the app using the SDK.
+                If set to True, the SDK's configuration will be made available
+                for the app to use, allowing it to inherit settings such as the host URL
+                or SSL configuration. If False, the app will not have access to these parameters,
+                and the SDK will handle its own configuration independently.
                 Defaults to False.
             **kwargs (Any, optional): Additional arguments to be passed to the workflow.
                 KItem ID is passed automatically
 
         """
         kwargs["kitem_id"] = str(self.id)
-        if use_sdk:
+        if expose_sdk_config:
             kwargs[
                 "access_token"
             ] = self.context.dsms.config.token.get_secret_value()

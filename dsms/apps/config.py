@@ -40,12 +40,18 @@ class AppConfig(BaseModel):
         description="File path for YAML Specification of the app",
     )
 
-    use_sdk: bool = Field(
+    expose_sdk_config: bool = Field(
         False,
-        description="""Whether the app is using the SDK internally.
-        This will pass the parameters like `request_timeout`, `pink_dsms`,
-        `host_url`, `ssl_verify`, `encoding` and `kitem_repo` to the
-        config of the app. The `token` will be set during runtime of the app.""",
+        description="""
+            Determines whether SDK parameters (such as host URL, SSL verification, etc.)
+            should be passed through or propagated to the app using the SDK.
+            If set to True, the SDK's configuration will be made available
+            for the app to use, allowing it to inherit settings such as the host URL
+            or SSL configuration. If False, the app will not have access to these parameters,
+            and the SDK will handle its own configuration independently.
+            The `token` will not be set here.
+            Defaults to False.
+            """,
     )
 
     model_config = ConfigDict(
@@ -164,7 +170,7 @@ class AppConfig(BaseModel):
             and self.name not in self.context.buffers.updated
         ):
             self.context.buffers.updated.update({self.name: self})
-        if self.use_sdk:
+        if self.expose_sdk_config:
             self.specification["spec"]["arguments"]["parameters"] += [
                 {
                     "name": "request_timeout",
