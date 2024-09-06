@@ -40,6 +40,20 @@ class AppConfig(BaseModel):
         description="File path for YAML Specification of the app",
     )
 
+    expose_sdk_config: bool = Field(
+        False,
+        description="""
+            Determines whether SDK parameters (such as host URL, SSL verification, etc.)
+            should be passed through or propagated to the app using the SDK.
+            If set to True, the SDK's configuration will be made available
+            for the app to use, allowing it to inherit settings such as the host URL
+            or SSL configuration. If False, the app will not have access to these parameters,
+            and the SDK will handle its own configuration independently.
+            The `token` will not be set here.
+            Defaults to False.
+            """,
+    )
+
     model_config = ConfigDict(
         extra="forbid",
         validate_assignment=True,
@@ -156,6 +170,18 @@ class AppConfig(BaseModel):
             and self.name not in self.context.buffers.updated
         ):
             self.context.buffers.updated.update({self.name: self})
+        if self.expose_sdk_config:
+            self.specification["spec"]["arguments"]["parameters"] += [
+                {
+                    "name": "request_timeout",
+                    "value": self.dsms.config.request_timeout,
+                },
+                {"name": "ping", "value": self.dsms.config.ping_dsms},
+                {"name": "host_url", "value": str(self.dsms.config.host_url)},
+                {"name": "verify_ssl", "value": self.dsms.config.ssl_verify},
+                {"name": "kitem_repo", "value": self.dsms.config.kitem_repo},
+                {"name": "encoding", "value": self.dsms.config.encoding},
+            ]
         return self
 
     @property
