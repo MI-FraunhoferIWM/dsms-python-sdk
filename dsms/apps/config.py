@@ -165,13 +165,14 @@ class AppConfig(BaseModel):
         ):
             self.context.buffers.updated.update({self.name: self})
         if self.use_sdk:
-            parameters = self.specification["spec"]["arguments"]["parameters"]
-            parameters["request_timeout"] = self.dsms.config.request_timeout
-            parameters["ping"] = self.dsms.config.ping_dsms
-            parameters["host_url"] = str(self.dsms.config.host_url)
-            parameters["verify_ssl"] = self.dsms.config.ssl_verify
-            parameters["kitem_repo"] = self.dsms.config.kitem_repo
-            parameters["encoding"] = self.dsms.config.encoding
+            self.specification["spec"]["arguments"]["parameters"] += [
+                {"request_timeout": self.dsms.config.request_timeout},
+                {"ping": self.dsms.config.ping_dsms},
+                {"host_url": str(self.dsms.config.host_url)},
+                {"verify_ssl": self.dsms.config.ssl_verify},
+                {"kitem_repo": self.dsms.config.kitem_repo},
+                {"encoding": self.dsms.config.encoding},
+            ]
         return self
 
     @property
