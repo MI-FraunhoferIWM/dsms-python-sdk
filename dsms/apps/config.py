@@ -178,7 +178,7 @@ class AppConfig(BaseModel):
                 },
                 {"name": "ping", "value": self.dsms.config.ping_dsms},
                 {"name": "host_url", "value": str(self.dsms.config.host_url)},
-                {"name": "verify_ssl", "value": self.dsms.config.ssl_verify},
+                {"name": "ssl_verify", "value": self.dsms.config.ssl_verify},
                 {"name": "kitem_repo", "value": self.dsms.config.kitem_repo},
                 {"name": "encoding", "value": self.dsms.config.encoding},
             ]
