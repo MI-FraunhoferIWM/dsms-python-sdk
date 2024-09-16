@@ -15,9 +15,9 @@ class KType(BaseModel):
     name: Optional[str] = Field(
         None, description="Human readable name of the KType."
     )
-    webform: Optional[Any] = Field(None, description="Form data of the KItem.")
+    webform: Optional[Any] = Field(None, description="Form data of the KType.")
     json_schema: Optional[Any] = Field(
-        None, description="OpenAPI schema of the KItem."
+        None, description="OpenAPI schema of the KType."
     )
 
     def __hash__(self) -> int:

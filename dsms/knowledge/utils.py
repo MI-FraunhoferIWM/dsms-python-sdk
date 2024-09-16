@@ -192,7 +192,89 @@ def _get_remote_ktypes() -> Enum:
     logger.debug("Got the following ktypes from backend: `%s`.", list(ktypes))
     return ktypes
 
+def _ktype_exists(ktype: Union[Any, str, UUID]) -> bool:
+    """Check whether the KType exists in the remote backend"""
+    from dsms.knowledge.ktype import (  # isort:skip
+        KType,
+    )
 
+    if isinstance(ktype, KType):
+        route = f"api/knowledge-type/{ktype.id}"
+    else:
+        route = f"api/knowledge-type/{ktype}"
+    response = _perform_request(route, "get")
+    return response.ok
+
+def _create_new_ktype(ktype: "KType") -> None:
+    """Create a new KType in the remote backend"""
+    body = {
+       "name": ktype.name,
+       "id": str(ktype.id),
+    }
+    logger.debug("Create new KType with body: %s", body)
+    response = _perform_request("api/knowledge-type/", "post", json=body)
+    if not response.ok:
+        raise ValueError(
+            f"KType with id `{ktype.id}` could not be created in DSMS: {response.text}`"
+        )
+
+def _get_ktype(
+    uuid: Union[UUID, str], as_json=False
+) -> "Union[KItem, Dict[str, Any]]":
+    """Get the KType for an instance with a certain ID from remote backend"""
+    
+    from dsms import Context, KType #why this Ktype/Kitem import in all these methods?? it is already imported at the beginning
+
+    response = _perform_request(f"api/knowledge-type/{uuid}", "get")
+    if response.status_code == 404:
+        raise ValueError(
+            f"""KType with uuid `{uuid}` does not exist in
+            DSMS-instance `{Context.dsms.config.host_url}`"""
+        )
+    
+    if not response.ok:
+        raise ValueError(
+            f"""An error occured fetching the KType with uuid `{uuid}`:
+            `{response.text}`"""
+        )
+    
+    body = response.json()
+    if as_json:
+        response = body
+    else:
+        response = KType(**body)
+    return response
+
+
+def _update_ktype(ktype: "KType") -> Response:
+    """Update a KType in the remote backend."""
+    payload = ktype.model_dump(
+        exclude_none=True,
+    )
+    
+    logger.debug(
+        "Update KType for `%s` with body: %s", ktype.id, payload
+    )
+    response = _perform_request(
+        f"api/knowledge-type/{ktype.id}", "put", json=payload
+    )
+    if not response.ok:
+        raise ValueError(
+            f"KType with uuid `{ktype.id}` could not be updated in DSMS: {response.text}`"
+        )
+    return response
+
+
+def _delete_ktype(ktype: "KType") -> None:
+    """Delete a KType in the remote backend"""
+    logger.debug("Delete KType with id: %s", ktype.id)
+    response = _perform_request(f"api/knowledge-type/{ktype.id}", "delete")
+    if not response.ok:
+        raise ValueError(
+            f"KItem with uuid `{ktype.id}` could not be deleted from DSMS: `{response.text}`"
+        )
+
+    
 def _get_kitem_list() -> "List[KItem]":
     """Get all available KItems from the remote backend."""
     from dsms.knowledge.kitem import (  # isort:skip
@@ -533,9 +615,7 @@ def _commit_created(
         elif isinstance(obj, AppConfig):
             _create_or_update_app_spec(obj)
         elif isinstance(obj, KType):
-            raise NotImplementedError(
-                "Committing of KTypes not implemented yet."
-            )
+            _create_new_ktype(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed."
@@ -554,9 +634,7 @@ def _commit_updated(
         elif isinstance(obj, AppConfig):
             _create_or_update_app_spec(obj, overwrite=True)
         elif isinstance(obj, KType):
-            raise NotImplementedError(
-                "Committing of KTypes not implemented yet."
-            )
+            _commit_updated_ktype(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed."
@@ -593,6 +671,21 @@ def _commit_updated_kitem(new_kitem: "KItem") -> None:
         new_kitem.refresh()
 
 
+def _commit_updated_ktype(new_ktype: "KType") -> None:
+    """Commit the updated KTypes"""
+    old_ktype = _get_ktype(new_ktype.id, as_json=True)
+    logger.debug(
+        "Fetched data from old KType with id `%s`: %s",
+        new_ktype.id,
+        old_ktype,
+    )
+    if old_ktype:
+        _update_ktype(new_ktype)
+        logger.debug(
+            "Fetching updated KType from remote backend: %s", new_ktype.id
+        )
+
+
 def _commit_deleted(
     buffer: "Dict[str, Union[KItem, KType, AppConfig]]",
 ) -> None:
@@ -606,9 +699,7 @@ def _commit_deleted(
         elif isinstance(obj, AppConfig):
             _delete_app_spec(obj.name)
         elif isinstance(obj, KType):
-            raise NotImplementedError(
-                "Deletion of KTypes not implemented yet."
-            )
+            _delete_ktype(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed or deleted."
