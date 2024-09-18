@@ -112,7 +112,7 @@ class DSMS:
         elif isinstance(obj, AppConfig):
             self.context.buffers.deleted.update({obj.name: obj})
         elif isinstance(obj, KType):
-            raise NotImplementedError("Deletion of KTypes not available yet.")
+            self.context.buffers.deleted.update({obj.name: obj})
         else:
             raise TypeError(
                 f"Object must be of type {KItem}, {AppConfig} or {KType}, not {type(obj)}. "
