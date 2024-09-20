@@ -1,12 +1,17 @@
 """KItem types"""
 
 import logging
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_serializer, ValidationInfo
 
-from dsms.knowledge.utils import _create_custom_properties_model, _ktype_exists
+from dsms.knowledge.utils import (
+    _create_custom_properties_model,
+    _ktype_exists, 
+    _refresh_ktype
+)
 
 from dsms.core.logging import handler 
 
@@ -30,9 +35,12 @@ class KType(BaseModel):
     json_schema: Optional[Any] = Field(
         None, description="OpenAPI schema of the KType."
     )
-    in_backend: bool = Field(
-        False,
-        description="Whether the Ktype was already created in the backend.",
+    rdf_mapping: Optional[str] = Field(None, description="")
+    created_at: Optional[Union[str, datetime]] = Field(
+        None, description="Time and date when the KType was created."
+    )
+    updated_at: Optional[Union[str, datetime]] = Field(
+        None, description="Time and date when the KType was updated."
     )
 
     def __hash__(self) -> int:
@@ -48,7 +56,6 @@ class KType(BaseModel):
         if not self.dsms:
             self.dsms = DSMS()
 
-        # initialize the kitem
         super().__init__(**kwargs)
 
         # add ktype to buffer
@@ -68,26 +75,11 @@ class KType(BaseModel):
         """Create the datamodel for the ktype"""
         return _create_custom_properties_model(value)
 
-    @model_serializer
-    def serialize(self):
-        """Serialize ktype."""
-        return {
-            key: (
-                value
-                if not isinstance(value, BaseModel)
-                else value.model_dump_json()
-            )
-            for key, value in self.items()
-        }
-    
-    @field_validator("in_backend")
-    @classmethod
-    def validate_in_backend(cls, value: bool, info: ValidationInfo) -> bool:
+
+    @property
+    def in_backend(self) -> bool:
         """Checks whether the KType already exists"""
-        ktype_id = info.data["id"]
-        if not value:
-            value = _ktype_exists(ktype_id)
-        return value
+        return _ktype_exists(self)
 
 
     @property
@@ -108,3 +100,7 @@ class KType(BaseModel):
         )
 
         return Context  
+    
+    def refresh(self) -> None:
+        """Refresh the KType"""
+        _refresh_ktype(self)

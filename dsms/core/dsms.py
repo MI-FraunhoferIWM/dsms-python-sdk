@@ -17,6 +17,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _get_kitem,
     _get_kitem_list,
     _get_remote_ktypes,
+    _get_ktype_list
 )
 
 if TYPE_CHECKING:
@@ -145,6 +146,11 @@ class DSMS:
     def ktypes(cls) -> "Enum":
         """ "Enum of the KTypes defined in the DSMS instance."""
         return cls._ktypes
+    
+    # @property
+    # def ktypes(cls) -> "List[KType]":
+    #     return _get_ktype_list()
+
 
     @property
     def config(cls) -> Configuration:
@@ -181,7 +187,8 @@ class DSMS:
         The default timeout for requests is defined under the
         `request_timeout`-attribute in the `Configuration`-class."""
         return _get_kitem_list()
-
+    
+    
     @property
     def app_configs(cls) -> "List[AppConfig]":
         """Return available app configs in the DSMS"""

@@ -192,6 +192,20 @@ def _get_remote_ktypes() -> Enum:
     logger.debug("Got the following ktypes from backend: `%s`.", list(ktypes))
     return ktypes
 
+def _get_ktype_list() -> "List[KType]":
+    """Get all available KTypes from the remote backend."""
+    from dsms import (  # isort:skip
+        KType
+    )
+
+    response = _perform_request("api/knowledge-type/", "get")
+    if not response.ok:
+        raise ValueError(
+            f"Something went wrong fetching the available ktypes: {response.text}"
+        )
+    return [KType(**ktype) for ktype in response.json()]
+
+
 def _ktype_exists(ktype: Union[Any, str, UUID]) -> bool:
     """Check whether the KType exists in the remote backend"""
     from dsms.knowledge.ktype import (  # isort:skip
@@ -219,22 +233,22 @@ def _create_new_ktype(ktype: "KType") -> None:
         )
 
 def _get_ktype(
-    uuid: Union[UUID, str], as_json=False
-) -> "Union[KItem, Dict[str, Any]]":
+    id: str, as_json=False
+) -> "Union[KType, Dict[str, Any]]":
     """Get the KType for an instance with a certain ID from remote backend"""
     
     from dsms import Context, KType #why this Ktype/Kitem import in all these methods?? it is already imported at the beginning
 
-    response = _perform_request(f"api/knowledge-type/{uuid}", "get")
+    response = _perform_request(f"api/knowledge-type/{id}", "get")
     if response.status_code == 404:
         raise ValueError(
-            f"""KType with uuid `{uuid}` does not exist in
+            f"""KType with the id `{id}` does not exist in
             DSMS-instance `{Context.dsms.config.host_url}`"""
         )
     
     if not response.ok:
         raise ValueError(
-            f"""An error occured fetching the KType with uuid `{uuid}`:
+            f"""An error occured fetching the KType with id `{id}`:
             `{response.text}`"""
         )
     
@@ -684,6 +698,7 @@ def _commit_updated_ktype(new_ktype: "KType") -> None:
         logger.debug(
             "Fetching updated KType from remote backend: %s", new_ktype.id
         )
+        new_ktype.refresh()
 
 
 def _commit_deleted(
@@ -717,6 +732,18 @@ def _refresh_kitem(kitem: "KItem") -> None:
         )
         setattr(kitem, key, value)
     kitem.dataframe = _inspect_dataframe(kitem.id)
+    
+
+def _refresh_ktype(ktype: "KType") -> None:
+    """Refresh the KItem"""
+    for key, value in _get_ktype(ktype.id, as_json=True).items():
+        logger.debug(
+            "Set updated property `%s` for KType with id `%s` after commiting: %s",
+            key,
+            ktype.id,
+            value,
+        )
+        setattr(ktype, key, value)
 
 
 def _split_iri(iri: str) -> List[str]:
