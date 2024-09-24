@@ -233,25 +233,22 @@ def _create_new_ktype(ktype: "KType") -> None:
         )
 
 def _get_ktype(
-    id: str, as_json=False
+    ktype_id: str, as_json=False
 ) -> "Union[KType, Dict[str, Any]]":
     """Get the KType for an instance with a certain ID from remote backend"""
-    
-    from dsms import Context, KType #why this Ktype/Kitem import in all these methods?? it is already imported at the beginning
+    from dsms import Context, KType
 
-    response = _perform_request(f"api/knowledge-type/{id}", "get")
+    response = _perform_request(f"api/knowledge-type/{ktype_id}", "get")
     if response.status_code == 404:
         raise ValueError(
-            f"""KType with the id `{id}` does not exist in
+            f"""KType with the id `{ktype_id}` does not exist in
             DSMS-instance `{Context.dsms.config.host_url}`"""
         )
-    
     if not response.ok:
         raise ValueError(
-            f"""An error occured fetching the KType with id `{id}`:
+            f"""An error occured fetching the KType with id `{ktype_id}`:
             `{response.text}`"""
         )
-    
     body = response.json()
     if as_json:
         response = body
@@ -265,7 +262,6 @@ def _update_ktype(ktype: "KType") -> Response:
     payload = ktype.model_dump(
         exclude_none=True,
     )
-    
     logger.debug(
         "Update KType for `%s` with body: %s", ktype.id, payload
     )
@@ -288,7 +284,6 @@ def _delete_ktype(ktype: "KType") -> None:
             f"KItem with uuid `{ktype.id}` could not be deleted from DSMS: `{response.text}`"
         )
 
-    
 def _get_kitem_list() -> "List[KItem]":
     """Get all available KItems from the remote backend."""
     from dsms.knowledge.kitem import (  # isort:skip
@@ -732,7 +727,6 @@ def _refresh_kitem(kitem: "KItem") -> None:
         )
         setattr(kitem, key, value)
     kitem.dataframe = _inspect_dataframe(kitem.id)
-    
 
 def _refresh_ktype(ktype: "KType") -> None:
     """Refresh the KItem"""

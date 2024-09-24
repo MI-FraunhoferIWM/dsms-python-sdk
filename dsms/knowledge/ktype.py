@@ -5,15 +5,15 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_serializer, ValidationInfo
+from pydantic import BaseModel, Field, field_validator
 
 from dsms.knowledge.utils import (
     _create_custom_properties_model,
-    _ktype_exists, 
+    _ktype_exists,
     _refresh_ktype
 )
 
-from dsms.core.logging import handler 
+from dsms.core.logging import handler
 
 if TYPE_CHECKING:
     from dsms import Context
@@ -45,7 +45,7 @@ class KType(BaseModel):
 
     def __hash__(self) -> int:
         return hash(str(self))
-    
+
     def __init__(self, **kwargs: "Any") -> None:
         """Initialize the KType"""
         from dsms import DSMS
@@ -98,9 +98,8 @@ class KType(BaseModel):
         from dsms import (  # isort:skip
             Context,
         )
+        return Context
 
-        return Context  
-    
     def refresh(self) -> None:
         """Refresh the KType"""
         _refresh_ktype(self)
