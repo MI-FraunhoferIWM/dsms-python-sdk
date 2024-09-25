@@ -7,13 +7,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
+from dsms.core.logging import handler
 from dsms.knowledge.utils import (
     _create_custom_properties_model,
     _ktype_exists,
-    _refresh_ktype
+    _refresh_ktype,
 )
-
-from dsms.core.logging import handler
 
 if TYPE_CHECKING:
     from dsms import Context
@@ -75,12 +74,10 @@ class KType(BaseModel):
         """Create the datamodel for the ktype"""
         return _create_custom_properties_model(value)
 
-
     @property
     def in_backend(self) -> bool:
         """Checks whether the KType already exists"""
         return _ktype_exists(self)
-
 
     @property
     def dsms(cls) -> "DSMS":
@@ -98,6 +95,7 @@ class KType(BaseModel):
         from dsms import (  # isort:skip
             Context,
         )
+
         return Context
 
     def refresh(self) -> None:

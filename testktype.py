@@ -1,12 +1,9 @@
-from dsms import DSMS, KItem, KType
+from dsms import DSMS, KType
 
 dsms = DSMS(env=".env")
 
 # type = dsms.context.ktypes()
-type = KType( 
-        id='batch',
-        name='Batch'
-)
+type = KType(id="batch", name="Batch")
 dsms.commit()
 print(type)
 # for i in range(15):

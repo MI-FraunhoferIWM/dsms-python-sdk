@@ -192,11 +192,10 @@ def _get_remote_ktypes() -> Enum:
     logger.debug("Got the following ktypes from backend: `%s`.", list(ktypes))
     return ktypes
 
+
 def _get_ktype_list() -> "List[KType]":
     """Get all available KTypes from the remote backend."""
-    from dsms import (  # isort:skip
-        KType
-    )
+    from dsms import KType  # isort:skip
 
     response = _perform_request("api/knowledge-type/", "get")
     if not response.ok:
@@ -219,11 +218,12 @@ def _ktype_exists(ktype: Union[Any, str, UUID]) -> bool:
     response = _perform_request(route, "get")
     return response.ok
 
+
 def _create_new_ktype(ktype: "KType") -> None:
     """Create a new KType in the remote backend"""
     body = {
-       "name": ktype.name,
-       "id": str(ktype.id),
+        "name": ktype.name,
+        "id": str(ktype.id),
     }
     logger.debug("Create new KType with body: %s", body)
     response = _perform_request("api/knowledge-type/", "post", json=body)
@@ -232,9 +232,8 @@ def _create_new_ktype(ktype: "KType") -> None:
             f"KType with id `{ktype.id}` could not be created in DSMS: {response.text}`"
         )
 
-def _get_ktype(
-    ktype_id: str, as_json=False
-) -> "Union[KType, Dict[str, Any]]":
+
+def _get_ktype(ktype_id: str, as_json=False) -> "Union[KType, Dict[str, Any]]":
     """Get the KType for an instance with a certain ID from remote backend"""
     from dsms import Context, KType
 
@@ -262,9 +261,7 @@ def _update_ktype(ktype: "KType") -> Response:
     payload = ktype.model_dump(
         exclude_none=True,
     )
-    logger.debug(
-        "Update KType for `%s` with body: %s", ktype.id, payload
-    )
+    logger.debug("Update KType for `%s` with body: %s", ktype.id, payload)
     response = _perform_request(
         f"api/knowledge-type/{ktype.id}", "put", json=payload
     )
@@ -283,6 +280,7 @@ def _delete_ktype(ktype: "KType") -> None:
         raise ValueError(
             f"KItem with uuid `{ktype.id}` could not be deleted from DSMS: `{response.text}`"
         )
+
 
 def _get_kitem_list() -> "List[KItem]":
     """Get all available KItems from the remote backend."""
@@ -727,6 +725,7 @@ def _refresh_kitem(kitem: "KItem") -> None:
         )
         setattr(kitem, key, value)
     kitem.dataframe = _inspect_dataframe(kitem.id)
+
 
 def _refresh_ktype(ktype: "KType") -> None:
     """Refresh the KItem"""
