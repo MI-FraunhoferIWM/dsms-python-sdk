@@ -433,16 +433,18 @@ class KItem(BaseModel):
 
     @field_validator("ktype")
     @classmethod
-    def validate_ktype(cls, value: KType, info: ValidationInfo) -> KType:
+    def validate_ktype(
+        cls, value: Union[str, Enum], info: ValidationInfo
+    ) -> KType:
         """Validate the data attribute of the KItem"""
         from dsms import Context
 
         if not value:
             ktype_id = info.data.get("ktype_id")
-            if not isinstance(ktype_id, str):
-                value = Context.ktypes.get(ktype_id.value)
-            else:
+            if isinstance(ktype_id, str):
                 value = Context.ktypes.get(ktype_id)
+            else:
+                value = ktype_id.value
 
             if not value:
                 raise TypeError(
@@ -471,10 +473,10 @@ class KItem(BaseModel):
         if not isinstance(kitem_exists, bool):
             kitem_exists = cls.in_backend
 
-        if not isinstance(ktype_id, str):
-            ktype = ktype_id.value
-        else:
+        if isinstance(ktype_id, str):
             ktype = ktype_id
+        else:
+            ktype = ktype_id.value.id
         name = info.data.get("name")
 
         if not value:
@@ -618,7 +620,8 @@ class KItem(BaseModel):
     def is_a(self, to_be_compared: KType) -> bool:
         """Check the KType of the KItem"""
         return (
-            self.ktype_id == to_be_compared.value  # pylint: disable=no-member
+            self.ktype_id
+            == to_be_compared.value.id  # pylint: disable=no-member
         )
 
     def refresh(self) -> None:
@@ -629,7 +632,7 @@ class KItem(BaseModel):
         if isinstance(self.ktype_id, str):
             ktype = self.ktype_id
         elif isinstance(self.ktype_id, Enum):
-            ktype = self.ktype_id.value  # pylint: disable=no-member
+            ktype = self.ktype_id.value.id  # pylint: disable=no-member
         else:
             raise TypeError(f"Datatype for KType is unknown: {type(ktype)}")
         return ktype

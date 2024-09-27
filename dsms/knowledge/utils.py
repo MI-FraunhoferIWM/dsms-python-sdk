@@ -187,7 +187,8 @@ def _get_remote_ktypes() -> Enum:
     Context.ktypes = {ktype["id"]: KType(**ktype) for ktype in response.json()}
 
     ktypes = Enum(
-        "KTypes", {_name_to_camel(key): key for key in Context.ktypes}
+        "KTypes",
+        {_name_to_camel(key): value for key, value in Context.ktypes.items()},
     )
     logger.debug("Got the following ktypes from backend: `%s`.", list(ktypes))
     return ktypes
@@ -680,6 +681,8 @@ def _commit_updated_kitem(new_kitem: "KItem") -> None:
 
 def _commit_updated_ktype(new_ktype: "KType") -> None:
     """Commit the updated KTypes"""
+    from dsms import Context
+
     old_ktype = _get_ktype(new_ktype.id, as_json=True)
     logger.debug(
         "Fetched data from old KType with id `%s`: %s",
@@ -692,6 +695,7 @@ def _commit_updated_ktype(new_ktype: "KType") -> None:
             "Fetching updated KType from remote backend: %s", new_ktype.id
         )
         new_ktype.refresh()
+        Context.dsms.ktypes = _get_remote_ktypes()
 
 
 def _commit_deleted(
@@ -754,7 +758,7 @@ def _make_annotation_schema(iri: str) -> Dict[str, Any]:
 
 def _search(
     query: Optional[str] = None,
-    ktypes: "Optional[List[KType]]" = [],
+    ktypes: "Optional[List[Union[Enum, KType]]]" = [],
     annotations: "Optional[List[str]]" = [],
     limit: "Optional[int]" = 10,
     allow_fuzzy: "Optional[bool]" = True,
@@ -764,7 +768,7 @@ def _search(
 
     payload = {
         "search_term": query or "",
-        "ktypes": [ktype.value for ktype in ktypes],
+        "ktypes": [ktype.value.id for ktype in ktypes],
         "annotations": [_make_annotation_schema(iri) for iri in annotations],
         "limit": limit,
     }
