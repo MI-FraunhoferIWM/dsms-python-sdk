@@ -431,12 +431,27 @@ class KItem(BaseModel):
             )
         return value
 
+    @field_validator("ktype_id")
+    @classmethod
+    def validate_ktype_id(cls, value: Union[str, Enum]) -> KType:
+        """Validate the ktype id of the KItem"""
+        from dsms import Context
+
+        if isinstance(value, str):
+            value = Context.ktypes.get(value)
+            if not value:
+                raise TypeError(
+                    f"KType for `ktype_id={value}` does not exist."
+                )
+
+        return value.id
+
     @field_validator("ktype")
     @classmethod
     def validate_ktype(
         cls, value: Union[str, Enum], info: ValidationInfo
     ) -> KType:
-        """Validate the data attribute of the KItem"""
+        """Validate the ktype of the KItem"""
         from dsms import Context
 
         if not value:
@@ -629,7 +644,7 @@ class KItem(BaseModel):
         if isinstance(self.ktype_id, str):
             ktype = self.ktype_id
         elif isinstance(self.ktype_id, Enum):
-            ktype = self.ktype_id.value.id  # pylint: disable=no-member
+            ktype = self.ktype_id.id  # pylint: disable=no-member
         else:
             raise TypeError(f"Datatype for KType is unknown: {type(ktype)}")
         return ktype

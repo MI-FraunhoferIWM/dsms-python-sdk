@@ -157,7 +157,7 @@ def test_ktype_property(get_mock_kitem_ids, custom_address):
         ktype_id=dsms.ktypes.Organization,
     )
 
-    assert kitem.ktype == dsms.ktypes.Organization
+    assert kitem.is_a(dsms.ktypes.Organization)
 
 
 # @responses.activate
