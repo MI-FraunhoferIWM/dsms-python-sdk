@@ -145,7 +145,6 @@ def test_kitem_default_ktypes(custom_address):
 
 @responses.activate
 def test_ktype_property(get_mock_kitem_ids, custom_address):
-    from dsms.core.context import Context
     from dsms.core.dsms import DSMS
     from dsms.knowledge.kitem import KItem
 
@@ -158,7 +157,7 @@ def test_ktype_property(get_mock_kitem_ids, custom_address):
         ktype_id=dsms.ktypes.Organization,
     )
 
-    assert kitem.ktype == Context.ktypes.get(dsms.ktypes.Organization.value)
+    assert kitem.ktype == dsms.ktypes.Organization
 
 
 # @responses.activate

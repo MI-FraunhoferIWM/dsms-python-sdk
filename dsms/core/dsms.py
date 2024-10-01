@@ -1,6 +1,7 @@
 """DSMS connection module"""
 
 import os
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List
 
 from dotenv import load_dotenv
@@ -20,7 +21,6 @@ from dsms.knowledge.utils import (  # isort:skip
 )
 
 if TYPE_CHECKING:
-    from enum import Enum
     from typing import Optional, Union
 
     from dsms.apps import AppConfig
@@ -112,7 +112,9 @@ class DSMS:
             self.context.buffers.deleted.update({obj.id: obj})
         elif isinstance(obj, AppConfig):
             self.context.buffers.deleted.update({obj.name: obj})
-        elif isinstance(obj, KType):
+        elif isinstance(obj, KType) or (
+            isinstance(obj, Enum) and isinstance(obj.value, KType)
+        ):
             self.context.buffers.deleted.update({obj.name: obj})
         else:
             raise TypeError(

@@ -444,7 +444,7 @@ class KItem(BaseModel):
             if isinstance(ktype_id, str):
                 value = Context.ktypes.get(ktype_id)
             else:
-                value = ktype_id.value
+                value = ktype_id
 
             if not value:
                 raise TypeError(
@@ -476,7 +476,7 @@ class KItem(BaseModel):
         if isinstance(ktype_id, str):
             ktype = ktype_id
         else:
-            ktype = ktype_id.value.id
+            ktype = ktype_id.id
         name = info.data.get("name")
 
         if not value:
@@ -619,10 +619,7 @@ class KItem(BaseModel):
 
     def is_a(self, to_be_compared: KType) -> bool:
         """Check the KType of the KItem"""
-        return (
-            self.ktype_id
-            == to_be_compared.value.id  # pylint: disable=no-member
-        )
+        return self.ktype_id == to_be_compared.id  # pylint: disable=no-member
 
     def refresh(self) -> None:
         """Refresh the KItem"""
