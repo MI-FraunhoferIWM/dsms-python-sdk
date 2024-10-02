@@ -175,7 +175,7 @@ class KItem(BaseModel):
     custom_properties: Optional[Any] = Field(
         None, description="Custom properties associated to the KItem"
     )
-    ktype: Optional[KType] = Field(
+    ktype: Optional[Union[str, Enum, KType]] = Field(
         None, description="KType of the KItem", exclude=True
     )
 
@@ -449,22 +449,21 @@ class KItem(BaseModel):
     @field_validator("ktype")
     @classmethod
     def validate_ktype(
-        cls, value: Union[str, Enum], info: ValidationInfo
+        cls, value: Optional[Union[KType, str, Enum]], info: ValidationInfo
     ) -> KType:
         """Validate the ktype of the KItem"""
         from dsms import Context
 
         if not value:
-            ktype_id = info.data.get("ktype_id")
-            if isinstance(ktype_id, str):
-                value = Context.ktypes.get(ktype_id)
-            else:
-                value = ktype_id
+            value = info.data.get("ktype_id")
 
+        if isinstance(value, str):
+            value = Context.ktypes.get(value)
             if not value:
                 raise TypeError(
-                    f"KType for `ktype_id={ktype_id}` does not exist."
+                    f"KType for `ktype_id={value}` does not exist."
                 )
+
         return value
 
     @field_validator("in_backend")
