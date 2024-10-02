@@ -95,7 +95,7 @@ class DSMS:
             )
 
         self._sparql_interface = SparqlInterface(self)
-        self.ktypes = _get_remote_ktypes()
+        self._ktypes = _get_remote_ktypes()
 
     def __getitem__(self, key: str) -> "KItem":
         """Get KItem from remote DSMS instance."""
