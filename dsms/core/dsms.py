@@ -149,19 +149,6 @@ class DSMS:
         """Getter for the Enum of the KTypes defined in the DSMS instance."""
         return cls._ktypes
 
-    @ktypes.setter
-    def ktypes(self, value: "Enum") -> None:
-        """Setter for the ktypes property of the DSMS instance.
-
-        Args:
-            value: the Enum object to be set as the ktypes property.
-        """
-        self._ktypes = value
-
-    # @property
-    # def ktypes(cls) -> "List[KType]":
-    #     return _get_ktype_list()
-
     @property
     def config(cls) -> Configuration:
         """Property returning the DSMS Configuration"""

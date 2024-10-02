@@ -276,18 +276,6 @@ def _get_remote_ktypes() -> Enum:
     return ktypes
 
 
-def _get_ktype_list() -> "List[KType]":
-    """Get all available KTypes from the remote backend."""
-    from dsms import KType  # isort:skip
-
-    response = _perform_request("api/knowledge-type/", "get")
-    if not response.ok:
-        raise ValueError(
-            f"Something went wrong fetching the available ktypes: {response.text}"
-        )
-    return [KType(**ktype) for ktype in response.json()]
-
-
 def _ktype_exists(ktype: Union[Any, str, UUID]) -> bool:
     """Check whether the KType exists in the remote backend"""
     from dsms.knowledge.ktype import (  # isort:skip
