@@ -72,6 +72,7 @@ class DSMS:
         """
 
         self._config = None
+        self._ktypes = None
         self._context.dsms = self
 
         if env:
@@ -94,7 +95,7 @@ class DSMS:
             )
 
         self._sparql_interface = SparqlInterface(self)
-        self._ktypes = _get_remote_ktypes()
+        self.ktypes = _get_remote_ktypes()
 
     def __getitem__(self, key: str) -> "KItem":
         """Get KItem from remote DSMS instance."""
@@ -147,6 +148,15 @@ class DSMS:
     def ktypes(cls) -> "Enum":
         """Getter for the Enum of the KTypes defined in the DSMS instance."""
         return cls._ktypes
+
+    @ktypes.setter
+    def ktypes(self, value: "Enum") -> None:
+        """Setter for the ktypes property of the DSMS instance.
+
+        Args:
+            value: the Enum object to be set as the ktypes property.
+        """
+        self._ktypes = value
 
     @property
     def config(cls) -> Configuration:
