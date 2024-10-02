@@ -72,7 +72,6 @@ class DSMS:
         """
 
         self._config = None
-        self._ktype = None
         self._context.dsms = self
 
         if env:
