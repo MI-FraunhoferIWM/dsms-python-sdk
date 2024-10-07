@@ -147,10 +147,7 @@ class LinkedKItem(KItemProperty):
 
     def is_a(self, to_be_compared: KType) -> bool:
         """Check the KType of the KItem"""
-        return (
-            self.ktype_id.value  # pylint: disable=no-member
-            == to_be_compared.value
-        )
+        return self.ktype_id == to_be_compared.id  # pylint: disable=no-member
 
     # OVERRIDE
     def __str__(self) -> str:

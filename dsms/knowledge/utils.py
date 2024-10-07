@@ -171,6 +171,47 @@ def _validate_model(
     return values
 
 
+def print_webform(webform: BaseModel) -> str:
+    """
+    Helper function to pretty print a webform.
+
+    Args:
+        webform (BaseModel): The webform to print.
+
+    Returns:
+        str: A string representation of the webform.
+    """
+    if hasattr(webform, "model_fields"):
+        fields = [
+            f"\t\t{model_key}=dict({model_value})"
+            for model_key, model_value in webform.model_fields.items()
+            if model_key != "kitem"
+        ]
+        if fields:
+            fields = "\twebform={\n" + ",\n".join(fields) + "\n\t}"
+        else:
+            fields = "\twebform=None"
+    else:
+        fields = "\twebform=None"
+    return fields
+
+
+def print_ktype(self) -> str:
+    """Pretty print the ktype fields"""
+    if hasattr(self, "value"):
+        fields = [
+            f"\t{key}={value}" if key != "webform" else print_webform(value)
+            for key, value in self.value.__dict__.items()
+        ]
+    else:
+        fields = [
+            f"\t{key}={value}" if key != "webform" else print_webform(value)
+            for key, value in self.__dict__.items()
+        ]
+    fields = ",\n".join(fields)
+    return f"{self.name}(\n{fields}\n)"
+
+
 def _get_remote_ktypes() -> Enum:
     """Get the KTypes from the remote backend"""
     from dsms import (  # isort:skip
@@ -187,22 +228,52 @@ def _get_remote_ktypes() -> Enum:
     Context.ktypes = {ktype["id"]: KType(**ktype) for ktype in response.json()}
 
     ktypes = Enum(
-        "KTypes", {_name_to_camel(key): key for key in Context.ktypes}
+        "KTypes",
+        {_name_to_camel(key): value for key, value in Context.ktypes.items()},
     )
+
+    def custom_getattr(self, name) -> None:
+        """
+        Custom getattr method for the Enum of KTypes.
+
+        When a KType field is accessed, first check if the field is an attribute of the
+        underlying KType object (self.value). If it is, return that.
+        Otherwise, call the super method to access the Enum field.
+
+        This is needed because the Enum object is not a KType object, but has all the same
+        fields. This allows us to access the fields of the KType object as if it were an
+        Enum.
+        """
+        if hasattr(self.value, name):
+            return getattr(self.value, name)
+        return super(ktypes, self).__getattr__(name)
+
+    def custom_setattr(self, name, value) -> None:
+        """
+        Custom setattr method for the Enum of KTypes.
+
+        When a KType field is set, first check if the field is an attribute of the
+        underlying KType object (self.value). If it is, set that.
+        Otherwise, call the super method to set the Enum field.
+
+        This is needed because the Enum object is not a KType object, but has all the same
+        fields. This allows us to set the fields of the KType object as if it were an
+        Enum.
+        """
+
+        if hasattr(self.value, name):
+            setattr(self.value, name, value)
+        else:
+            super(ktypes, self).__setattr__(name, value)
+
+    # Attach methods to the dynamically created Enum class
+    setattr(ktypes, "__getattr__", custom_getattr)
+    setattr(ktypes, "__setattr__", custom_setattr)
+    setattr(ktypes, "__str__", print_ktype)
+    setattr(ktypes, "__repr__", print_ktype)
+
     logger.debug("Got the following ktypes from backend: `%s`.", list(ktypes))
     return ktypes
-
-
-def _get_ktype_list() -> "List[KType]":
-    """Get all available KTypes from the remote backend."""
-    from dsms import KType  # isort:skip
-
-    response = _perform_request("api/knowledge-type/", "get")
-    if not response.ok:
-        raise ValueError(
-            f"Something went wrong fetching the available ktypes: {response.text}"
-        )
-    return [KType(**ktype) for ktype in response.json()]
 
 
 def _ktype_exists(ktype: Union[Any, str, UUID]) -> bool:
@@ -274,12 +345,15 @@ def _update_ktype(ktype: "KType") -> Response:
 
 def _delete_ktype(ktype: "KType") -> None:
     """Delete a KType in the remote backend"""
+    from dsms import Context
+
     logger.debug("Delete KType with id: %s", ktype.id)
     response = _perform_request(f"api/knowledge-type/{ktype.id}", "delete")
     if not response.ok:
         raise ValueError(
             f"KItem with uuid `{ktype.id}` could not be deleted from DSMS: `{response.text}`"
         )
+    Context.dsms.ktypes = _get_remote_ktypes()
 
 
 def _get_kitem_list() -> "List[KItem]":
@@ -680,6 +754,8 @@ def _commit_updated_kitem(new_kitem: "KItem") -> None:
 
 def _commit_updated_ktype(new_ktype: "KType") -> None:
     """Commit the updated KTypes"""
+    from dsms import Context
+
     old_ktype = _get_ktype(new_ktype.id, as_json=True)
     logger.debug(
         "Fetched data from old KType with id `%s`: %s",
@@ -692,6 +768,7 @@ def _commit_updated_ktype(new_ktype: "KType") -> None:
             "Fetching updated KType from remote backend: %s", new_ktype.id
         )
         new_ktype.refresh()
+        Context.dsms.ktypes = _get_remote_ktypes()
 
 
 def _commit_deleted(
@@ -706,7 +783,9 @@ def _commit_deleted(
             _delete_kitem(obj)
         elif isinstance(obj, AppConfig):
             _delete_app_spec(obj.name)
-        elif isinstance(obj, KType):
+        elif isinstance(obj, KType) or (
+            isinstance(obj, Enum) and isinstance(obj.value, KType)
+        ):
             _delete_ktype(obj)
         else:
             raise TypeError(
@@ -754,7 +833,7 @@ def _make_annotation_schema(iri: str) -> Dict[str, Any]:
 
 def _search(
     query: Optional[str] = None,
-    ktypes: "Optional[List[KType]]" = [],
+    ktypes: "Optional[List[Union[Enum, KType]]]" = [],
     annotations: "Optional[List[str]]" = [],
     limit: "Optional[int]" = 10,
     allow_fuzzy: "Optional[bool]" = True,
@@ -764,7 +843,7 @@ def _search(
 
     payload = {
         "search_term": query or "",
-        "ktypes": [ktype.value for ktype in ktypes],
+        "ktypes": [ktype.value.id for ktype in ktypes],
         "annotations": [_make_annotation_schema(iri) for iri in annotations],
         "limit": limit,
     }

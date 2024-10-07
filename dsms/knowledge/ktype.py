@@ -1,17 +1,19 @@
 """KItem types"""
 
 import logging
+import warnings
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_serializer
 
 from dsms.core.logging import handler
 from dsms.knowledge.utils import (
     _create_custom_properties_model,
     _ktype_exists,
     _refresh_ktype,
+    print_ktype,
 )
 
 if TYPE_CHECKING:
@@ -68,6 +70,28 @@ class KType(BaseModel):
 
         logger.debug("KType initialization successful.")
 
+    def __setattr__(self, name, value) -> None:
+        """Add ktype to updated-buffer if an attribute is set"""
+        super().__setattr__(name, value)
+        logger.debug(
+            "Setting property with key `%s` on KType level: %s.", name, value
+        )
+
+        if self.id not in self.context.buffers.updated:
+            logger.debug(
+                "Setting KType with ID `%s` as updated during KType.__setattr__",
+                self.id,
+            )
+            self.context.buffers.updated.update({self.id: self})
+
+    def __repr__(self) -> str:
+        """Print the KType"""
+        return print_ktype(self)
+
+    def __str__(self) -> str:
+        """Print the KType"""
+        return print_ktype(self)
+
     @field_validator("webform")
     @classmethod
     def create_model(cls, value: Optional[Dict[str, Any]]) -> Any:
@@ -101,3 +125,18 @@ class KType(BaseModel):
     def refresh(self) -> None:
         """Refresh the KType"""
         _refresh_ktype(self)
+
+    @model_serializer
+    def serialize(self):
+        """Serialize ktype."""
+        return {
+            key: (
+                value
+                if key != "webform"
+                else warnings.warn(
+                    """Commiting `webform` is not supported yet.
+                    Will commit the changes in the ktype without it."""
+                )
+            )
+            for key, value in self.__dict__.items()
+        }

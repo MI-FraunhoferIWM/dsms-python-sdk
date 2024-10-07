@@ -1,6 +1,7 @@
 """DSMS connection module"""
 
 import os
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List
 
 from dotenv import load_dotenv
@@ -20,8 +21,7 @@ from dsms.knowledge.utils import (  # isort:skip
 )
 
 if TYPE_CHECKING:
-    from enum import Enum
-    from typing import Optional
+    from typing import Optional, Union
 
     from dsms.apps import AppConfig
     from dsms.core.context import Buffers
@@ -72,6 +72,7 @@ class DSMS:
         """
 
         self._config = None
+        self._ktypes = None
         self._context.dsms = self
 
         if env:
@@ -94,7 +95,7 @@ class DSMS:
             )
 
         self._sparql_interface = SparqlInterface(self)
-        self._ktypes = _get_remote_ktypes()
+        self.ktypes = _get_remote_ktypes()
 
     def __getitem__(self, key: str) -> "KItem":
         """Get KItem from remote DSMS instance."""
@@ -111,7 +112,9 @@ class DSMS:
             self.context.buffers.deleted.update({obj.id: obj})
         elif isinstance(obj, AppConfig):
             self.context.buffers.deleted.update({obj.name: obj})
-        elif isinstance(obj, KType):
+        elif isinstance(obj, KType) or (
+            isinstance(obj, Enum) and isinstance(obj.value, KType)
+        ):
             self.context.buffers.deleted.update({obj.name: obj})
         else:
             raise TypeError(
@@ -128,7 +131,7 @@ class DSMS:
     def search(
         self,
         query: "Optional[str]" = None,
-        ktypes: "Optional[List[KType]]" = [],
+        ktypes: "Optional[List[Union[Enum, KType]]]" = [],
         annotations: "Optional[List[str]]" = [],
         limit: int = 10,
         allow_fuzzy: "Optional[bool]" = True,
@@ -143,12 +146,17 @@ class DSMS:
 
     @property
     def ktypes(cls) -> "Enum":
-        """ "Enum of the KTypes defined in the DSMS instance."""
+        """Getter for the Enum of the KTypes defined in the DSMS instance."""
         return cls._ktypes
 
-    # @property
-    # def ktypes(cls) -> "List[KType]":
-    #     return _get_ktype_list()
+    @ktypes.setter
+    def ktypes(self, value: "Enum") -> None:
+        """Setter for the ktypes property of the DSMS instance.
+
+        Args:
+            value: the Enum object to be set as the ktypes property.
+        """
+        self._ktypes = value
 
     @property
     def config(cls) -> Configuration:
