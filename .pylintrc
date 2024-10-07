@@ -77,6 +77,7 @@ disable= no-name-in-module,
     too-many-public-methods,
     too-many-locals,
     no-value-for-parameter,
+    too-many-lines,
 
 
 
