@@ -2,11 +2,12 @@
 
 import logging
 import warnings
+import json
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_serializer
+from pydantic import BaseModel, Field, field_validator, model_serializer, model_validator
 
 from dsms.core.logging import handler
 from dsms.knowledge.utils import (
@@ -15,6 +16,7 @@ from dsms.knowledge.utils import (
     _refresh_ktype,
     print_ktype,
 )
+from dsms.knowledge.webform import Webform
 
 if TYPE_CHECKING:
     from dsms import Context
@@ -32,7 +34,7 @@ class KType(BaseModel):
     name: Optional[str] = Field(
         None, description="Human readable name of the KType."
     )
-    webform: Optional[Any] = Field(None, description="Form data of the KType.")
+    webform: Optional[Webform] = Field(None, description="Form data of the KType.")
     json_schema: Optional[Any] = Field(
         None, description="OpenAPI schema of the KType."
     )
@@ -43,6 +45,7 @@ class KType(BaseModel):
     updated_at: Optional[Union[str, datetime]] = Field(
         None, description="Time and date when the KType was updated."
     )
+    custom_properties: Optional[Any] = Field(None, description="")
 
     def __hash__(self) -> int:
         return hash(str(self))
@@ -133,10 +136,18 @@ class KType(BaseModel):
             key: (
                 value
                 if key != "webform"
-                else warnings.warn(
-                    """Commiting `webform` is not supported yet.
-                    Will commit the changes in the ktype without it."""
-                )
+                else json.dumps(value)
             )
             for key, value in self.__dict__.items()
         }
+    
+    @model_validator(mode="after")
+    @classmethod
+    def validate_ktype(cls, self: "KType") -> "KType":
+        if self.webform is not None:
+            self.custom_properties = _create_custom_properties_model(self.webform)
+        return self
+
+ 
+
+

@@ -56,15 +56,17 @@ def _create_custom_properties_model(
     value: Optional[Dict[str, Any]]
 ) -> BaseModel:
     """Convert the dict with the model schema into a pydantic model."""
-    from dsms import KItem
+    from dsms import KItem, KType
+    from dsms.knowledge.webform import Webform
 
+    print(type(value))
     fields = {}
-    if isinstance(value, dict):
-        for item in value.get("sections"):
-            for form_input in item.get("inputs"):
-                label = form_input.get("label")
-                dtype = form_input.get("widget")
-                default = form_input.get("defaultValue")
+    if isinstance(value, Webform):
+        for item in value.sections:
+            for form_input in item.inputs:
+                label = form_input.label
+                dtype = form_input.widget
+                default = form_input.default_value
                 slug = _slugify(label)
                 if dtype in ("Text", "File", "Textarea", "Vocabulary term"):
                     dtype = Optional[str]
@@ -108,6 +110,7 @@ def _create_custom_properties_model(
     setattr(model, "__str__", _print_properties)
     setattr(model, "__repr__", _print_properties)
     setattr(model, "__setattr__", __setattr_property__)
+    setattr(model, "serialize", KType.serialize)
     logger.debug("Create custom properties model with fields: %s", fields)
     return model
 
