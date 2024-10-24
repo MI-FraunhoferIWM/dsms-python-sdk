@@ -1,33 +1,61 @@
-from typing import List, Any, Optional, Union
-from uuid import UUID
-from pydantic import BaseModel, Field
+"""Webform model"""
+
+from typing import Any, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
+
+
+class WebformSelectOption(BaseModel):
+    """Choices in webform"""
+
+    label: Optional[str] = Field(None)
+    value: Optional[Any] = Field(None)
+    disabled: Optional[bool] = Field(False)
+
 
 class Inputs(BaseModel):
-    id: Union[UUID, str] = Field(None, description="")
-    label: Optional[str] = Field(None, description="")
-    widget: Optional[str] = Field(None, description="")
-    default_value: Optional[str] = Field(None, description="")
-    value: Optional[Any] = Field(None, description="")
-    check: Optional[str] = Field(None, description="")
-    error: Optional[str] = Field(None, description="")
-    feedback: Optional[str] = Field(None, description="")
-    hint: Optional[str] = Field(None, description="")
-    measurement_unit: Optional[str] = Field(None, description="")
-    mapping: Optional[str] = Field(None, description="")
-    knowledge_type: Optional[str] = Field(None, description="")
-    knowledge_service_url: Optional[str] = Field(None, description="")
-    vocabulary_service_url: Optional[str] = Field(None, description="")
-    hidden: Optional[bool] = Field(False, description="")
-    ignore: Optional[bool] = Field(False, description="")
-    extra: dict = Field({}, description="")
-    
+    """Input fields in the sections in webform"""
+
+    model_config = ConfigDict(
+        alias_generator=lambda field_name: to_camel(field_name)
+    )
+
+    id: Optional[str] = Field(None)
+    label: Optional[str] = Field(None)
+    widget: Optional[str] = Field(None)
+    default_value: Optional[Any] = Field(None)
+    value: Optional[Any] = Field(None)
+    choices: List[WebformSelectOption] = Field([])
+    on_change: Optional[Any] = Field(None)
+    check: Optional[Any] = Field(None)
+    error: Optional[str] = Field(None)
+    feedback: Optional[str] = Field(None)
+    hint: Optional[str] = Field(None)
+    measurement_unit: Optional[str] = Field(None)
+    mapping: Optional[str] = Field(None)
+    mapping_name: Optional[str] = Field(None)
+    mapping_kitem_id: Optional[str] = Field(None)
+    knowledge_type: Optional[str] = Field(None)
+    knowledge_service_url: Optional[str] = Field(None)
+    vocabulary_service_url: Optional[str] = Field(None)
+    hidden: Optional[bool] = Field(False)
+    ignore: Optional[bool] = Field(False)
+    extra: dict = Field({})
+
+
 class Sections(BaseModel):
-    id:  Union[UUID, str] = Field(None, description="")
-    name: Optional[str] = Field(None, description="")
-    inputs: List[Inputs] = Field([], description="")
-    hidden: Optional[bool] = Field(False, description="")
+    """Sections in webform"""
+
+    id: Optional[str] = Field(None)
+    name: Optional[str] = Field(None)
+    inputs: List[Inputs] = Field([])
+    hidden: Optional[bool] = Field(False)
 
 
 class Webform(BaseModel):
-    semantics_enabled: Optional[bool] = Field(False, description="")
-    sections: List[Sections] = Field([], description="")
+    """User defined webform for ktype"""
+
+    semantics_enabled: Optional[bool] = Field(False)
+    rdf_type: Optional[str] = Field(None)
+    sections: List[Sections] = Field([])

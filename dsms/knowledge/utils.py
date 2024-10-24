@@ -59,7 +59,6 @@ def _create_custom_properties_model(
     from dsms import KItem, KType
     from dsms.knowledge.webform import Webform
 
-    print(type(value))
     fields = {}
     if isinstance(value, Webform):
         for item in value.sections:
@@ -78,8 +77,8 @@ def _create_custom_properties_model(
                     choices = Enum(
                         _name_to_camel(label) + "Choices",
                         {
-                            _name_to_camel(choice["value"]): choice["value"]
-                            for choice in form_input.get("choices")
+                            _name_to_camel(choice.value): choice.value
+                            for choice in form_input.choices
                         },
                     )
                     dtype = Optional[choices]

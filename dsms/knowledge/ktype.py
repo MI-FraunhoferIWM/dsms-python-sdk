@@ -1,13 +1,11 @@
 """KItem types"""
 
 import logging
-import warnings
-import json
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_serializer, model_validator
+from pydantic import BaseModel, Field, model_serializer, model_validator
 
 from dsms.core.logging import handler
 from dsms.knowledge.utils import (
@@ -34,7 +32,9 @@ class KType(BaseModel):
     name: Optional[str] = Field(
         None, description="Human readable name of the KType."
     )
-    webform: Optional[Webform] = Field(None, description="Form data of the KType.")
+    webform: Optional[Webform] = Field(
+        None, description="Form data of the KType."
+    )
     json_schema: Optional[Any] = Field(
         None, description="OpenAPI schema of the KType."
     )
@@ -76,16 +76,20 @@ class KType(BaseModel):
     def __setattr__(self, name, value) -> None:
         """Add ktype to updated-buffer if an attribute is set"""
         super().__setattr__(name, value)
-        logger.debug(
-            "Setting property with key `%s` on KType level: %s.", name, value
-        )
 
-        if self.id not in self.context.buffers.updated:
+        if name != "custom_properties":
             logger.debug(
-                "Setting KType with ID `%s` as updated during KType.__setattr__",
-                self.id,
+                "Setting property with key `%s` on KType level: %s.",
+                name,
+                value,
             )
-            self.context.buffers.updated.update({self.id: self})
+
+            if self.id not in self.context.buffers.updated:
+                logger.debug(
+                    "Setting KType with ID `%s` as updated during KType.__setattr__",
+                    self.id,
+                )
+                self.context.buffers.updated.update({self.id: self})
 
     def __repr__(self) -> str:
         """Print the KType"""
@@ -94,12 +98,6 @@ class KType(BaseModel):
     def __str__(self) -> str:
         """Print the KType"""
         return print_ktype(self)
-
-    @field_validator("webform")
-    @classmethod
-    def create_model(cls, value: Optional[Dict[str, Any]]) -> Any:
-        """Create the datamodel for the ktype"""
-        return _create_custom_properties_model(value)
 
     @property
     def in_backend(self) -> bool:
@@ -134,20 +132,21 @@ class KType(BaseModel):
         """Serialize ktype."""
         return {
             key: (
-                value
-                if key != "webform"
-                else json.dumps(value)
+                value.dict(exclude_none=False, by_alias=False)
+                if key == "webform" and not isinstance(value, dict)
+                else value
             )
             for key, value in self.__dict__.items()
+            if key != "custom_properties"
         }
-    
+
     @model_validator(mode="after")
     @classmethod
     def validate_ktype(cls, self: "KType") -> "KType":
+        """Model validator for ktype"""
         if self.webform is not None:
-            self.custom_properties = _create_custom_properties_model(self.webform)
+            self.webform.model_validate(self.webform)
+            self.custom_properties = _create_custom_properties_model(
+                self.webform
+            )
         return self
-
- 
-
-
