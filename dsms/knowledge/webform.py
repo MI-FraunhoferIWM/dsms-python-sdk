@@ -18,7 +18,9 @@ class Inputs(BaseModel):
     """Input fields in the sections in webform"""
 
     model_config = ConfigDict(
-        alias_generator=lambda field_name: to_camel(field_name)
+        alias_generator=lambda field_name: to_camel(  # pylint: disable=W0108
+            field_name
+        )
     )
 
     id: Optional[str] = Field(None)
@@ -56,6 +58,11 @@ class Sections(BaseModel):
 class Webform(BaseModel):
     """User defined webform for ktype"""
 
+    model_config = ConfigDict(
+        alias_generator=lambda field_name: to_camel(  # pylint: disable=W0108
+            field_name
+        )
+    )
     semantics_enabled: Optional[bool] = Field(False)
     rdf_type: Optional[str] = Field(None)
     sections: List[Sections] = Field([])
