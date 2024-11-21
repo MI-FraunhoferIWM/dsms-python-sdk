@@ -150,7 +150,7 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
 
     def _get_dataframe() -> "Dict[str, Any]":
         return {
-            urljoin(custom_address, f"api/knowledge/data_api/{uid}"): [
+            urljoin(custom_address, f"api/knowledge/data/{uid}"): [
                 {
                     "method": responses.GET,
                     "returns": {

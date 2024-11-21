@@ -61,7 +61,7 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         "annotations": [
             {
                 "iri": "http://example.org/",
-                "name": "bar",
+                "label": "bar",
                 "namespace": "example",
                 "description": None,
             }
@@ -99,7 +99,7 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         annotations=[
             {
                 "iri": "http://example.org/",
-                "name": "foo",
+                "label": "foo",
                 "namespace": "example",
             }
         ],
@@ -115,7 +115,7 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         "annotations_to_link": [
             {
                 "iri": "http://example.org/",
-                "name": "foo",
+                "label": "foo",
                 "namespace": "example",
                 "description": None,
             }
@@ -136,7 +136,7 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         "annotations_to_unlink": [
             {
                 "iri": "http://example.org/",
-                "name": "bar",
+                "label": "bar",
                 "namespace": "example",
                 "description": None,
             }

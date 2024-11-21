@@ -284,6 +284,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "created_at",
             "external_links",
             "dataframe",
+            "access_url",
         },
         exclude_none=True,
     )
@@ -637,8 +638,8 @@ def _split_iri(iri: str) -> List[str]:
 
 
 def _make_annotation_schema(iri: str) -> Dict[str, Any]:
-    namespace, name = _split_iri(iri)
-    return {"namespace": namespace, "name": name, "iri": iri}
+    namespace, label = _split_iri(iri)
+    return {"namespace": namespace, "label": label, "iri": iri}
 
 
 def _search(
@@ -703,7 +704,7 @@ def _get_dataframe_column(kitem_id: str, column_id: int) -> List[Any]:
     """Download the column of a dataframe container of a certain kitem"""
 
     response = _perform_request(
-        f"api/knowledge/data_api/{kitem_id}/column-{column_id}", "get"
+        f"api/knowledge/data/{kitem_id}/column-{column_id}", "get"
     )
     if not response.ok:
         message = f"""Something went wrong fetch column id `{column_id}`
@@ -714,7 +715,7 @@ def _get_dataframe_column(kitem_id: str, column_id: int) -> List[Any]:
 
 def _inspect_dataframe(kitem_id: str) -> Optional[List[Dict[str, Any]]]:
     """Get column info for the dataframe container of a certain kitem"""
-    response = _perform_request(f"api/knowledge/data_api/{kitem_id}", "get")
+    response = _perform_request(f"api/knowledge/data/{kitem_id}", "get")
     if not response.ok and response.status_code == 404:
         dataframe = None
     elif not response.ok and response.status_code != 404:
@@ -734,7 +735,7 @@ def _update_dataframe(kitem_id: str, data: pd.DataFrame):
         data.to_json(buffer, indent=2)
         buffer.seek(0)
         response = _perform_request(
-            f"api/knowledge/data_api/{kitem_id}", "put", files={"data": buffer}
+            f"api/knowledge/data/{kitem_id}", "put", files={"data": buffer}
         )
         if not response.ok:
             raise RuntimeError(
@@ -744,7 +745,7 @@ def _update_dataframe(kitem_id: str, data: pd.DataFrame):
 
 def _delete_dataframe(kitem_id: str) -> Response:
     logger.debug("Delete DataFrame for kitem with id `%s`.", kitem_id)
-    return _perform_request(f"api/knowledge/data_api/{kitem_id}", "delete")
+    return _perform_request(f"api/knowledge/data/{kitem_id}", "delete")
 
 
 def _commit_avatar(kitem) -> None:

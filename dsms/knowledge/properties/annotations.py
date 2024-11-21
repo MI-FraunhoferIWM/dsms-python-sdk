@@ -15,7 +15,7 @@ class Annotation(KItemProperty):
     """KItem annotation model"""
 
     iri: str = Field(..., description="IRI of the annotation")
-    name: str = Field(..., description="Name of the annotation")
+    label: str = Field(..., description="Label of the annotation")
     namespace: str = Field(..., description="Namespace of the annotation")
     description: Optional[str] = Field(
         None, description="Description of the annotation"

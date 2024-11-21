@@ -191,6 +191,14 @@ class KItem(BaseModel):
         default_factory=Avatar, description="KItem avatar interface"
     )
 
+    access_url: Optional[str] = Field(
+        None, description="Access URL of the KItem"
+    )
+
+    context_id: Optional[Union[UUID, str]] = Field(
+        None, description="Context ID of the KItem"
+    )
+
     model_config = ConfigDict(
         extra="forbid",
         validate_assignment=True,
@@ -610,7 +618,7 @@ class KItem(BaseModel):
     @property
     def url(cls) -> str:
         """URL of the KItem"""
-        return urljoin(
+        return cls.access_url or urljoin(
             str(cls.context.dsms.config.host_url),
             f"knowledge/{cls._get_ktype_as_str()}/{cls.slug}",
         )
