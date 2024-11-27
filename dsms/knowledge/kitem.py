@@ -116,7 +116,9 @@ class KItem(BaseModel):
     """
 
     # public
-    name: str = Field(..., description="Human readable name of the KItem")
+    name: str = Field(
+        ..., description="Human readable name of the KItem", max_length=300
+    )
     id: Optional[UUID] = Field(
         default_factory=uuid4,
         description="ID of the KItem",
@@ -127,7 +129,10 @@ class KItem(BaseModel):
         description="Whether the KItem was already created in the backend.",
     )
     slug: Optional[str] = Field(
-        None, description="Slug of the KContext.dsms", min_length=4
+        None,
+        description="Slug of the KContext.dsms",
+        min_length=4,
+        max_length=1000,
     )
     annotations: List[Union[str, Annotation]] = Field(
         [], description="Annotations of the KItem"

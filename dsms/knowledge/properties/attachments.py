@@ -16,7 +16,9 @@ if TYPE_CHECKING:
 class Attachment(KItemProperty):
     """Attachment uploaded by a  certain user."""
 
-    name: str = Field(..., description="File name of the attachment")
+    name: str = Field(
+        ..., description="File name of the attachment", max_length=100
+    )
 
     content: Optional[Union[str, bytes]] = Field(
         None, description="Content of the file"

@@ -1,6 +1,6 @@
 """Annotation property of a KItem"""
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from pydantic import Field
 
@@ -14,11 +14,12 @@ if TYPE_CHECKING:
 class Annotation(KItemProperty):
     """KItem annotation model"""
 
-    iri: str = Field(..., description="IRI of the annotation")
-    label: str = Field(..., description="Label of the annotation")
-    namespace: str = Field(..., description="Namespace of the annotation")
-    description: Optional[str] = Field(
-        None, description="Description of the annotation"
+    iri: str = Field(..., description="IRI of the annotation", max_length=200)
+    label: str = Field(
+        ..., description="Label of the annotation", max_length=100
+    )
+    namespace: str = Field(
+        ..., description="Namespace of the annotation", max_length=100
     )
 
 

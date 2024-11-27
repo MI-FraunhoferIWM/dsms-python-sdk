@@ -63,7 +63,6 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 "iri": "http://example.org/",
                 "label": "bar",
                 "namespace": "example",
-                "description": None,
             }
         ],
         "linked_kitems": [
@@ -117,7 +116,6 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 "iri": "http://example.org/",
                 "label": "foo",
                 "namespace": "example",
-                "description": None,
             }
         ],
         "user_groups_to_add": [],
@@ -138,7 +136,6 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 "iri": "http://example.org/",
                 "label": "bar",
                 "namespace": "example",
-                "description": None,
             }
         ],
         "user_groups_to_remove": [],

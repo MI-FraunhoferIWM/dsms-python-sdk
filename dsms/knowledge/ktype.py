@@ -11,9 +11,11 @@ from dsms.knowledge.utils import _create_custom_properties_model
 class KType(BaseModel):
     """Knowledge type of the knowledge item."""
 
-    id: Union[UUID, str] = Field(..., description="ID of the KType.")
+    id: Union[UUID, str] = Field(
+        ..., description="ID of the KType.", max_length=50
+    )
     name: Optional[str] = Field(
-        None, description="Human readable name of the KType."
+        None, description="Human readable name of the KType.", max_length=50
     )
     webform: Optional[Any] = Field(None, description="Form data of the KItem.")
     json_schema: Optional[Any] = Field(

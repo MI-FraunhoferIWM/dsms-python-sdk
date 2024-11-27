@@ -15,7 +15,10 @@ if TYPE_CHECKING:
 class Summary(BaseModel):
     """Model for the custom properties of the KItem"""
 
-    id: Optional[UUID] = Field(None, description="ID of the KItem")
+    id: Optional[UUID] = Field(
+        None,
+        description="ID of the KItem",
+    )
     text: str = Field(..., description="Summary text of the KItem")
     kitem: Optional[Any] = Field(
         None, description="KItem related to the summary", exclude=True

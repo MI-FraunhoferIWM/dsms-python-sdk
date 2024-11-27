@@ -14,7 +14,10 @@ if TYPE_CHECKING:
 class Author(KItemProperty):
     """Author of a KItem."""
 
-    user_id: UUID = Field(..., description="ID of the DSMS User")
+    user_id: UUID = Field(
+        ...,
+        description="ID of the DSMS User",
+    )
 
     # OVERRIDE
     @model_serializer

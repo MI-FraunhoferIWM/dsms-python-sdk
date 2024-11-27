@@ -14,7 +14,9 @@ if TYPE_CHECKING:
 class Affiliation(KItemProperty):
     """Affiliation of a KItem."""
 
-    name: str = Field(..., description="Name of the affiliation")
+    name: str = Field(
+        ..., description="Name of the affiliation", max_length=100
+    )
 
 
 class AffiliationsProperty(KItemPropertyList):

@@ -64,11 +64,17 @@ class App(KItemProperty):
         None, description="ID of the KItem App"
     )
     executable: str = Field(
-        ..., description="Name of the executable related to the app"
+        ...,
+        description="Name of the executable related to the app",
+        max_length=400,
     )
-    title: str = Field(..., description="Title of the appilcation")
+    title: str = Field(
+        ..., description="Title of the appilcation", max_length=50
+    )
     description: Optional[str] = Field(
-        None, description="Description of the appilcation"
+        None,
+        description="Description of the appilcation",
+        max_length=1000,
     )
     tags: Optional[dict] = Field(
         None, description="Tags related to the appilcation"

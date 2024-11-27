@@ -13,8 +13,12 @@ if TYPE_CHECKING:
 class UserGroup(KItemProperty):
     """Users groups related to a KItem."""
 
-    name: str = Field(..., description="Name of the user group")
-    group_id: str = Field(..., description="ID of the user group")
+    name: str = Field(
+        ..., description="Name of the user group", max_length=100
+    )
+    group_id: str = Field(
+        ..., description="ID of the user group", max_length=100
+    )
 
 
 class UserGroupsProperty(KItemPropertyList):

@@ -13,7 +13,9 @@ if TYPE_CHECKING:
 class ExternalLink(KItemProperty):
     """External link of a KItem."""
 
-    label: str = Field(..., description="Label of the external link")
+    label: str = Field(
+        ..., description="Label of the external link", max_length=50
+    )
     url: AnyUrl = Field(..., description="URL of the external link")
 
 
