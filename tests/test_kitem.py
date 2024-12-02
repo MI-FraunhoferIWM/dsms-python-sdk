@@ -8,8 +8,8 @@ def test_kitem_basic(custom_address, get_mock_kitem_ids):
     """Test KItem properties"""
 
     from dsms.core.configuration import Configuration
-    from dsms.core.session import Session
     from dsms.core.dsms import DSMS
+    from dsms.core.session import Session
     from dsms.knowledge.kitem import KItem
 
     assert Session.dsms is None
@@ -33,8 +33,8 @@ def test_kitem_config_class(custom_address, get_mock_kitem_ids):
     """Test KItem properties"""
 
     from dsms.core.configuration import Configuration
-    from dsms.core.session import Session
     from dsms.core.dsms import DSMS
+    from dsms.core.session import Session
     from dsms.knowledge.kitem import KItem
 
     assert Session.dsms is None

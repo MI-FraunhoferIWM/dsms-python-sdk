@@ -1,17 +1,17 @@
 """Webform model"""
 
-from typing import Any, List, Optional
-
 from enum import Enum
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from dsms.knowledge.utils import id_generator
 
+
 class Widget(Enum):
     """Enum for widgets"""
-   
+
     TEXT = "Text"
     FILE = "File"
     TEXTAREA = "Textarea"

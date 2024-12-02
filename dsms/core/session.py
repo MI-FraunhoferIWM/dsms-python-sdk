@@ -21,7 +21,7 @@ class Buffers:
 
 
 class Session:
-    """Object giving the current DSMS context."""
+    """Object giving the current DSMS session."""
 
     dsms: "Optional[DSMS]" = None
 

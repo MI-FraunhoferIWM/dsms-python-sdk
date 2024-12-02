@@ -2,11 +2,11 @@
 import base64
 import io
 import logging
-import re
-import warnings
-import time
 import random
+import re
 import string
+import time
+import warnings
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
@@ -54,12 +54,15 @@ def _is_number(value):
     except Exception:
         return False
 
+
 def id_generator(prefix: str = "id") -> str:
     """Generates a random string as id"""
 
     # Generate a unique part using time and random characters
     unique_part = f"{int(time.time() * 1000)}"  # Milliseconds since epoch
-    random_part = "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
+    random_part = "".join(
+        random.choices(string.ascii_lowercase + string.digits, k=6)
+    )
     # Combine prefix, unique part, and random part
     generated_id = f"{prefix}{unique_part}{random_part}"
     return generated_id
@@ -321,7 +324,7 @@ def _create_new_ktype(ktype: "KType") -> None:
 
 def _get_ktype(ktype_id: str, as_json=False) -> "Union[KType, Dict[str, Any]]":
     """Get the KType for an instance with a certain ID from remote backend"""
-    from dsms import Session, KType
+    from dsms import KType, Session
 
     response = _perform_request(f"api/knowledge-type/{ktype_id}", "get")
     if response.status_code == 404:
@@ -403,7 +406,7 @@ def _get_kitem(
     uuid: Union[str, UUID], as_json=False
 ) -> "Union[KItem, Dict[str, Any]]":
     """Get the KItem for a instance with a certain ID from remote backend"""
-    from dsms import Session, KItem
+    from dsms import KItem, Session
 
     response = _perform_request(f"api/knowledge/kitems/{uuid}", "get")
     if response.status_code == 404:

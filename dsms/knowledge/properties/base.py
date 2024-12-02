@@ -24,7 +24,7 @@ logger.propagate = False
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Set, Union
 
-    from dsms import Session, KItem
+    from dsms import KItem, Session
 
 
 class KItemProperty(BaseModel):

@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_serializer, model_validator
@@ -32,8 +32,12 @@ class KType(BaseModel):
     name: Optional[str] = Field(
         None, description="Human readable name of the KType."
     )
-    context: Optional[bool] = Field(False, description="Identifies if the ktype is a context ktype")
-    context_schema: Optional[list] = Field([], description="Schema of the context ktype")
+    context: Optional[bool] = Field(
+        False, description="Identifies if the ktype is a context ktype"
+    )
+    context_schema: Optional[list] = Field(
+        [], description="Schema of the context ktype"
+    )
     webform: Optional[Webform] = Field(
         None, description="Form data of the KType."
     )
@@ -46,7 +50,9 @@ class KType(BaseModel):
     updated_at: Optional[Union[str, datetime]] = Field(
         None, description="Time and date when the KType was updated."
     )
-    custom_properties: Optional[Any] = Field(None, description="Additional custom properties for the KType.")
+    custom_properties: Optional[Any] = Field(
+        None, description="Additional custom properties for the KType."
+    )
 
     def __hash__(self) -> int:
         return hash(str(self))
@@ -134,7 +140,9 @@ class KType(BaseModel):
         return {
             key: (
                 value.dict(exclude_none=False, by_alias=False)
-                if key == "webform" and value is not None and not isinstance(value, dict) 
+                if key == "webform"
+                and value is not None
+                and not isinstance(value, dict)
                 else value
             )
             for key, value in self.__dict__.items()
