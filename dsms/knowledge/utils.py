@@ -2,7 +2,10 @@
 import base64
 import io
 import logging
+import random
 import re
+import string
+import time
 import warnings
 from enum import Enum
 from pathlib import Path
@@ -10,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
 import pandas as pd
+import requests
 import segno
 import yaml
 from PIL import Image
@@ -844,3 +848,140 @@ def _delete_app_spec(name: str) -> None:
         message = f"Something went wrong deleting app spec with name `{name}`: {response.text}"
         raise RuntimeError(message)
     return response.text
+
+
+def _get_ktype(ktype_id: str) -> Optional[Dict[str, Any]]:
+    try:
+        response = _perform_request(f"api/knowledge-type/{ktype_id}", "get")
+
+        if not response.status_code == 200:
+            logger.error(
+                "An error occurred while retrieving RDF mapping: %s, %s",
+                response.status_code,
+                response.content,
+            )
+    except requests.RequestException as e:
+        logger.error("KType mapping connection failed: %s", e)
+    except Exception as ex:
+        logger.error("An error occurred while retrieving Mapping: %s", ex)
+    return response.json()
+
+
+def _transform_custom_properties_schema(
+    custom_properties: Any, ktype_id: str, from_context: bool = False
+):
+    """
+    Given a ktype_id and a custom_properties dictionary,
+    transform the input into the format expected by the frontend.
+    If the ktype_id is not found, just return the custom_properties dictionary
+    as is.
+    """
+
+    if from_context:
+        from dsms import Context
+
+        ktype_spec = Context.ktypes.get(ktype_id)
+    else:
+        ktype_spec = _get_ktype(ktype_id)
+
+    if ktype_spec:
+        webform = ktype_spec.get("webform")
+    else:
+        webform = None
+
+    if webform and isinstance(custom_properties, dict):
+        copy_properties = custom_properties.copy()
+        transformed_sections = {}
+        for section_def in webform["sections"]:
+            for input_def in section_def["inputs"]:
+                label = input_def["label"]
+                if label in copy_properties:
+                    if input_def.get("classMapping"):
+                        class_mapping = {
+                            "classMapping": {
+                                "iri": input_def.get("classMapping")
+                            }
+                        }
+                    else:
+                        class_mapping = {}
+
+                    entry = {
+                        "id": input_def["id"],
+                        "label": label,
+                        "value": copy_properties.pop(label),
+                        "measurementUnit": input_def.get("measurementUnit"),
+                        **class_mapping,
+                    }
+                    section_name = section_def["name"]
+                    if section_name not in transformed_sections:
+                        section = {
+                            "id": section_def["id"],
+                            "name": section_name,
+                            "entries": [],
+                        }
+                        transformed_sections[section_name] = section
+                    transformed_sections[section_name]["entries"].append(entry)
+        if copy_properties:
+            logger.info(
+                "Some custom properties were not found in the webform: %s for ktype: %s",
+                copy_properties,
+                ktype_id,
+            )
+            transformed_sections["General"] = _make_misc_section(
+                copy_properties
+            )
+        response = {"sections": list(transformed_sections.values())}
+    elif not webform and isinstance(custom_properties, dict):
+        response = _transform_from_flat_schema(custom_properties)
+    elif isinstance(custom_properties, dict) and custom_properties.get(
+        "sections"
+    ):
+        response = custom_properties
+    else:
+        raise TypeError(
+            f"Invalid custom properties type: {type(custom_properties)}"
+        )
+    return response
+
+
+def _transform_from_flat_schema(
+    custom_properties: Dict[str, Any]
+) -> Dict[str, Any]:
+    return {"sections": [_make_misc_section(custom_properties)]}
+
+
+def _make_misc_section(custom_properties: dict):
+    """
+    If the ktype_id is not found, return the custom_properties dictionary
+    as is, wrapped in a section named "Misc".
+    """
+    section = {"id": id_generator(), "name": "Misc", "entries": []}
+    for key, value in custom_properties.items():
+        section["entries"].append(
+            {
+                "id": id_generator(),
+                "label": key,
+                "value": value,
+            }
+        )
+    return section
+
+
+def id_generator(prefix: str = "id") -> str:
+    # Generate a unique part using time and random characters
+    """
+    Generates a unique id using a combination of the current time and 6 random characters.
+
+    Args:
+    prefix (str): The prefix to use for the generated id. Defaults to "id".
+
+    Returns:
+    str: The generated id.
+    """
+    unique_part = f"{int(time.time() * 1000)}"  # Milliseconds since epoch
+    random_part = "".join(
+        random.choices(string.ascii_lowercase + string.digits, k=6)  # nosec
+    )
+    # Combine prefix, unique part, and random part
+    generated_id = f"{prefix}{unique_part}{random_part}"
+    return generated_id
