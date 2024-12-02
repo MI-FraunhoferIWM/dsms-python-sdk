@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from dsms.apps.utils import _get_available_apps_specs
 from dsms.core.configuration import Configuration
-from dsms.core.context import Context
+from dsms.core.session import Session
 from dsms.core.utils import _ping_dsms
 from dsms.knowledge.sparql_interface import SparqlInterface
 from dsms.knowledge.utils import _search
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from typing import Optional, Union
 
     from dsms.apps import AppConfig
-    from dsms.core.context import Buffers
+    from dsms.core.session import Buffers
     from dsms.knowledge.kitem import KItem
     from dsms.knowledge.ktype import KType
     from dsms.knowledge.search import SearchResult
@@ -49,7 +49,7 @@ class DSMS:
 
     """
 
-    _context = Context
+    _session = Session
 
     def __init__(
         self,
@@ -73,7 +73,7 @@ class DSMS:
 
         self._config = None
         self._ktypes = None
-        self._context.dsms = self
+        self._session.dsms = self
 
         if env:
             if not os.path.exists(env):
@@ -207,12 +207,12 @@ class DSMS:
     @property
     def buffers(cls) -> "Buffers":
         """Return buffers of the DSMS session"""
-        return cls._context.buffers
+        return cls._session.buffers
 
     @property
-    def context(cls) -> "Context":
-        """Return DSMS context"""
-        return cls._context
+    def context(cls) -> "Session":
+        """Return DSMS session"""
+        return cls._session
 
     @classmethod
     def __get_pydantic_core_schema__(cls):

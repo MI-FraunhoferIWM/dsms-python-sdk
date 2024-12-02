@@ -24,7 +24,7 @@ logger.propagate = False
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Set, Union
 
-    from dsms import Context, KItem
+    from dsms import KItem, Session
 
 
 class KItemProperty(BaseModel):
@@ -94,13 +94,13 @@ class KItemProperty(BaseModel):
         return cls.model_config.get("exclude")
 
     @property
-    def context(cls) -> "Context":
-        """Getter for Context"""
+    def context(cls) -> "Session":
+        """Getter for Session"""
         from dsms import (  # isort:skip
-            Context,
+            Session,
         )
 
-        return Context
+        return Session
 
     @model_serializer
     def serialize(self):
@@ -270,13 +270,13 @@ class KItemPropertyList(list):
             self.context.buffers.updated.update({self._kitem.id: self._kitem})
 
     @property
-    def context(cls) -> "Context":
-        """Getter for Context"""
+    def context(cls) -> "Session":
+        """Getter for Session"""
         from dsms import (  # isort:skip
-            Context,
+            Session,
         )
 
-        return Context
+        return Session
 
     @property
     def kitem(cls) -> "KItem":

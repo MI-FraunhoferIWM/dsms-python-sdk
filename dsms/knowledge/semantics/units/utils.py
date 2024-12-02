@@ -92,9 +92,9 @@ def get_property_unit(
         ValueError: If unable to retrieve the unit for the property due to any errors or if
             the property does not have a unit or has more than one unit associated with it.
     """
-    from dsms import Context
+    from dsms import Session
 
-    units_sparql_object = Context.dsms.config.units_sparql_object
+    units_sparql_object = Session.dsms.config.units_sparql_object
     if not issubclass(units_sparql_object, BaseUnitSparqlQuery):
         raise TypeError(
             f"´{units_sparql_object}´ must be a subclass of `{BaseUnitSparqlQuery}`"

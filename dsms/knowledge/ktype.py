@@ -17,7 +17,7 @@ from dsms.knowledge.utils import (
 from dsms.knowledge.webform import Webform
 
 if TYPE_CHECKING:
-    from dsms import Context
+    from dsms import Session
     from dsms.core.dsms import DSMS
 
 logger = logging.getLogger(__name__)
@@ -32,20 +32,27 @@ class KType(BaseModel):
     name: Optional[str] = Field(
         None, description="Human readable name of the KType."
     )
+    context: Optional[bool] = Field(
+        False, description="Identifies if the ktype is a context ktype"
+    )
+    context_schema: Optional[list] = Field(
+        [], description="Schema of the context ktype"
+    )
     webform: Optional[Webform] = Field(
         None, description="Form data of the KType."
     )
     json_schema: Optional[Any] = Field(
         None, description="OpenAPI schema of the KType."
     )
-    rdf_mapping: Optional[str] = Field(None, description="")
     created_at: Optional[Union[str, datetime]] = Field(
         None, description="Time and date when the KType was created."
     )
     updated_at: Optional[Union[str, datetime]] = Field(
         None, description="Time and date when the KType was updated."
     )
-    custom_properties: Optional[Any] = Field(None, description="")
+    custom_properties: Optional[Any] = Field(
+        None, description="Additional custom properties for the KType."
+    )
 
     def __hash__(self) -> int:
         return hash(str(self))
@@ -63,13 +70,13 @@ class KType(BaseModel):
         super().__init__(**kwargs)
 
         # add ktype to buffer
-        if not self.in_backend and self.id not in self.context.buffers.created:
+        if not self.in_backend and self.id not in self.session.buffers.created:
             logger.debug(
                 "Marking KTpe with ID `%s` as created and updated during KItem initialization.",
                 self.id,
             )
-            self.context.buffers.created.update({self.id: self})
-            self.context.buffers.updated.update({self.id: self})
+            self.session.buffers.created.update({self.id: self})
+            self.session.buffers.updated.update({self.id: self})
 
         logger.debug("KType initialization successful.")
 
@@ -84,12 +91,12 @@ class KType(BaseModel):
                 value,
             )
 
-            if self.id not in self.context.buffers.updated:
+            if self.id not in self.session.buffers.updated:
                 logger.debug(
                     "Setting KType with ID `%s` as updated during KType.__setattr__",
                     self.id,
                 )
-                self.context.buffers.updated.update({self.id: self})
+                self.session.buffers.updated.update({self.id: self})
 
     def __repr__(self) -> str:
         """Print the KType"""
@@ -106,22 +113,22 @@ class KType(BaseModel):
 
     @property
     def dsms(cls) -> "DSMS":
-        """DSMS context getter"""
-        return cls.context.dsms
+        """DSMS session getter"""
+        return cls.session.dsms
 
     @dsms.setter
     def dsms(cls, value: "DSMS") -> None:
-        """DSMS context setter"""
-        cls.context.dsms = value
+        """DSMS session setter"""
+        cls.session.dsms = value
 
     @property
-    def context(cls) -> "Context":
-        """Getter for Context"""
+    def session(cls) -> "Session":
+        """Getter for Session"""
         from dsms import (  # isort:skip
-            Context,
+            Session,
         )
 
-        return Context
+        return Session
 
     def refresh(self) -> None:
         """Refresh the KType"""
@@ -133,7 +140,9 @@ class KType(BaseModel):
         return {
             key: (
                 value.dict(exclude_none=False, by_alias=False)
-                if key == "webform" and not isinstance(value, dict)
+                if key == "webform"
+                and value is not None
+                and not isinstance(value, dict)
                 else value
             )
             for key, value in self.__dict__.items()
