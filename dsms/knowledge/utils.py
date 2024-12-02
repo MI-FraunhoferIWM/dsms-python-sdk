@@ -4,6 +4,9 @@ import io
 import logging
 import re
 import warnings
+import time
+import random
+import string
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
@@ -35,7 +38,7 @@ from dsms.knowledge.search import SearchResult  # isort:skip
 
 if TYPE_CHECKING:
     from dsms.apps import AppConfig
-    from dsms.core.context import Buffers
+    from dsms.core.session import Buffers
     from dsms.knowledge import KItem, KType
     from dsms.knowledge.properties import Attachment
 
@@ -50,6 +53,16 @@ def _is_number(value):
         return True
     except Exception:
         return False
+
+def id_generator(prefix: str = "id") -> str:
+    """Generates a random string as id"""
+
+    # Generate a unique part using time and random characters
+    unique_part = f"{int(time.time() * 1000)}"  # Milliseconds since epoch
+    random_part = "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
+    # Combine prefix, unique part, and random part
+    generated_id = f"{prefix}{unique_part}{random_part}"
+    return generated_id
 
 
 def _create_custom_properties_model(
@@ -217,7 +230,7 @@ def print_ktype(self) -> str:
 def _get_remote_ktypes() -> Enum:
     """Get the KTypes from the remote backend"""
     from dsms import (  # isort:skip
-        Context,
+        Session,
         KType,
     )
 
@@ -227,11 +240,11 @@ def _get_remote_ktypes() -> Enum:
             f"Something went wrong fetching the remote ktypes: {response.text}"
         )
 
-    Context.ktypes = {ktype["id"]: KType(**ktype) for ktype in response.json()}
+    Session.ktypes = {ktype["id"]: KType(**ktype) for ktype in response.json()}
 
     ktypes = Enum(
         "KTypes",
-        {_name_to_camel(key): value for key, value in Context.ktypes.items()},
+        {_name_to_camel(key): value for key, value in Session.ktypes.items()},
     )
 
     def custom_getattr(self, name) -> None:
@@ -308,13 +321,13 @@ def _create_new_ktype(ktype: "KType") -> None:
 
 def _get_ktype(ktype_id: str, as_json=False) -> "Union[KType, Dict[str, Any]]":
     """Get the KType for an instance with a certain ID from remote backend"""
-    from dsms import Context, KType
+    from dsms import Session, KType
 
     response = _perform_request(f"api/knowledge-type/{ktype_id}", "get")
     if response.status_code == 404:
         raise ValueError(
             f"""KType with the id `{ktype_id}` does not exist in
-            DSMS-instance `{Context.dsms.config.host_url}`"""
+            DSMS-instance `{Session.dsms.config.host_url}`"""
         )
     if not response.ok:
         raise ValueError(
@@ -347,7 +360,7 @@ def _update_ktype(ktype: "KType") -> Response:
 
 def _delete_ktype(ktype: "KType") -> None:
     """Delete a KType in the remote backend"""
-    from dsms import Context
+    from dsms import Session
 
     logger.debug("Delete KType with id: %s", ktype.id)
     response = _perform_request(f"api/knowledge-type/{ktype.id}", "delete")
@@ -355,7 +368,7 @@ def _delete_ktype(ktype: "KType") -> None:
         raise ValueError(
             f"KItem with uuid `{ktype.id}` could not be deleted from DSMS: `{response.text}`"
         )
-    Context.dsms.ktypes = _get_remote_ktypes()
+    Session.dsms.ktypes = _get_remote_ktypes()
 
 
 def _get_kitem_list() -> "List[KItem]":
@@ -390,13 +403,13 @@ def _get_kitem(
     uuid: Union[str, UUID], as_json=False
 ) -> "Union[KItem, Dict[str, Any]]":
     """Get the KItem for a instance with a certain ID from remote backend"""
-    from dsms import Context, KItem
+    from dsms import Session, KItem
 
     response = _perform_request(f"api/knowledge/kitems/{uuid}", "get")
     if response.status_code == 404:
         raise ValueError(
             f"""KItem with uuid `{uuid}` does not exist in
-            DSMS-instance `{Context.dsms.config.host_url}`"""
+            DSMS-instance `{Session.dsms.config.host_url}`"""
         )
     if not response.ok:
         raise ValueError(
@@ -756,7 +769,7 @@ def _commit_updated_kitem(new_kitem: "KItem") -> None:
 
 def _commit_updated_ktype(new_ktype: "KType") -> None:
     """Commit the updated KTypes"""
-    from dsms import Context
+    from dsms import Session
 
     old_ktype = _get_ktype(new_ktype.id, as_json=True)
     logger.debug(
@@ -770,7 +783,7 @@ def _commit_updated_ktype(new_ktype: "KType") -> None:
             "Fetching updated KType from remote backend: %s", new_ktype.id
         )
         new_ktype.refresh()
-        Context.dsms.ktypes = _get_remote_ktypes()
+        Session.dsms.ktypes = _get_remote_ktypes()
 
 
 def _commit_deleted(

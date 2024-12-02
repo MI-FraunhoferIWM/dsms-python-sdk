@@ -14,16 +14,16 @@ if TYPE_CHECKING:
 
 def _kitem_id2uri(kitem_id: UUID) -> str:
     "Convert a kitem id in the DSMS to the full resolvable URI"
-    from dsms import Context
+    from dsms import Session
 
-    return urljoin(str(Context.dsms.config.host_url), str(kitem_id))
+    return urljoin(str(Session.dsms.config.host_url), str(kitem_id))
 
 
 def _uri2kitem_idi(uri: str) -> str:
     "Extract the kitem id from an URI of the DSMS"
-    from dsms import Context
+    from dsms import Session
 
-    return uri.replace(f"{Context.dsms.config.host_url}/", "").split("/")[0]
+    return uri.replace(f"{Session.dsms.config.host_url}/", "").split("/")[0]
 
 
 def _ping_dsms():
@@ -35,9 +35,9 @@ def _perform_request(route: str, method: str, **kwargs: "Any") -> Response:
     """Perform a general request for a certain route and with a certain method.
     Kwargs are general arguments which can be passed to the `requests.request`-function.
     """
-    from dsms import Context
+    from dsms import Session
 
-    dsms = Context.dsms
+    dsms = Session.dsms
     response = requests.request(
         method,
         url=urljoin(str(dsms.config.host_url), route),
@@ -46,7 +46,7 @@ def _perform_request(route: str, method: str, **kwargs: "Any") -> Response:
         verify=dsms.config.ssl_verify,
         **kwargs,
     )
-    response.encoding = Context.dsms.config.encoding
+    response.encoding = Session.dsms.config.encoding
     return response
 
 

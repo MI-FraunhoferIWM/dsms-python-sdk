@@ -63,7 +63,7 @@ from dsms.knowledge.utils import (  # isort:skip
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
 
 if TYPE_CHECKING:
-    from dsms import Context
+    from dsms import Session
     from dsms.core.dsms import DSMS
 
 logger = logging.getLogger(__name__)
@@ -411,11 +411,11 @@ class KItem(BaseModel):
     @classmethod
     def validate_created(cls, value: str) -> Any:
         """Convert the str for `created_at` in to a `datetime`-object"""
-        from dsms import Context
+        from dsms import Session
 
         if isinstance(value, str):
             value = datetime.strptime(
-                value, Context.dsms.config.datetime_format
+                value, Session.dsms.config.datetime_format
             )
         return value
 
@@ -423,11 +423,11 @@ class KItem(BaseModel):
     @classmethod
     def validate_updated(cls, value: str) -> Any:
         """Convert the str for `created_at` in to a `datetime`-object"""
-        from dsms import Context
+        from dsms import Session
 
         if isinstance(value, str):
             value = datetime.strptime(
-                value, Context.dsms.config.datetime_format
+                value, Session.dsms.config.datetime_format
             )
         return value
 
@@ -435,10 +435,10 @@ class KItem(BaseModel):
     @classmethod
     def validate_ktype_id(cls, value: Union[str, Enum]) -> KType:
         """Validate the ktype id of the KItem"""
-        from dsms import Context
+        from dsms import Session
 
         if isinstance(value, str):
-            value = Context.ktypes.get(value)
+            value = Session.ktypes.get(value)
             if not value:
                 raise TypeError(
                     f"KType for `ktype_id={value}` does not exist."
@@ -452,13 +452,13 @@ class KItem(BaseModel):
         cls, value: Optional[Union[KType, str, Enum]], info: ValidationInfo
     ) -> KType:
         """Validate the ktype of the KItem"""
-        from dsms import Context
+        from dsms import Session
 
         if not value:
             value = info.data.get("ktype_id")
 
         if isinstance(value, str):
-            value = Context.ktypes.get(value)
+            value = Session.ktypes.get(value)
             if not value:
                 raise TypeError(
                     f"KType for `ktype_id={value}` does not exist."
@@ -479,7 +479,7 @@ class KItem(BaseModel):
     @classmethod
     def validate_slug(cls, value: str, info: ValidationInfo) -> str:
         """Validate slug"""
-        from dsms import Context
+        from dsms import Session
 
         ktype_id = info.data["ktype_id"]
         kitem_id = info.data.get("id")
@@ -499,7 +499,7 @@ class KItem(BaseModel):
                 raise ValueError(
                     "Slug length must have a minimum length of 4."
                 )
-            if Context.dsms.config.individual_slugs:
+            if Session.dsms.config.individual_slugs:
                 value += f"-{str(kitem_id).split('-', maxsplit=1)[0]}"
         if not kitem_exists and not _slug_is_available(ktype, value):
             raise ValueError(f"Slug for `{value}` is already taken.")
@@ -615,13 +615,13 @@ class KItem(BaseModel):
         )
 
     @property
-    def context(cls) -> "Context":
-        """Getter for Context"""
+    def context(cls) -> "Session":
+        """Getter for Session"""
         from dsms import (  # isort:skip
-            Context,
+            Session,
         )
 
-        return Context
+        return Session
 
     @property
     def url(cls) -> str:

@@ -1,6 +1,6 @@
 """DSMS core module
 """
 from dsms.core.configuration import Configuration
-from dsms.core.context import Context
+from dsms.core.session import Session
 
-__all__ = ["Context", "Configuration"]
+__all__ = ["Session", "Configuration"]

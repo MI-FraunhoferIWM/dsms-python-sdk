@@ -260,11 +260,11 @@ class LinkedKItemsProperty(KItemPropertyList):
     @property
     def by_ktype(self) -> "Dict[KType, List[KItem]]":
         """Get the kitems grouped by ktype"""
-        from dsms import Context
+        from dsms import Session
 
         grouped = {}
         for linked in self:
-            ktype = Context.dsms.ktypes[_name_to_camel(linked.ktype_id)]
+            ktype = Session.dsms.ktypes[_name_to_camel(linked.ktype_id)]
             if not ktype in grouped:
                 grouped[ktype] = []
             if not linked in grouped[ktype]:

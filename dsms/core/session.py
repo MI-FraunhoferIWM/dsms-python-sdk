@@ -20,7 +20,7 @@ class Buffers:
     deleted: "Dict[UUID, KItem]" = {}
 
 
-class Context:
+class Session:
     """Object giving the current DSMS context."""
 
     dsms: "Optional[DSMS]" = None

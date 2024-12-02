@@ -247,10 +247,10 @@ def register_mocks(
 
 
 @pytest.fixture(autouse=True, scope="function")
-def reset_dsms_context():
-    from dsms.core.context import Context
+def reset_dsms_session():
+    from dsms.core.session import Session
 
-    Context.dsms = None
+    Session.dsms = None
 
 
 @pytest.fixture(scope="function")
