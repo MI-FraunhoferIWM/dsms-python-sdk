@@ -64,34 +64,43 @@ def _create_custom_properties_model(
 
     fields = {}
     if isinstance(value, dict):
-        for item in value.get("sections"):
-            for form_input in item.get("inputs"):
-                label = form_input.get("label")
-                dtype = form_input.get("widget")
-                default = form_input.get("defaultValue")
-                slug = _slugify(label)
-                if dtype in ("Text", "File", "Textarea", "Vocabulary term"):
-                    dtype = Optional[str]
-                elif dtype in ("Number", "Slider"):
-                    dtype = Optional[NumericalDataType]
-                elif dtype == "Checkbox":
-                    dtype = Optional[bool]
-                elif dtype in ("Select", "Radio"):
-                    choices = Enum(
-                        _name_to_camel(label) + "Choices",
-                        {
-                            _name_to_camel(choice["value"]): choice["value"]
-                            for choice in form_input.get("choices")
-                        },
-                    )
-                    dtype = Optional[choices]
-                elif dtype == "Knowledge item":
-                    warnings.warn(
-                        "knowledge item not fully supported for KTypes yet."
-                    )
-                    dtype = Optional[str]
+        for item in value.get("sections", []):
+            if isinstance(item, dict):
+                for form_input in item.get("inputs", []):
+                    if isinstance(form_input, dict):
+                        label = form_input.get("label")
+                        dtype = form_input.get("widget")
+                        default = form_input.get("defaultValue")
+                        slug = _slugify(label)
+                        if dtype in (
+                            "Text",
+                            "File",
+                            "Textarea",
+                            "Vocabulary term",
+                        ):
+                            dtype = Optional[str]
+                        elif dtype in ("Number", "Slider"):
+                            dtype = Optional[NumericalDataType]
+                        elif dtype == "Checkbox":
+                            dtype = Optional[bool]
+                        elif dtype in ("Select", "Radio"):
+                            choices = Enum(
+                                _name_to_camel(label) + "Choices",
+                                {
+                                    _name_to_camel(choice["value"]): choice[
+                                        "value"
+                                    ]
+                                    for choice in form_input.get("choices")
+                                },
+                            )
+                            dtype = Optional[choices]
+                        elif dtype == "Knowledge item":
+                            warnings.warn(
+                                "knowledge item not fully supported for KTypes yet."
+                            )
+                            dtype = Optional[str]
 
-                fields[slug] = (dtype, default or None)
+                        fields[slug] = (dtype, default or None)
     fields["kitem"] = (
         Optional[KItem],
         Field(None, exclude=True),
