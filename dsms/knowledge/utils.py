@@ -894,7 +894,7 @@ def _transform_custom_properties_schema(
         ktype_spec = _get_ktype(ktype_id)
 
     if ktype_spec:
-        webform = ktype_spec.get("webform")
+        webform = ktype_spec.webform
     else:
         webform = None
 

@@ -58,6 +58,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _inspect_dataframe,
     _make_annotation_schema,
     _refresh_kitem,
+    _transform_from_flat_schema,
 )
 
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
@@ -567,6 +568,11 @@ class KItem(BaseModel):
                     raise TypeError(
                         f"Invalid type: {type(content)}"
                     ) from error
+            # transform from flat dict. fix: replace with `_transform_from_flat_schema`
+            # content = _transform_from_flat_schema(
+            #     content, self.ktype_id, from_context=True
+            # )
+            content = _transform_from_flat_schema(content)
             was_in_buffer = self.id in self.context.buffers.updated
             self.custom_properties = self.ktype.webform(**content)
             # fix: find a better way to prehebit that properties are
