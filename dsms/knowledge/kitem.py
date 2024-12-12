@@ -2,6 +2,7 @@
 
 import json
 import logging
+import warnings
 from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
@@ -58,10 +59,12 @@ from dsms.knowledge.utils import (  # isort:skip
     _inspect_dataframe,
     _make_annotation_schema,
     _refresh_kitem,
-    _transform_from_flat_schema,
+    _transform_custom_properties_schema,
 )
 
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
+
+from dsms.knowledge.webform import KItemCustomPropertiesModel  # isort:skip
 
 if TYPE_CHECKING:
     from dsms import Session
@@ -178,9 +181,9 @@ class KItem(BaseModel):
         [],
         description="User groups able to access the KItem.",
     )
-    custom_properties: Optional[Any] = Field(
-        None, description="Custom properties associated to the KItem"
-    )
+    custom_properties: Optional[
+        Union[KItemCustomPropertiesModel, Dict]
+    ] = Field(None, description="Custom properties associated to the KItem")
     ktype: Optional[Union[str, Enum, KType]] = Field(
         None, description="KType of the KItem", exclude=True
     )
@@ -195,10 +198,6 @@ class KItem(BaseModel):
 
     avatar: Optional[Union[Avatar, Dict]] = Field(
         default_factory=Avatar, description="KItem avatar interface"
-    )
-
-    access_url: Optional[str] = Field(
-        None, description="Access URL of the KItem"
     )
 
     context_id: Optional[Union[UUID, str]] = Field(
@@ -572,8 +571,8 @@ class KItem(BaseModel):
                 f"""Custom properties must be one of the following types:
                   {(BaseModel, dict, type(None))}. Not {type(self.custom_properties)}"""
             )
-        # validate content with webform model
-        if self.ktype.webform and isinstance(self.custom_properties, dict):
+        # transform custom properties
+        if isinstance(self.custom_properties, dict):
             content = (
                 self.custom_properties.get("content") or self.custom_properties
             )
@@ -584,20 +583,17 @@ class KItem(BaseModel):
                     raise TypeError(
                         f"Invalid type: {type(content)}"
                     ) from error
-            # transform from flat dict. fix: replace with `_transform_from_flat_schema`
-            # content = _transform_from_flat_schema(
-            #     content, self.ktype_id, from_context=True
-            # )
-            content = _transform_from_flat_schema(content)
+            content = _transform_custom_properties_schema(
+                content, self.ktype_id, from_context=True
+            )
             was_in_buffer = self.id in self.context.buffers.updated
-            self.custom_properties = self.ktype.webform(**content)
-            # fix: find a better way to prehebit that properties are
-            # set in the buffer
+            self.custom_properties = KItemCustomPropertiesModel(**content)
             if not was_in_buffer:
                 self.context.buffers.updated.pop(self.id)
-        # set kitem id for custom properties
-        if isinstance(self.custom_properties, BaseModel):
-            self.custom_properties.kitem = self
+            warnings.warn(
+                "A flat dict was provided for custom properties."
+                "Will transform to `KItemCustomPropertiesModel`.",
+            )
         return self
 
     def _set_kitem_for_properties(self) -> None:
@@ -606,7 +602,15 @@ class KItem(BaseModel):
         """
         for prop in self.__dict__.values():
             if (
-                isinstance(prop, (KItemPropertyList, Summary, Avatar))
+                isinstance(
+                    prop,
+                    (
+                        KItemPropertyList,
+                        Summary,
+                        Avatar,
+                        KItemCustomPropertiesModel,
+                    ),
+                )
                 and not prop.kitem
             ):
                 logger.debug(

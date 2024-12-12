@@ -5,15 +5,10 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_serializer, model_validator
+from pydantic import BaseModel, Field, model_serializer
 
 from dsms.core.logging import handler
-from dsms.knowledge.utils import (
-    _create_custom_properties_model,
-    _ktype_exists,
-    _refresh_ktype,
-    print_ktype,
-)
+from dsms.knowledge.utils import _ktype_exists, _refresh_ktype, print_ktype
 from dsms.knowledge.webform import Webform
 
 if TYPE_CHECKING:
@@ -52,9 +47,6 @@ class KType(BaseModel):
     updated_at: Optional[Union[str, datetime]] = Field(
         None, description="Time and date when the KType was updated."
     )
-    custom_properties: Optional[Any] = Field(
-        None, description="Additional custom properties for the KType."
-    )
 
     def __hash__(self) -> int:
         return hash(str(self))
@@ -74,7 +66,7 @@ class KType(BaseModel):
         # add ktype to buffer
         if not self.in_backend and self.id not in self.session.buffers.created:
             logger.debug(
-                "Marking KTpe with ID `%s` as created and updated during KItem initialization.",
+                "Marking KType with ID `%s` as created and updated during KItem initialization.",
                 self.id,
             )
             self.session.buffers.created.update({self.id: self})
@@ -150,16 +142,4 @@ class KType(BaseModel):
                 else value
             )
             for key, value in self.__dict__.items()
-            if key != "custom_properties"
         }
-
-    @model_validator(mode="after")
-    @classmethod
-    def validate_ktype(cls, self: "KType") -> "KType":
-        """Model validator for ktype"""
-        if self.webform is not None:
-            self.webform.model_validate(self.webform)
-            self.custom_properties = _create_custom_properties_model(
-                self.webform
-            )
-        return self

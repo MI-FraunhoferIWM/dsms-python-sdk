@@ -6,7 +6,6 @@ import random
 import re
 import string
 import time
-import warnings
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
@@ -20,19 +19,11 @@ from requests import Response
 
 from pydantic import (  # isort: skip
     BaseModel,
-    ConfigDict,
-    Field,
-    create_model,
-    model_validator,
 )
 
 from dsms.core.logging import handler  # isort:skip
 
 from dsms.core.utils import _name_to_camel, _perform_request  # isort:skip
-
-from dsms.knowledge.properties.custom_datatype import (  # isort:skip
-    NumericalDataType,
-)
 
 from dsms.knowledge.search import SearchResult  # isort:skip
 
@@ -45,135 +36,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.propagate = False
-
-
-def _is_number(value):
-    try:
-        float(value)
-        return True
-    except Exception:
-        return False
-
-
-def _create_custom_properties_model(
-    value: Optional[Dict[str, Any]]
-) -> BaseModel:
-    """Convert the dict with the model schema into a pydantic model."""
-    from dsms import KItem, KType
-    from dsms.knowledge.webform import Webform
-
-    fields = {}
-    if isinstance(value, Webform):
-        for item in value.sections:
-            for form_input in item.inputs:
-                label = form_input.label
-                dtype = form_input.widget
-                default = form_input.default_value
-                slug = _slugify(label)
-                if dtype in ("Text", "File", "Textarea", "Vocabulary term"):
-                    dtype = Optional[str]
-                elif dtype in ("Number", "Slider"):
-                    dtype = Optional[NumericalDataType]
-                elif dtype == "Checkbox":
-                    dtype = Optional[bool]
-                elif dtype in ("Select", "Radio"):
-                    choices = Enum(
-                        _name_to_camel(label) + "Choices",
-                        {
-                            _name_to_camel(choice.value): choice.value
-                            for choice in form_input.choices
-                        },
-                    )
-                    dtype = Optional[choices]
-                elif dtype == "Knowledge item":
-                    warnings.warn(
-                        "knowledge item not fully supported for KTypes yet."
-                    )
-                    dtype = Optional[str]
-
-                fields[slug] = (dtype, default or None)
-    fields["kitem"] = (
-        Optional[KItem],
-        Field(None, exclude=True),
-    )
-
-    config = ConfigDict(
-        extra="allow", arbitrary_types_allowed=True, exclude={"kitem"}
-    )
-    validators = {
-        "validate_model": model_validator(mode="before")(_validate_model)
-    }
-    model = create_model(
-        "CustomPropertiesModel",
-        __config__=config,
-        __validators__=validators,
-        **fields,
-    )
-    setattr(model, "__str__", _print_properties)
-    setattr(model, "__repr__", _print_properties)
-    setattr(model, "__setattr__", __setattr_property__)
-    setattr(model, "serialize", KType.serialize)
-    logger.debug("Create custom properties model with fields: %s", fields)
-    return model
-
-
-def _print_properties(self: Any) -> str:
-    fields = ", \n".join(
-        [
-            f"\t\t{key}: {value}"
-            for key, value in self.model_dump().items()
-            if key not in self.model_config["exclude"]
-        ]
-    )
-    return f"{{\n{fields}\n\t}}"
-
-
-def __setattr_property__(self, key, value) -> None:
-    logger.debug(
-        "Setting property for custom property with key `%s` with value `%s`.",
-        key,
-        value,
-    )
-    if _is_number(value):
-        # convert to convertable numeric object
-        value = _create_numerical_dtype(key, value, self.kitem)
-        # mark as updated
-    if key != "kitem" and self.kitem:
-        logger.debug(
-            "Setting related kitem for custom properties with id `%s` as updated",
-            self.kitem.id,
-        )
-        self.kitem.context.buffers.updated.update({self.kitem.id: self.kitem})
-    elif key == "kitem":
-        # set kitem for convertable numeric datatype
-        for prop in self.model_dump().values():
-            if isinstance(prop, NumericalDataType) and not prop.kitem:
-                prop.kitem = value
-    # reassignment of extra fields does not work, seems to be a bug?
-    # have this workaround:
-    if key in self.__pydantic_extra__:
-        self.__pydantic_extra__[key] = value
-    super(BaseModel, self).__setattr__(key, value)
-
-
-def _create_numerical_dtype(
-    key: str, value: Union[int, float], kitem: "KItem"
-) -> NumericalDataType:
-    value = NumericalDataType(value)
-    value.name = key
-    value.kitem = kitem
-    return value
-
-
-def _validate_model(
-    cls, values: Dict[str, Any]  # pylint: disable=unused-argument
-) -> Dict[str, Any]:
-    for key, value in values.items():
-        if _is_number(value):
-            values[key] = _create_numerical_dtype(
-                key, value, values.get("kitem")
-            )
-    return values
 
 
 def print_webform(webform: BaseModel) -> str:
