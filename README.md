@@ -48,12 +48,13 @@ Please have a look at our tutorials on _readthedocs_:
 * [6. Apps](https://dsms-python-sdk.readthedocs.io/en/latest/dsms_sdk/tutorials/6_apps.html)
 
 Or try our Jupyter Notebooks:
-* [1. Introduction](examples/tutorials/1_introduction.ipynb)
-* [2. Creation](examples/tutorials/2_creation.ipynb)
-* [3. Updation](examples/tutorials/3_updation.ipynb)
-* [4. Deletion](examples/tutorials/4_deletion.ipynb)
-* [5. Search](examples/tutorials/5_search.ipynb)
-* [6. Apps](examples/tutorials/6_apps.ipynb)
+* [1. Introduction](docs/dsms_sdk/tutorials/1_introduction.ipynb)
+* [2. Creation](docs/dsms_sdk/tutorials/2_creation.ipynb)
+* [3. Updation](docs/dsms_sdk/tutorials/3_updation.ipynb)
+* [4. Deletion](docs/dsms_sdk/tutorials/4_deletion.ipynb)
+* [5. Search](docs/dsms_sdk/tutorials/5_search.ipynb)
+* [6. Apps](docs/dsms_sdk/tutorials/6_apps.ipynb)
+* [7. KTypes](docs/dsms_sdk/tutorials/7_ktypes.ipynb)
 
 ## Authors
 
@@ -64,6 +65,8 @@ Or try our Jupyter Notebooks:
 [Pablo De Andres](mailto:pablo.de.andres@iwm.fraunhofer.de) (Fraunhofer Institute for Mechanics of Materials IWM)
 
 [Priyabrat Mishra](mailto:priyabrat.mishra@iwm.fraunhofer.de) (Fraunhofer Institute for Mechanics of Materials IWM)
+
+[Arjun Gopalakrishnan](mailto:arjun.gopalakrishnan@iwm.fraunhofer.de) (Fraunhofer Institute for Mechanics of Materials IWM)
 
 ## License
 

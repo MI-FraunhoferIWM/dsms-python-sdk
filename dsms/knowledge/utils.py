@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
 import pandas as pd
-import requests
 import segno
 import yaml
 from PIL import Image
@@ -39,7 +38,7 @@ from dsms.knowledge.search import SearchResult  # isort:skip
 
 if TYPE_CHECKING:
     from dsms.apps import AppConfig
-    from dsms.core.context import Buffers
+    from dsms.core.session import Buffers
     from dsms.knowledge import KItem, KType
     from dsms.knowledge.properties import Attachment
 
@@ -60,47 +59,39 @@ def _create_custom_properties_model(
     value: Optional[Dict[str, Any]]
 ) -> BaseModel:
     """Convert the dict with the model schema into a pydantic model."""
-    from dsms import KItem
+    from dsms import KItem, KType
+    from dsms.knowledge.webform import Webform
 
     fields = {}
-    if isinstance(value, dict):
-        for item in value.get("sections", []):
-            if isinstance(item, dict):
-                for form_input in item.get("inputs", []):
-                    if isinstance(form_input, dict):
-                        label = form_input.get("label")
-                        dtype = form_input.get("widget")
-                        default = form_input.get("defaultValue")
-                        slug = _slugify(label)
-                        if dtype in (
-                            "Text",
-                            "File",
-                            "Textarea",
-                            "Vocabulary term",
-                        ):
-                            dtype = Optional[str]
-                        elif dtype in ("Number", "Slider"):
-                            dtype = Optional[NumericalDataType]
-                        elif dtype == "Checkbox":
-                            dtype = Optional[bool]
-                        elif dtype in ("Select", "Radio"):
-                            choices = Enum(
-                                _name_to_camel(label) + "Choices",
-                                {
-                                    _name_to_camel(choice["value"]): choice[
-                                        "value"
-                                    ]
-                                    for choice in form_input.get("choices")
-                                },
-                            )
-                            dtype = Optional[choices]
-                        elif dtype == "Knowledge item":
-                            warnings.warn(
-                                "knowledge item not fully supported for KTypes yet."
-                            )
-                            dtype = Optional[str]
+    if isinstance(value, Webform):
+        for item in value.sections:
+            for form_input in item.inputs:
+                label = form_input.label
+                dtype = form_input.widget
+                default = form_input.default_value
+                slug = _slugify(label)
+                if dtype in ("Text", "File", "Textarea", "Vocabulary term"):
+                    dtype = Optional[str]
+                elif dtype in ("Number", "Slider"):
+                    dtype = Optional[NumericalDataType]
+                elif dtype == "Checkbox":
+                    dtype = Optional[bool]
+                elif dtype in ("Select", "Radio"):
+                    choices = Enum(
+                        _name_to_camel(label) + "Choices",
+                        {
+                            _name_to_camel(choice.value): choice.value
+                            for choice in form_input.choices
+                        },
+                    )
+                    dtype = Optional[choices]
+                elif dtype == "Knowledge item":
+                    warnings.warn(
+                        "knowledge item not fully supported for KTypes yet."
+                    )
+                    dtype = Optional[str]
 
-                        fields[slug] = (dtype, default or None)
+                fields[slug] = (dtype, default or None)
     fields["kitem"] = (
         Optional[KItem],
         Field(None, exclude=True),
@@ -121,6 +112,7 @@ def _create_custom_properties_model(
     setattr(model, "__str__", _print_properties)
     setattr(model, "__repr__", _print_properties)
     setattr(model, "__setattr__", __setattr_property__)
+    setattr(model, "serialize", KType.serialize)
     logger.debug("Create custom properties model with fields: %s", fields)
     return model
 
@@ -184,10 +176,51 @@ def _validate_model(
     return values
 
 
+def print_webform(webform: BaseModel) -> str:
+    """
+    Helper function to pretty print a webform.
+
+    Args:
+        webform (BaseModel): The webform to print.
+
+    Returns:
+        str: A string representation of the webform.
+    """
+    if hasattr(webform, "model_fields"):
+        fields = [
+            f"\t\t{model_key}=dict({model_value})"
+            for model_key, model_value in webform.model_fields.items()
+            if model_key != "kitem"
+        ]
+        if fields:
+            fields = "\twebform={\n" + ",\n".join(fields) + "\n\t}"
+        else:
+            fields = "\twebform=None"
+    else:
+        fields = "\twebform=None"
+    return fields
+
+
+def print_ktype(self) -> str:
+    """Pretty print the ktype fields"""
+    if hasattr(self, "value"):
+        fields = [
+            f"\t{key}={value}" if key != "webform" else print_webform(value)
+            for key, value in self.value.__dict__.items()
+        ]
+    else:
+        fields = [
+            f"\t{key}={value}" if key != "webform" else print_webform(value)
+            for key, value in self.__dict__.items()
+        ]
+    fields = ",\n".join(fields)
+    return f"{self.name}(\n{fields}\n)"
+
+
 def _get_remote_ktypes() -> Enum:
     """Get the KTypes from the remote backend"""
     from dsms import (  # isort:skip
-        Context,
+        Session,
         KType,
     )
 
@@ -197,13 +230,135 @@ def _get_remote_ktypes() -> Enum:
             f"Something went wrong fetching the remote ktypes: {response.text}"
         )
 
-    Context.ktypes = {ktype["id"]: KType(**ktype) for ktype in response.json()}
+    Session.ktypes = {ktype["id"]: KType(**ktype) for ktype in response.json()}
 
     ktypes = Enum(
-        "KTypes", {_name_to_camel(key): key for key in Context.ktypes}
+        "KTypes",
+        {_name_to_camel(key): value for key, value in Session.ktypes.items()},
     )
+
+    def custom_getattr(self, name) -> None:
+        """
+        Custom getattr method for the Enum of KTypes.
+
+        When a KType field is accessed, first check if the field is an attribute of the
+        underlying KType object (self.value). If it is, return that.
+        Otherwise, call the super method to access the Enum field.
+
+        This is needed because the Enum object is not a KType object, but has all the same
+        fields. This allows us to access the fields of the KType object as if it were an
+        Enum.
+        """
+        if hasattr(self.value, name):
+            return getattr(self.value, name)
+        return super(ktypes, self).__getattr__(name)
+
+    def custom_setattr(self, name, value) -> None:
+        """
+        Custom setattr method for the Enum of KTypes.
+
+        When a KType field is set, first check if the field is an attribute of the
+        underlying KType object (self.value). If it is, set that.
+        Otherwise, call the super method to set the Enum field.
+
+        This is needed because the Enum object is not a KType object, but has all the same
+        fields. This allows us to set the fields of the KType object as if it were an
+        Enum.
+        """
+
+        if hasattr(self.value, name):
+            setattr(self.value, name, value)
+        else:
+            super(ktypes, self).__setattr__(name, value)
+
+    # Attach methods to the dynamically created Enum class
+    setattr(ktypes, "__getattr__", custom_getattr)
+    setattr(ktypes, "__setattr__", custom_setattr)
+    setattr(ktypes, "__str__", print_ktype)
+    setattr(ktypes, "__repr__", print_ktype)
+
     logger.debug("Got the following ktypes from backend: `%s`.", list(ktypes))
     return ktypes
+
+
+def _ktype_exists(ktype: Union[Any, str, UUID]) -> bool:
+    """Check whether the KType exists in the remote backend"""
+    from dsms.knowledge.ktype import (  # isort:skip
+        KType,
+    )
+
+    if isinstance(ktype, KType):
+        route = f"api/knowledge-type/{ktype.id}"
+    else:
+        route = f"api/knowledge-type/{ktype}"
+    response = _perform_request(route, "get")
+    return response.ok
+
+
+def _create_new_ktype(ktype: "KType") -> None:
+    """Create a new KType in the remote backend"""
+    body = {
+        "name": ktype.name,
+        "id": str(ktype.id),
+    }
+    logger.debug("Create new KType with body: %s", body)
+    response = _perform_request("api/knowledge-type/", "post", json=body)
+    if not response.ok:
+        raise ValueError(
+            f"KType with id `{ktype.id}` could not be created in DSMS: {response.text}`"
+        )
+
+
+def _get_ktype(ktype_id: str, as_json=False) -> "Union[KType, Dict[str, Any]]":
+    """Get the KType for an instance with a certain ID from remote backend"""
+    from dsms import KType, Session
+
+    response = _perform_request(f"api/knowledge-type/{ktype_id}", "get")
+    if response.status_code == 404:
+        raise ValueError(
+            f"""KType with the id `{ktype_id}` does not exist in
+            DSMS-instance `{Session.dsms.config.host_url}`"""
+        )
+    if not response.ok:
+        raise ValueError(
+            f"""An error occured fetching the KType with id `{ktype_id}`:
+            `{response.text}`"""
+        )
+    body = response.json()
+    if as_json:
+        response = body
+    else:
+        response = KType(**body)
+    return response
+
+
+def _update_ktype(ktype: "KType") -> Response:
+    """Update a KType in the remote backend."""
+    payload = ktype.model_dump(
+        exclude_none=True,
+    )
+    logger.debug("Update KType for `%s` with body: %s", ktype.id, payload)
+    response = _perform_request(
+        f"api/knowledge-type/{ktype.id}", "put", json=payload
+    )
+    if not response.ok:
+        raise ValueError(
+            f"KType with uuid `{ktype.id}` could not be updated in DSMS: {response.text}`"
+        )
+    return response
+
+
+def _delete_ktype(ktype: "KType") -> None:
+    """Delete a KType in the remote backend"""
+    from dsms import Session
+
+    logger.debug("Delete KType with id: %s", ktype.id)
+    response = _perform_request(f"api/knowledge-type/{ktype.id}", "delete")
+    if not response.ok:
+        raise ValueError(
+            f"KItem with uuid `{ktype.id}` could not be deleted from DSMS: `{response.text}`"
+        )
+    Session.dsms.ktypes = _get_remote_ktypes()
 
 
 def _get_kitem_list() -> "List[KItem]":
@@ -238,13 +393,13 @@ def _get_kitem(
     uuid: Union[str, UUID], as_json=False
 ) -> "Union[KItem, Dict[str, Any]]":
     """Get the KItem for a instance with a certain ID from remote backend"""
-    from dsms import Context, KItem
+    from dsms import KItem, Session
 
     response = _perform_request(f"api/knowledge/kitems/{uuid}", "get")
     if response.status_code == 404:
         raise ValueError(
             f"""KItem with uuid `{uuid}` does not exist in
-            DSMS-instance `{Context.dsms.config.host_url}`"""
+            DSMS-instance `{Session.dsms.config.host_url}`"""
         )
     if not response.ok:
         raise ValueError(
@@ -547,9 +702,7 @@ def _commit_created(
         elif isinstance(obj, AppConfig):
             _create_or_update_app_spec(obj)
         elif isinstance(obj, KType):
-            raise NotImplementedError(
-                "Committing of KTypes not implemented yet."
-            )
+            _create_new_ktype(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed."
@@ -568,9 +721,7 @@ def _commit_updated(
         elif isinstance(obj, AppConfig):
             _create_or_update_app_spec(obj, overwrite=True)
         elif isinstance(obj, KType):
-            raise NotImplementedError(
-                "Committing of KTypes not implemented yet."
-            )
+            _commit_updated_ktype(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed."
@@ -607,6 +758,25 @@ def _commit_updated_kitem(new_kitem: "KItem") -> None:
         new_kitem.refresh()
 
 
+def _commit_updated_ktype(new_ktype: "KType") -> None:
+    """Commit the updated KTypes"""
+    from dsms import Session
+
+    old_ktype = _get_ktype(new_ktype.id, as_json=True)
+    logger.debug(
+        "Fetched data from old KType with id `%s`: %s",
+        new_ktype.id,
+        old_ktype,
+    )
+    if old_ktype:
+        _update_ktype(new_ktype)
+        logger.debug(
+            "Fetching updated KType from remote backend: %s", new_ktype.id
+        )
+        new_ktype.refresh()
+        Session.dsms.ktypes = _get_remote_ktypes()
+
+
 def _commit_deleted(
     buffer: "Dict[str, Union[KItem, KType, AppConfig]]",
 ) -> None:
@@ -619,10 +789,10 @@ def _commit_deleted(
             _delete_kitem(obj)
         elif isinstance(obj, AppConfig):
             _delete_app_spec(obj.name)
-        elif isinstance(obj, KType):
-            raise NotImplementedError(
-                "Deletion of KTypes not implemented yet."
-            )
+        elif isinstance(obj, KType) or (
+            isinstance(obj, Enum) and isinstance(obj.value, KType)
+        ):
+            _delete_ktype(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed or deleted."
@@ -642,6 +812,18 @@ def _refresh_kitem(kitem: "KItem") -> None:
     kitem.dataframe = _inspect_dataframe(kitem.id)
 
 
+def _refresh_ktype(ktype: "KType") -> None:
+    """Refresh the KItem"""
+    for key, value in _get_ktype(ktype.id, as_json=True).items():
+        logger.debug(
+            "Set updated property `%s` for KType with id `%s` after commiting: %s",
+            key,
+            ktype.id,
+            value,
+        )
+        setattr(ktype, key, value)
+
+
 def _split_iri(iri: str) -> List[str]:
     if "#" in iri:
         namspace, name = iri.rsplit("#", 1)
@@ -657,7 +839,7 @@ def _make_annotation_schema(iri: str) -> Dict[str, Any]:
 
 def _search(
     query: Optional[str] = None,
-    ktypes: "Optional[List[KType]]" = [],
+    ktypes: "Optional[List[Union[Enum, KType]]]" = [],
     annotations: "Optional[List[str]]" = [],
     limit: "Optional[int]" = 10,
     allow_fuzzy: "Optional[bool]" = True,
@@ -667,7 +849,7 @@ def _search(
 
     payload = {
         "search_term": query or "",
-        "ktypes": [ktype.value for ktype in ktypes],
+        "ktypes": [ktype.value.id for ktype in ktypes],
         "annotations": [_make_annotation_schema(iri) for iri in annotations],
         "limit": limit,
     }
@@ -857,23 +1039,6 @@ def _delete_app_spec(name: str) -> None:
         message = f"Something went wrong deleting app spec with name `{name}`: {response.text}"
         raise RuntimeError(message)
     return response.text
-
-
-def _get_ktype(ktype_id: str) -> Optional[Dict[str, Any]]:
-    try:
-        response = _perform_request(f"api/knowledge-type/{ktype_id}", "get")
-
-        if not response.status_code == 200:
-            logger.error(
-                "An error occurred while retrieving RDF mapping: %s, %s",
-                response.status_code,
-                response.content,
-            )
-    except requests.RequestException as e:
-        logger.error("KType mapping connection failed: %s", e)
-    except Exception as ex:
-        logger.error("An error occurred while retrieving Mapping: %s", ex)
-    return response.json()
 
 
 def _transform_custom_properties_schema(

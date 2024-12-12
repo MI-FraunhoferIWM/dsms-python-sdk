@@ -49,6 +49,17 @@ class MockDB:
         ]
     }
 
+    ktypes = [
+        {
+            "name": "organization",
+            "id": "organization",
+        },
+        {
+            "name": "dataset",
+            "id": "dataset",
+        },
+    ]
+
 
 @pytest.fixture(scope="function")
 def custom_address(request) -> str:
@@ -89,18 +100,8 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
     ktypes = urljoin(custom_address, "api/knowledge-type/")
 
     def return_ktypes(request):
-        ktypes = [
-            {
-                "name": "organization",
-                "id": "organization",
-            },
-            {
-                "name": "dataset",
-                "id": "dataset",
-            },
-        ]
         header = {"content_type": "application/json"}
-        return (200, header, json.dumps(ktypes))
+        return (200, header, json.dumps(MockDB.ktypes))
 
     def return_kitems(request):
         # Extract 'id' parameter from the URL
@@ -113,6 +114,19 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
             return 404, {}, "KItem does not exist"
         else:
             return 200, {}, json.dumps(MockDB.kitems[item_id])
+
+    def return_ktype(request):
+        # Extract 'id' parameter from the URL
+        url_parts = request.url.split("/")
+        ktype_id = url_parts[-1]
+        ktypes = {ktype["id"]: ktype for ktype in MockDB.ktypes}
+
+        # Your logic to generate a dynamic response based on 'ktype_id'
+        # This is just a placeholder; you should replace it with your actual logic
+        if ktype_id not in ktypes:
+            return 404, {}, "KType does not exist"
+        else:
+            return 200, {}, json.dumps(ktypes[ktype_id])
 
     def return_dataframe(request):
         # Extract 'id' parameter from the URL
@@ -178,6 +192,20 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
             for slug in MockDB.slugs
         }
 
+    def _get_individual_ktypes() -> "Dict[str, Any]":
+        return {
+            urljoin(custom_address, f"api/knowledge-type/{ktype['id']}"): [
+                {
+                    "method": responses.GET,
+                    "returns": {
+                        "content_type": "application/json",
+                        "callback": return_ktype,
+                    },
+                }
+            ]
+            for ktype in MockDB.ktypes
+        }
+
     return {
         ktypes: [
             {
@@ -191,6 +219,7 @@ def mock_callbacks(custom_address) -> "Dict[str, Any]":
         **_get_kitems(),
         **_get_dataframe(),
         **_get_slugs(),
+        **_get_individual_ktypes(),
     }
 
 
@@ -218,10 +247,10 @@ def register_mocks(
 
 
 @pytest.fixture(autouse=True, scope="function")
-def reset_dsms_context():
-    from dsms.core.context import Context
+def reset_dsms_session():
+    from dsms.core.session import Session
 
-    Context.dsms = None
+    Session.dsms = None
 
 
 @pytest.fixture(scope="function")

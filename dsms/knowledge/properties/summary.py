@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_serializer
 if TYPE_CHECKING:
     from typing import Set
 
-    from dsms import Context
+    from dsms import Session
 
 
 class Summary(BaseModel):
@@ -63,13 +63,13 @@ class Summary(BaseModel):
         return cls.kitem.id  # pylint: disable=E1101
 
     @property
-    def context(cls) -> "Context":
-        """Getter for Context"""
+    def context(cls) -> "Session":
+        """Getter for Session"""
         from dsms import (  # isort:skip
-            Context,
+            Session,
         )
 
-        return Context
+        return Session
 
     @property
     def exclude(cls) -> "Optional[Set[str]]":

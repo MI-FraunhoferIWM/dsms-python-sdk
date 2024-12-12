@@ -27,7 +27,7 @@ logger.addHandler(handler)
 logger.propagate = False
 
 if TYPE_CHECKING:
-    from dsms import DSMS, Context
+    from dsms import DSMS, Session
 
 
 class AppConfig(BaseModel):
@@ -76,15 +76,15 @@ class AppConfig(BaseModel):
         # add app config to buffer
         if (
             not self.in_backend
-            and self.name not in self.context.buffers.created
+            and self.name not in self.session.buffers.created
         ):
             logger.debug(
                 """Marking AppConfig with name `%s` as created
                 and updated during AppConfig initialization.""",
                 self.name,
             )
-            self.context.buffers.created.update({self.name: self})
-            self.context.buffers.updated.update({self.name: self})
+            self.session.buffers.created.update({self.name: self})
+            self.session.buffers.updated.update({self.name: self})
 
         logger.debug("AppConfig initialization successful.")
 
@@ -94,12 +94,12 @@ class AppConfig(BaseModel):
         logger.debug(
             "Setting property with key `%s` on KItem level: %s.", name, value
         )
-        if self.name not in self.context.buffers.updated:
+        if self.name not in self.session.buffers.updated:
             logger.debug(
                 "Setting AppConfig with name `%s` as updated during AppConfig.__setattr__",
                 self.name,
             )
-            self.context.buffers.updated.update({self.name: self})
+            self.session.buffers.updated.update({self.name: self})
 
     def __str__(self) -> str:
         """Pretty print the app config fields"""
@@ -156,20 +156,20 @@ class AppConfig(BaseModel):
                 raise RuntimeError(
                     f"Invalid yaml specification path: `{error.args[0]}`"
                 ) from error
-            self.context.buffers.updated.update({self.name: self})
+            self.session.buffers.updated.update({self.name: self})
         elif isinstance(self.specification, dict) and self.in_backend:
             spec = _get_app_specification(self.name)
             if (
                 not yaml.safe_load(spec) == self.specification
-                and self.name not in self.context.buffers.updated
+                and self.name not in self.session.buffers.updated
             ):
-                self.context.buffers.updated.update({self.name: self})
+                self.session.buffers.updated.update({self.name: self})
         elif (
             isinstance(self.specification, dict)
             and not self.in_backend
-            and self.name not in self.context.buffers.updated
+            and self.name not in self.session.buffers.updated
         ):
-            self.context.buffers.updated.update({self.name: self})
+            self.session.buffers.updated.update({self.name: self})
         if self.expose_sdk_config:
             self.specification["spec"]["arguments"]["parameters"] += [
                 {
@@ -190,20 +190,20 @@ class AppConfig(BaseModel):
         return _app_spec_exists(self.name)
 
     @property
-    def context(cls) -> "Context":
-        """Getter for Context"""
+    def session(cls) -> "Session":
+        """Getter for Session"""
         from dsms import (  # isort:skip
-            Context,
+            Session,
         )
 
-        return Context
+        return Session
 
     @property
     def dsms(self) -> "DSMS":
-        """DSMS context getter"""
-        return self.context.dsms
+        """DSMS session getter"""
+        return self.session.dsms
 
     @dsms.setter
     def dsms(self, value: "DSMS") -> None:
-        """DSMS context setter"""
-        self.context.dsms = value
+        """DSMS session setter"""
+        self.session.dsms = value

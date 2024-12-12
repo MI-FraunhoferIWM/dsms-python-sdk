@@ -8,11 +8,11 @@ def test_kitem_basic(custom_address, get_mock_kitem_ids):
     """Test KItem properties"""
 
     from dsms.core.configuration import Configuration
-    from dsms.core.context import Context
     from dsms.core.dsms import DSMS
+    from dsms.core.session import Session
     from dsms.knowledge.kitem import KItem
 
-    assert Context.dsms is None
+    assert Session.dsms is None
 
     with pytest.warns(UserWarning, match="No authentication details"):
         dsms = DSMS(host_url=custom_address)
@@ -25,7 +25,7 @@ def test_kitem_basic(custom_address, get_mock_kitem_ids):
 
     assert isinstance(instance.dsms, DSMS)
     assert isinstance(instance.dsms.config, Configuration)
-    assert Context.dsms == instance.dsms
+    assert Session.dsms == instance.dsms
 
 
 @responses.activate
@@ -33,11 +33,11 @@ def test_kitem_config_class(custom_address, get_mock_kitem_ids):
     """Test KItem properties"""
 
     from dsms.core.configuration import Configuration
-    from dsms.core.context import Context
     from dsms.core.dsms import DSMS
+    from dsms.core.session import Session
     from dsms.knowledge.kitem import KItem
 
-    assert Context.dsms is None
+    assert Session.dsms is None
 
     with pytest.warns(UserWarning, match="No authentication details"):
         config = Configuration(host_url=custom_address)
@@ -51,7 +51,7 @@ def test_kitem_config_class(custom_address, get_mock_kitem_ids):
 
     assert isinstance(instance.dsms, DSMS)
     assert config == instance.dsms.config
-    assert Context.dsms == instance.dsms
+    assert Session.dsms == instance.dsms
 
 
 @responses.activate
@@ -145,7 +145,6 @@ def test_kitem_default_ktypes(custom_address):
 
 @responses.activate
 def test_ktype_property(get_mock_kitem_ids, custom_address):
-    from dsms.core.context import Context
     from dsms.core.dsms import DSMS
     from dsms.knowledge.kitem import KItem
 
@@ -158,7 +157,7 @@ def test_ktype_property(get_mock_kitem_ids, custom_address):
         ktype_id=dsms.ktypes.Organization,
     )
 
-    assert kitem.ktype == Context.ktypes.get(dsms.ktypes.Organization.value)
+    assert kitem.is_a(dsms.ktypes.Organization)
 
 
 # @responses.activate

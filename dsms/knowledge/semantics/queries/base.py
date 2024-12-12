@@ -15,11 +15,11 @@ class BaseSparqlQuery(ABC):
     """Abstract class for DSMS Sparql Query"""
 
     def __init__(self, **kwargs: "Dict[str, Any]") -> None:
-        from dsms import Context
+        from dsms import Session
 
         self._kwargs = kwargs
         self._results: "Optional[Dict[str, Any]]" = None
-        self._dsms: "DSMS" = Context.dsms
+        self._dsms: "DSMS" = Session.dsms
 
         self.execute()
 

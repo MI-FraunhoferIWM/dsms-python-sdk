@@ -147,10 +147,7 @@ class LinkedKItem(KItemProperty):
 
     def is_a(self, to_be_compared: KType) -> bool:
         """Check the KType of the KItem"""
-        return (
-            self.ktype_id.value  # pylint: disable=no-member
-            == to_be_compared.value
-        )
+        return self.ktype_id == to_be_compared.id  # pylint: disable=no-member
 
     # OVERRIDE
     def __str__(self) -> str:
@@ -263,11 +260,11 @@ class LinkedKItemsProperty(KItemPropertyList):
     @property
     def by_ktype(self) -> "Dict[KType, List[KItem]]":
         """Get the kitems grouped by ktype"""
-        from dsms import Context
+        from dsms import Session
 
         grouped = {}
         for linked in self:
-            ktype = Context.dsms.ktypes[_name_to_camel(linked.ktype_id)]
+            ktype = Session.dsms.ktypes[_name_to_camel(linked.ktype_id)]
             if not ktype in grouped:
                 grouped[ktype] = []
             if not linked in grouped[ktype]:
