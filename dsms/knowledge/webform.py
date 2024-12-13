@@ -2,9 +2,16 @@
 
 import logging
 from enum import Enum
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from pydantic import AnyUrl, BaseModel, ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import (
+    AnyUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    model_serializer,
+    model_validator,
+)
 from pydantic.alias_generators import to_camel
 
 from dsms.knowledge.utils import id_generator
@@ -15,7 +22,7 @@ from dsms.knowledge.properties.custom_datatype import (  # isort:skip
 from dsms.core.logging import handler  # isort:skip
 
 if TYPE_CHECKING:
-    from dsms.knowledge.kitem import KItem
+    from dsms.knowledge.ktype import KType
 
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
@@ -35,6 +42,7 @@ class Widget(Enum):
     SELECT = "Select"
     RADIO = "Radio"
     KNOWLEDGE_ITEM = "Knowledge item"
+    MULTI_SELECT = "Multi-select"
 
 
 class WebformSelectOption(BaseModel):
@@ -65,10 +73,12 @@ class WebformMeasurementUnit(BaseModel):
 class WebformRangeOptions(BaseModel):
     """Range options"""
 
-    min: Optional[int] = Field(0, description="Minimum value")
-    max: Optional[int] = Field(0, description="Maximum value")
-    step: Optional[int] = Field(0, description="Step value")
-    range: Optional[bool] = Field(False, description="Range value")
+    min: Optional[Union[int, float]] = Field(0, description="Minimum value")
+    max: Optional[Union[int, float]] = Field(0, description="Maximum value")
+    step: Optional[Union[int, float]] = Field(0, description="Step value")
+    range: Optional[Union[int, float]] = Field(
+        False, description="Range value"
+    )
 
 
 class RelationMappingType(Enum):
@@ -81,29 +91,87 @@ class RelationMappingType(Enum):
     ANNOTATION_PROPERTY = "annotation_property"
 
 
-class RelationMapping(BaseModel):
-    """Relation mapping"""
-
-    iri: str = Field(..., description="IRI of the annotation", max_length=200)
-    type: Optional[RelationMappingType] = Field(
-        None, description="Type of the annotation"
-    )
-    class_iri: Optional[str] = Field(
-        None,
-        description="Target class IRI if the type of relation is an object property",
-    )
-    _kitem = PrivateAttr(default=None)
+class BaseWebformModel(BaseModel):
+    """Base webform model"""
 
     model_config = ConfigDict(
         alias_generator=lambda field_name: to_camel(  # pylint: disable=W0108
             field_name
-        )
+        ),
+        exclude={"kitem"},
+        validate_assignment=True,
+        extra="forbid",
+    )
+    kitem: Optional[Any] = Field(
+        None, description="Associated KItem instance", exclude=True, hide=True
     )
 
+    @property
+    def ktype(self) -> "KType":
+        """
+        KType instance the entry is related to
+
+        Returns:
+            KType: KType instance
+        """
+        return self.kitem.ktype
+
+    @property
+    def webform(self) -> "Webform":
+        """
+        Retrieve the webform associated with the KType of this entry.
+
+        Returns:
+            Webform: The webform instance related to the KType.
+        """
+        return self.ktype.webform
+
+    @property
+    def dsms(self):
+        """
+        Get the DSMS instance associated with the kitem.
+
+        This property retrieves the DSMS instance related to the kitem
+        of the custom properties section.
+
+        Returns:
+            DSMS: The DSMS instance associated with the kitem.
+        """
+        return self.kitem.dsms
+
+    def __str__(self) -> str:
+        """Pretty print the model fields"""
+        fields = ", \n".join(
+            [
+                f"\n\t{key} = {value}"
+                for key, value in self.__dict__.items()
+                if (
+                    key not in self.model_config["exclude"]
+                    and key not in self.dsms.config.hide_properties
+                )
+            ]
+        )
+        return f"{self.__class__.__name__}(\n{fields}\n)"
+
+    def __repr__(self) -> str:
+        """Pretty print the model fields"""
+        return str(self)
+
     def __setattr__(self, key, value) -> None:
+        """
+        Set an attribute of the model.
+
+        This method sets an attribute of the model and logs the operation.
+        If the attribute being set is `kitem`, it directly assigns the value.
+        For other attributes, it marks the associated `kitem` as updated in the
+        context buffers if it exists.
+
+        Args:
+            key (str): The name of the attribute to set.
+            value (Any): The value to set for the attribute.
+        """
         logger.debug(
-            "Setting property for relation mapping `%s` with key `%s` with value `%s`.",
-            self.iri,
+            "Setting property for model attribute with key `%s` with value `%s`.",
             key,
             value,
         )
@@ -117,40 +185,28 @@ class RelationMapping(BaseModel):
             self.kitem.context.buffers.updated.update(
                 {self.kitem.id: self.kitem}
             )
+
         elif key == "kitem":
             self.kitem = value
 
         super().__setattr__(key, value)
 
-    @property
-    def kitem(self) -> "KItem":
-        """
-        KItem instance the entry is related to
 
-        Returns:
-            KItem: KItem instance
-        """
-        return self._kitem
+class RelationMapping(BaseWebformModel):
+    """Relation mapping"""
 
-    @kitem.setter
-    def kitem(self, value: "KItem") -> None:
-        """
-        Setter for the KItem instance related to the relation mapping.
-
-        Args:
-            value (KItem): The KItem instance to associate with the relation mapping.
-        """
-        self._kitem = value
-
-
-class Input(BaseModel):
-    """Input fields in the sections in webform"""
-
-    model_config = ConfigDict(
-        alias_generator=lambda field_name: to_camel(  # pylint: disable=W0108
-            field_name
-        )
+    iri: str = Field(..., description="IRI of the annotation", max_length=200)
+    type: Optional[RelationMappingType] = Field(
+        None, description="Type of the annotation"
     )
+    class_iri: Optional[str] = Field(
+        None,
+        description="Target class IRI if the type of relation is an object property",
+    )
+
+
+class Input(BaseWebformModel):
+    """Input fields in the sections in webform"""
 
     id: Optional[str] = Field(
         default_factory=id_generator, description="ID of the input"
@@ -186,7 +242,7 @@ class Input(BaseModel):
     )
 
 
-class Section(BaseModel):
+class Section(BaseWebformModel):
     """Section in webform"""
 
     id: Optional[str] = Field(
@@ -199,25 +255,22 @@ class Section(BaseModel):
     hidden: Optional[bool] = Field(False, description="Hidden section")
 
 
-class Webform(BaseModel):
+class Webform(BaseWebformModel):
     """User defined webform for ktype"""
 
-    model_config = ConfigDict(
-        alias_generator=lambda field_name: to_camel(  # pylint: disable=W0108
-            field_name
-        )
-    )
     semantics_enabled: Optional[bool] = Field(
         False, description="Semantics enabled"
     )
     sections_enabled: Optional[bool] = Field(
         False, description="Sections enabled"
     )
-    class_mapping: Optional[str] = Field(None, description="Class mapping")
+    class_mapping: Optional[Union[List[str], str]] = Field(
+        [], description="Class mapping"
+    )
     sections: List[Section] = Field([], description="List of sections")
 
 
-class MeasurementUnit(BaseModel):
+class MeasurementUnit(BaseWebformModel):
     """Measurement unit"""
 
     iri: Optional[AnyUrl] = Field(
@@ -232,61 +285,6 @@ class MeasurementUnit(BaseModel):
     namespace: Optional[AnyUrl] = Field(
         None, description="Namespace of the measurement unit"
     )
-    _kitem = PrivateAttr(default=None)
-
-    def __setattr__(self, key, value) -> None:
-        """
-        Set an attribute of the MeasurementUnit instance.
-
-        This method overrides the default behavior of setting an attribute.
-        It logs the action and updates the related KItem in the buffer if
-        applicable. If the key is 'kitem', it sets the KItem instance directly.
-
-        Args:
-            key (str): The name of the attribute to set.
-            value (Any): The value to set for the attribute.
-        """
-        logger.debug(
-            "Setting property for measurement unit `%s` with key `%s` with value `%s`.",
-            self.iri,
-            key,
-            value,
-        )
-
-        # Set kitem as updated
-        if key != "kitem" and self.kitem:
-            logger.debug(
-                "Setting related kitem with id `%s` as updated",
-                self.kitem.id,
-            )
-            self.kitem.context.buffers.updated.update(
-                {self.kitem.id: self.kitem}
-            )
-
-        elif key == "kitem":
-            self.kitem = value
-
-        super().__setattr__(key, value)
-
-    @property
-    def kitem(self) -> "KItem":
-        """
-        KItem instance the entry is related to
-
-        Returns:
-            KItem: KItem instance
-        """
-        return self._kitem
-
-    @kitem.setter
-    def kitem(self, value: "KItem") -> None:
-        """
-        Setter for the KItem instance related to the measurement unit.
-
-        Args:
-            value (KItem): The KItem instance to associate with the measurement unit.
-        """
-        self._kitem = value
 
 
 class KnowledgeItemReference(BaseModel):
@@ -296,13 +294,13 @@ class KnowledgeItemReference(BaseModel):
     name: str = Field(..., description="Name of the knowledge item")
 
 
-class Entry(BaseModel):
+class Entry(BaseWebformModel):
     """
     Entry in a custom properties section
     """
 
     id: str = Field(default_factory=id_generator)
-    type: Widget = Field(..., description="Type of the entry")
+    type: Optional[Widget] = Field(None, description="Type of the entry")
     label: str = Field(..., description="Label of the entry")
     value: Optional[
         Union[
@@ -321,27 +319,20 @@ class Entry(BaseModel):
     relationMapping: Optional[RelationMapping] = Field(
         None, description="Relation mapping of the entry"
     )
-    _kitem = PrivateAttr(default=None)
 
     def __setattr__(self, key, value) -> None:
-        logger.debug(
-            "Setting property for entry `%s` with key `%s` with value `%s`.",
-            self.name,
-            key,
-            value,
-        )
+        """
+        Set an attribute of the Entry instance.
 
-        # Set kitem as updated
-        if key != "kitem" and self.kitem:
-            logger.debug(
-                "Setting related kitem with id `%s` as updated",
-                self.kitem.id,
-            )
-            self.kitem.context.buffers.updated.update(
-                {self.kitem.id: self.kitem}
-            )
-        elif key == "kitem":
-            self.kitem = value
+        This method overrides the default behavior of setting an attribute.
+        It sets the KItem instance of the measurement unit and relation mapping
+        if the key is 'kitem'.
+
+        Args:
+            key (str): The name of the attribute to set.
+            value (Any): The value to set for the attribute.
+        """
+        if key == "kitem":
             if self.measurementUnit:
                 self.measurementUnit.kitem = value
             if self.relationMapping:
@@ -349,71 +340,50 @@ class Entry(BaseModel):
 
         super().__setattr__(key, value)
 
-    @property
-    def kitem(self) -> "KItem":
-        """
-        KItem instance the entry is related to
-
-        Returns:
-            KItem: KItem instance
-        """
-        return self._kitem
-
-    @kitem.setter
-    def kitem(self, kitem: "KItem"):
-        """
-        Set KItem instance the entry is related to
-
-        Args:
-            kitem (KItem): KItem instance
-        """
-        self._kitem = kitem
-
-    @property
-    def ktype(self) -> "KItem":
-        """
-        KType instance the entry is related to
-
-        Returns:
-            KType: KType instance
-        """
-        return self.kitem.ktype
-
-    @property
-    def webform(self) -> "Webform":
-        """
-        Retrieve the webform associated with the KType of this entry.
-
-        Returns:
-            Webform: The webform instance related to the KType.
-        """
-        return self.ktype.webform
-
     @model_validator(mode="after")
     @classmethod
     def _validate_inputs(cls, self: "Entry") -> "Entry":
         spec = cls._get_input_spec(self)
+        print("###", self.type, spec, self.value)
+        if not self.type:
+            if len(spec) == 0:
+                raise ValueError(
+                    f"Could not find input spec for entry {self.label}"
+                )
+            if len(spec) > 1:
+                raise ValueError(
+                    f"Found multiple input specs for entry {self.label}"
+                )
+            spec = spec.pop()
+            self.type = spec.widget
+            default_value = spec.value
+            select_options = spec.select_options
+        else:
+            default_value = None
+            select_options = []
+
+        dtype = None
         choices = None
 
         # check if widget is mapped to a data type
-        if spec.widget in (
+        if self.type in (
             Widget.TEXT,
             Widget.FILE,
             Widget.TEXTAREA,
             Widget.VOCABULARY_TERM,
         ):
             dtype = str
-        elif spec.widget in (Widget.NUMBER, Widget.SLIDER):
+        elif self.type in (Widget.NUMBER, Widget.SLIDER):
             dtype = NumericalDataType
-        elif spec.widget == Widget.CHECKBOX:
+        elif self.type == Widget.CHECKBOX:
             dtype = bool
-        elif spec.widget in (Widget.SELECT, Widget.RADIO, Widget.MULTI_SELECT):
-            if spec.widget == Widget.MULTI_SELECT:
+        elif self.type in (Widget.SELECT, Widget.RADIO, Widget.MULTI_SELECT):
+            if self.type == Widget.MULTI_SELECT:
                 dtype = list
             else:
                 dtype = str
-            choices = [choice.value for choice in spec.select_options]
-        elif spec.widget == Widget.KNOWLEDGE_ITEM:
+            choices = [choice.value for choice in select_options]
+        elif self.type == Widget.KNOWLEDGE_ITEM:
             dtype = KnowledgeItemReference
         else:
             raise ValueError(
@@ -421,8 +391,8 @@ class Entry(BaseModel):
             )
 
         # check if value is set
-        if self.value is None and spec.value is not None:
-            self.value = spec.value
+        if self.value is None and default_value is not None:
+            self.value = default_value
 
         # check if value is of correct type
         if self.value is not None and not isinstance(self.value, dtype):
@@ -437,7 +407,7 @@ class Entry(BaseModel):
             raise ValueError(
                 f"Value {self.value} is not a valid choice for entry {self.label}"
             )
-        if self.value is None and spec.value is None and self.required:
+        if self.value is None and default_value is None and self.required:
             raise ValueError(f"Value for entry {self.label} is required")
 
         # set name and kitem of numerical data type
@@ -447,27 +417,36 @@ class Entry(BaseModel):
 
         return self
 
+    @model_serializer
+    def serialize(self) -> Dict[str, Any]:
+        """
+        Serialize the Entry object to a dictionary representation.
+
+        This method transforms the Entry instance into a dictionary, where the keys
+        are the attribute names and the values are the corresponding attribute values.
+        The "type" attribute is treated specially by storing its `value` instead of
+        the object itself.
+
+        Returns:
+            Dict[str, Any]: A dictionary representation of the Entry object.
+        """
+        return {
+            key: (value if key != "type" else value.value)
+            for key, value in self.__dict__.items()
+            if key != "kitem"
+        }
+
     @classmethod
     def _get_input_spec(cls, self: "Entry"):
-        potential_spec = []
-        spec = None
+        spec = []
         for section in self.webform.sections:
             for inp in section.inputs:
                 if inp.id == self.id:
-                    potential_spec.append(inp)
-        if len(potential_spec) == 0:
-            raise ValueError(
-                f"Could not find input spec for entry {self.label}"
-            )
-        if len(potential_spec) > 1:
-            raise ValueError(
-                f"Found multiple input specs for entry {self.label}"
-            )
-        spec = potential_spec.pop()
+                    spec.append(inp)
         return spec
 
 
-class CustomPropertiesSection(BaseModel):
+class CustomPropertiesSection(BaseWebformModel):
     """
     Section for custom properties
     """
@@ -475,27 +454,6 @@ class CustomPropertiesSection(BaseModel):
     id: Optional[str] = Field(default_factory=id_generator)
     name: str = Field(..., description="Name of the section")
     entries: List[Entry] = Field([], description="Entries of the section")
-    _kitem = PrivateAttr(default=None)
-
-    @property
-    def kitem(self) -> "KItem":
-        """
-        KItem instance the section is related to
-
-        Returns:
-            KItem: KItem instance
-        """
-        return self._kitem
-
-    @kitem.setter
-    def kitem(self, kitem: "KItem"):
-        """
-        Set KItem instance the section is related to
-
-        Args:
-            kitem (KItem): KItem instance
-        """
-        self._kitem = kitem
 
     def __setattr__(self, key, value) -> None:
         """
@@ -509,29 +467,12 @@ class CustomPropertiesSection(BaseModel):
             key: The key of the attribute to be set.
             value: The value of the attribute to be set.
         """
-        logger.debug(
-            "Setting property for section `%s` with key `%s` with value `%s`.",
-            self.name,
-            key,
-            value,
-        )
-
-        # Set kitem as updated
-        if key != "kitem" and self.kitem:
-            logger.debug(
-                "Setting related kitem with id `%s` as updated",
-                self.kitem.id,
-            )
-            self.kitem.context.buffers.updated.update(
-                {self.kitem.id: self.kitem}
-            )
-        elif key == "kitem":
-            self.kitem = value
+        if key == "kitem":
             for entry in self.entries:
                 entry.kitem = value
 
         # Set value
-        if key not in self.model_dump().keys():
+        if key not in self.model_dump() and key != "kitem":
             to_be_updated = []
             for entry in self.entries:
                 if entry.label == key:
@@ -571,7 +512,7 @@ class CustomPropertiesSection(BaseModel):
             AttributeError: If no entry or multiple entries with the given label are found.
         """
         target = []
-        if not hasattr(self, key):
+        if not key in self.model_dump() and key != "kitem":
             for entry in self.entries:
                 if entry.label == key:
                     target.append(entry)
@@ -590,8 +531,27 @@ class CustomPropertiesSection(BaseModel):
             target = super().__getattr__(key)
         return target
 
+    @model_validator(mode="before")
+    @classmethod
+    def set_kitem(cls, self: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Set kitem for all entries of the section.
 
-class KItemCustomPropertiesModel(BaseModel):
+        This validator is called before the model is validated. It sets the kitem
+        for all entries of the section if the kitem is set.
+
+        Args:
+            self (CustomPropertiesSection): The section to set the kitem for.
+        """
+        kitem = self.get("kitem")
+        if kitem:
+            for entry in self.get("entries"):
+                if not "kitem" in entry:
+                    entry["kitem"] = kitem
+        return self
+
+
+class KItemCustomPropertiesModel(BaseWebformModel):
     """
     A custom properties model for a KItem.
     """
@@ -599,27 +559,6 @@ class KItemCustomPropertiesModel(BaseModel):
     sections: List[CustomPropertiesSection] = Field(
         [], description="Sections of custom properties"
     )
-    _kitem = PrivateAttr(default=None)
-
-    @property
-    def kitem(self) -> "KItem":
-        """
-        KItem instance the custom properties is related to
-
-        Returns:
-            KItem: KItem instance
-        """
-        return self._kitem
-
-    @kitem.setter
-    def kitem(self, kitem: "KItem"):
-        """
-        Set KItem instance the custom properties is related to
-
-        Args:
-            kitem (KItem): KItem instance
-        """
-        self._kitem = kitem
 
     def __getattr__(self, key):
         """
@@ -641,7 +580,8 @@ class KItemCustomPropertiesModel(BaseModel):
             AttributeError: If no entry or multiple entries with the given label are found.
         """
         target = []
-        if not hasattr(self, key):
+
+        if not key in self.model_dump() and key != "kitem":
             for section in self.sections:
                 for entry in section.entries:
                     if entry.label == key:
@@ -678,23 +618,7 @@ class KItemCustomPropertiesModel(BaseModel):
             AttributeError: If no entry or multiple entries with the given label are found.
         """
 
-        logger.debug(
-            "Setting property for custom properties model with key `%s` with value `%s`.",
-            key,
-            value,
-        )
-
-        # Set kitem as updated
-        if key != "kitem" and self.kitem:
-            logger.debug(
-                "Setting related kitem for custom properties with id `%s` as updated",
-                self.kitem.id,
-            )
-            self.kitem.context.buffers.updated.update(
-                {self.kitem.id: self.kitem}
-            )
-        elif key == "kitem":
-            self.kitem = value
+        if key == "kitem":
             self.sections.kitem = value
 
         # Set value in model
@@ -717,3 +641,22 @@ class KItemCustomPropertiesModel(BaseModel):
             to_be_updated.value = value
         else:
             super().__setattr__(key, value)
+
+    @model_validator(mode="before")
+    @classmethod
+    def set_kitem(cls, self: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Set kitem for all sections of the custom properties model.
+
+        This validator is called before the model is validated. It sets the kitem
+        for all sections of the custom properties model if the kitem is set.
+
+        Args:
+            self (KItemCustomPropertiesModel): The custom properties model to set the kitem for.
+        """
+        kitem = self.get("kitem")
+        if kitem:
+            for section in self.get("sections"):
+                if not "kitem" in section:
+                    section["kitem"] = kitem
+        return self

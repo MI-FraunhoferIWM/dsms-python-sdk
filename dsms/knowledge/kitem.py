@@ -1,6 +1,5 @@
 """Knowledge Item implementation of the DSMS"""
 
-import json
 import logging
 import warnings
 from datetime import datetime
@@ -181,9 +180,10 @@ class KItem(BaseModel):
         [],
         description="User groups able to access the KItem.",
     )
-    custom_properties: Optional[
-        Union[KItemCustomPropertiesModel, Dict]
-    ] = Field(None, description="Custom properties associated to the KItem")
+    custom_properties: Optional[Union[Any]] = Field(
+        None, description="Custom properties associated to the KItem"
+    )
+
     ktype: Optional[Union[str, Enum, KType]] = Field(
         None, description="KType of the KItem", exclude=True
     )
@@ -202,6 +202,10 @@ class KItem(BaseModel):
 
     context_id: Optional[Union[UUID, str]] = Field(
         None, description="Context ID of the KItem"
+    )
+
+    access_url: Optional[str] = Field(
+        None, description="Access URL of the KItem", exclude=True
     )
 
     model_config = ConfigDict(
@@ -562,37 +566,32 @@ class KItem(BaseModel):
 
     @model_validator(mode="after")
     @classmethod
-    def validate_custom_properties(cls, self) -> "KItem":
-        """Validate the custom properties with respect to the KType of the KItem"""
-        if not isinstance(
-            self.custom_properties, (BaseModel, dict, type(None))
-        ):
-            raise TypeError(
-                f"""Custom properties must be one of the following types:
-                  {(BaseModel, dict, type(None))}. Not {type(self.custom_properties)}"""
-            )
-        # transform custom properties
+    def validate_custom_properties(cls, self: "KItem") -> "KItem":
+        """Validate custom properties"""
+
         if isinstance(self.custom_properties, dict):
-            content = (
+            value = (
                 self.custom_properties.get("content") or self.custom_properties
             )
-            if isinstance(content, str):
-                try:
-                    content = json.loads(content)
-                except Exception as error:
-                    raise TypeError(
-                        f"Invalid type: {type(content)}"
-                    ) from error
-            content = _transform_custom_properties_schema(
-                content, self.ktype_id, from_context=True
+
+            if not value.get("sections"):
+                value = _transform_custom_properties_schema(
+                    value, self.ktype.webform
+                )
+                warnings.warn(
+                    """A flat dictionary was provided for custom properties.
+                    Will be transformed into `KItemCustomPropertiesModel`."""
+                )
+
+            self.custom_properties = KItemCustomPropertiesModel(
+                **value, kitem=self
             )
-            was_in_buffer = self.id in self.context.buffers.updated
-            self.custom_properties = KItemCustomPropertiesModel(**content)
-            if not was_in_buffer:
-                self.context.buffers.updated.pop(self.id)
-            warnings.warn(
-                "A flat dict was provided for custom properties."
-                "Will transform to `KItemCustomPropertiesModel`.",
+        elif not isinstance(
+            self.custom_properties, KItemCustomPropertiesModel
+        ):
+            raise TypeError(
+                "Custom properties must be either a dictionary or a "
+                "KItemCustomPropertiesModel."
             )
         return self
 

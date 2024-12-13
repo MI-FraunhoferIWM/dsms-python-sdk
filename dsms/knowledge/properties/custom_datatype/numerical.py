@@ -9,7 +9,7 @@ from dsms.knowledge.semantics.units.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional
+    from typing import Any, Dict, Generator, Optional
 
     from dsms import KItem
 
@@ -37,6 +37,28 @@ class NumericalDataType(float):
         else:
             string = str(self.__float__())
         return string
+
+    @classmethod
+    def __get_validators__(cls) -> "Generator":
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v: "Any") -> "NumericalDataType":
+        """
+        Validate the input value as a valid NumericalDataType.
+
+        Args:
+            v (Any): The value to be validated.
+
+        Returns:
+            NumericalDataType: An instance of NumericalDataType if validation is successful.
+
+        Raises:
+            TypeError: If the input value is not a float or int.
+        """
+        if not isinstance(v, (float, int)):
+            raise TypeError(f"Expected float or int, got {type(v)}")
+        return cls(v)
 
     def __repr__(self) -> str:
         return str(self)

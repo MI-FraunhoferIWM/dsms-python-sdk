@@ -38,6 +38,14 @@ logger.addHandler(handler)
 logger.propagate = False
 
 
+def _is_number(value):
+    try:
+        float(value)
+        return True
+    except Exception:
+        return False
+
+
 def print_webform(webform: BaseModel) -> str:
     """
     Helper function to pretty print a webform.
@@ -903,55 +911,32 @@ def _delete_app_spec(name: str) -> None:
     return response.text
 
 
-def _transform_custom_properties_schema(
-    custom_properties: Any, ktype_id: str, from_context: bool = False
-):
-    """
-    Given a ktype_id and a custom_properties dictionary,
-    transform the input into the format expected by the frontend.
-    If the ktype_id is not found, just return the custom_properties dictionary
-    as is.
-    """
-
-    if from_context:
-        from dsms import Context
-
-        ktype_spec = Context.ktypes.get(ktype_id)
-    else:
-        ktype_spec = _get_ktype(ktype_id)
-
-    if ktype_spec:
-        webform = ktype_spec.webform
-    else:
-        webform = None
-
-    if webform and isinstance(custom_properties, dict):
+def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
+    if webform:
         copy_properties = custom_properties.copy()
         transformed_sections = {}
-        for section_def in webform["sections"]:
-            for input_def in section_def["inputs"]:
-                label = input_def["label"]
-                if label in copy_properties:
-                    if input_def.get("classMapping"):
+        for section_def in webform.sections:
+            for input_def in section_def.inputs:
+                if input_def.label in copy_properties:
+                    if input_def.class_mapping:
                         class_mapping = {
-                            "classMapping": {
-                                "iri": input_def.get("classMapping")
-                            }
+                            "classMapping": {"iri": input_def.class_mapping}
                         }
                     else:
                         class_mapping = {}
 
                     entry = {
-                        "id": input_def["id"],
-                        "label": label,
-                        "value": copy_properties.pop(label),
-                        "measurementUnit": input_def.get("measurementUnit"),
+                        "id": input_def.id,
+                        "label": input_def.label,
+                        "value": copy_properties.pop(input_def.label),
+                        "measurementUnit": input_def.measurement_unit,
+                        "type": input_def.widget,
                         **class_mapping,
                     }
-                    section_name = section_def["name"]
+                    section_name = section_def.name
                     if section_name not in transformed_sections:
                         section = {
-                            "id": section_def["id"],
+                            "id": section_def.id,
                             "name": section_name,
                             "entries": [],
                         }
@@ -959,24 +944,15 @@ def _transform_custom_properties_schema(
                     transformed_sections[section_name]["entries"].append(entry)
         if copy_properties:
             logger.info(
-                "Some custom properties were not found in the webform: %s for ktype: %s",
+                "Some custom properties were not found in the webform: %s",
                 copy_properties,
-                ktype_id,
             )
             transformed_sections["General"] = _make_misc_section(
                 copy_properties
             )
         response = {"sections": list(transformed_sections.values())}
-    elif not webform and isinstance(custom_properties, dict):
-        response = _transform_from_flat_schema(custom_properties)
-    elif isinstance(custom_properties, dict) and custom_properties.get(
-        "sections"
-    ):
-        response = custom_properties
     else:
-        raise TypeError(
-            f"Invalid custom properties type: {type(custom_properties)}"
-        )
+        response = _transform_from_flat_schema(custom_properties)
     return response
 
 
@@ -998,9 +974,24 @@ def _make_misc_section(custom_properties: dict):
                 "id": id_generator(),
                 "label": key,
                 "value": value,
+                "type": _map_data_type_to_widget(value),
             }
         )
     return section
+
+
+def _map_data_type_to_widget(value):
+    from dsms.knowledge.webform import Widget
+
+    if isinstance(value, str):
+        widget = Widget.TEXT
+    elif isinstance(value, (int, float)):
+        widget = Widget.NUMBER
+    elif isinstance(value, bool):
+        widget = Widget.CHECKBOX
+    else:
+        raise ValueError(f"Unsupported data type: {type(value)}")
+    return widget
 
 
 def id_generator(prefix: str = "id") -> str:
