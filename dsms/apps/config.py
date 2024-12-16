@@ -18,6 +18,7 @@ from dsms.apps.utils import (  # isort:skip
     _get_app_specification,
 )
 
+from dsms.knowledge.utils import print_model  # isort:skip
 
 from dsms.core.logging import handler  # isort:skip
 
@@ -101,30 +102,13 @@ class AppConfig(BaseModel):
             )
             self.session.buffers.updated.update({self.name: self})
 
-    # def __str__(self) -> str:
-    #     """Pretty print the app config fields"""
-    #     fields = ", ".join(
-    #         [
-    #             "{key}={value}".format(  # pylint: disable=consider-using-f-string
-    #                 key=key,
-    #                 value=(
-    #                     value
-    #                     if key != "specification"
-    #                     else {
-    #                         "metadata": value.get(  # pylint: disable=no-member
-    #                             "metadata"
-    #                         )
-    #                     }
-    #                 ),
-    #             )
-    #             for key, value in self.__dict__.items()
-    #         ]
-    #     )
-    #     return f"{self.__class__.__name__}({fields})"
+    def __str__(self) -> str:
+        """Pretty print the kitem Fields"""
+        return print_model(self, "app")
 
-    # def __repr__(self) -> str:
-    #     """Pretty print the kitem Fields"""
-    #     return str(self)
+    def __repr__(self) -> str:
+        """Pretty print the kitem Fields"""
+        return str(self)
 
     @field_validator("name")
     @classmethod
