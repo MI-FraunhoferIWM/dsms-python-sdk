@@ -43,16 +43,9 @@ class KItemProperty(BaseModel):
 
     _kitem = PrivateAttr(default=None)
 
+    @abstractmethod
     def __str__(self) -> str:
         """Pretty print the KItemProperty"""
-        values = ",\n\t\t\t".join(
-            [
-                f"{key}: {value}"
-                for key, value in self.__dict__.items()
-                if key not in self.exclude
-            ]
-        )
-        return f"{{\n\t\t\t{values}\n\t\t}}"
 
     def __repr__(self) -> str:
         """Pretty print the KItemProperty"""
@@ -128,17 +121,6 @@ class KItemPropertyList(list):
     def k_property_helper(cls) -> "Optional[Callable]":
         """Optional helper for transforming a given
         input into the k property item"""
-
-    def __str__(self) -> str:
-        """Pretty print the KItemPropertyList"""
-        values = ", \n".join(["\t\t" + repr(value) for value in self])
-        if values:
-            values = f"\n{values}\n\t"
-        return f"[{values}]"
-
-    def __repr__(self) -> str:
-        """Pretty print the KItemPropertyList"""
-        return str(self)
 
     def __hash__(self) -> int:
         return hash(str(self))

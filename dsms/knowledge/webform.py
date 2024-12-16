@@ -4,17 +4,23 @@ import logging
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-from pydantic import (
+from pydantic.alias_generators import to_camel
+
+from pydantic import (  # isort:skip
     AnyUrl,
     BaseModel,
     ConfigDict,
     Field,
+    field_validator,
     model_serializer,
     model_validator,
 )
-from pydantic.alias_generators import to_camel
 
-from dsms.knowledge.utils import id_generator
+from dsms.knowledge.utils import (  # isort:skip
+    _map_data_type_to_widget,
+    id_generator,
+    print_model,
+)
 
 from dsms.knowledge.properties.custom_datatype import (  # isort:skip
     NumericalDataType,
@@ -99,8 +105,6 @@ class BaseWebformModel(BaseModel):
             field_name
         ),
         exclude={"kitem"},
-        validate_assignment=True,
-        extra="forbid",
     )
     kitem: Optional[Any] = Field(
         None, description="Associated KItem instance", exclude=True, hide=True
@@ -141,17 +145,7 @@ class BaseWebformModel(BaseModel):
 
     def __str__(self) -> str:
         """Pretty print the model fields"""
-        fields = ", \n".join(
-            [
-                f"\n\t{key} = {value}"
-                for key, value in self.__dict__.items()
-                if (
-                    key not in self.model_config["exclude"]
-                    and key not in self.dsms.config.hide_properties
-                )
-            ]
-        )
-        return f"{self.__class__.__name__}(\n{fields}\n)"
+        return print_model(self, "webform")
 
     def __repr__(self) -> str:
         """Pretty print the model fields"""
@@ -195,7 +189,7 @@ class BaseWebformModel(BaseModel):
 class RelationMapping(BaseWebformModel):
     """Relation mapping"""
 
-    iri: str = Field(..., description="IRI of the annotation", max_length=200)
+    iri: str = Field(..., description="IRI of the annotation")
     type: Optional[RelationMappingType] = Field(
         None, description="Type of the annotation"
     )
@@ -274,13 +268,16 @@ class MeasurementUnit(BaseWebformModel):
     """Measurement unit"""
 
     iri: Optional[AnyUrl] = Field(
-        None, description="IRI of the annotation", max_length=200
+        None,
+        description="IRI of the annotation",
     )
     label: Optional[str] = Field(
-        None, description="Label of the measurement unit", max_length=100
+        None,
+        description="Label of the measurement unit",
     )
     symbol: Optional[str] = Field(
-        None, description="Symbol of the measurement unit", max_length=100
+        None,
+        description="Symbol of the measurement unit",
     )
     namespace: Optional[AnyUrl] = Field(
         None, description="Namespace of the measurement unit"
@@ -334,18 +331,28 @@ class Entry(BaseWebformModel):
         """
         if key == "kitem":
             if self.measurementUnit:
-                self.measurementUnit.kitem = value
+                self.measurementUnit.kitem = (  # pylint: disable=assigning-non-slot
+                    value
+                )
             if self.relationMapping:
-                self.relationMapping.kitem = value
+                self.relationMapping.kitem = (  # pylint: disable=assigning-non-slot
+                    value
+                )
 
         super().__setattr__(key, value)
+
+    @field_validator("value")
+    @classmethod
+    def _validate_value(cls, value: Any) -> Any:
+        if isinstance(value, (int, float)):
+            value = NumericalDataType(value)
+        return value
 
     @model_validator(mode="after")
     @classmethod
     def _validate_inputs(cls, self: "Entry") -> "Entry":
         spec = cls._get_input_spec(self)
-        print("###", self.type, spec, self.value)
-        if not self.type:
+        if spec:
             if len(spec) == 0:
                 raise ValueError(
                     f"Could not find input spec for entry {self.label}"
@@ -358,7 +365,11 @@ class Entry(BaseWebformModel):
             self.type = spec.widget
             default_value = spec.value
             select_options = spec.select_options
+        elif self.type and not spec:
+            default_value = None
+            select_options = []
         else:
+            self.type = _map_data_type_to_widget(self.value)
             default_value = None
             select_options = []
 
@@ -399,14 +410,18 @@ class Entry(BaseWebformModel):
             raise ValueError(
                 f"Value of type {type(self.value)} is not of type {dtype}"
             )
-        if (
-            self.value is not None
-            and choices is not None
-            and self.value not in choices
-        ):
-            raise ValueError(
-                f"Value {self.value} is not a valid choice for entry {self.label}"
-            )
+        if self.value is not None and choices is not None:
+            error_message = f"""Value {self.value} is not a valid choice for entry {self.label}.
+            Valid choices are: {choices}"""
+            # in case of multi-select
+            if isinstance(self.value, list):
+                for value in self.value:
+                    if value not in choices:
+                        raise ValueError(error_message)
+            # in case of single-select
+            else:
+                if self.value not in choices:
+                    raise ValueError(error_message)
         if self.value is None and default_value is None and self.required:
             raise ValueError(f"Value for entry {self.label} is required")
 
@@ -430,19 +445,24 @@ class Entry(BaseWebformModel):
         Returns:
             Dict[str, Any]: A dictionary representation of the Entry object.
         """
-        return {
-            key: (value if key != "type" else value.value)
-            for key, value in self.__dict__.items()
-            if key != "kitem"
-        }
+        dumped = {}
+        for key, value in self.__dict__.items():
+            if key != "kitem":
+                if isinstance(value, NumericalDataType):
+                    value = float(value)
+                if key == "type":
+                    value = value.value
+                dumped[key] = value
+        return dumped
 
     @classmethod
     def _get_input_spec(cls, self: "Entry"):
         spec = []
-        for section in self.webform.sections:
-            for inp in section.inputs:
-                if inp.id == self.id:
-                    spec.append(inp)
+        if self.webform:
+            for section in self.webform.sections:
+                for inp in section.inputs:
+                    if inp.id == self.id:
+                        spec.append(inp)
         return spec
 
 
@@ -468,13 +488,13 @@ class CustomPropertiesSection(BaseWebformModel):
             value: The value of the attribute to be set.
         """
         if key == "kitem":
-            for entry in self.entries:
-                entry.kitem = value
+            for entry in self.entries:  # pylint: disable=not-an-iterable
+                entry.kitem = value  # pylint: disable=assigning-non-slot
 
         # Set value
         if key not in self.model_dump() and key != "kitem":
             to_be_updated = []
-            for entry in self.entries:
+            for entry in self.entries:  # pylint: disable=not-an-iterable
                 if entry.label == key:
                     to_be_updated.append(entry)
             if len(to_be_updated) == 0:
@@ -513,7 +533,7 @@ class CustomPropertiesSection(BaseWebformModel):
         """
         target = []
         if not key in self.model_dump() and key != "kitem":
-            for entry in self.entries:
+            for entry in self.entries:  # pylint: disable=not-an-iterable
                 if entry.label == key:
                     target.append(entry)
             if len(target) == 0:
@@ -582,7 +602,7 @@ class KItemCustomPropertiesModel(BaseWebformModel):
         target = []
 
         if not key in self.model_dump() and key != "kitem":
-            for section in self.sections:
+            for section in self.sections:  # pylint: disable=not-an-iterable
                 for entry in section.entries:
                     if entry.label == key:
                         target.append(entry)
@@ -619,12 +639,12 @@ class KItemCustomPropertiesModel(BaseWebformModel):
         """
 
         if key == "kitem":
-            self.sections.kitem = value
+            self.sections.kitem = value  # pylint: disable=assigning-non-slot
 
         # Set value in model
         if key not in self.model_dump().keys():
             to_be_updated = []
-            for section in self.sections:
+            for section in self.sections:  # pylint: disable=not-an-iterable
                 for entry in section.entries:
                     if entry.label == key:
                         to_be_updated.append(entry)

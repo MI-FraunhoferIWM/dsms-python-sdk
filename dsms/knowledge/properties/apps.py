@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, model_serializer
 
 from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
-from dsms.knowledge.utils import _perform_request
+from dsms.knowledge.utils import _perform_request, print_model
 
 if TYPE_CHECKING:
     from typing import Callable
@@ -23,17 +23,6 @@ class AdditionalProperties(BaseModel):
         None,
         description="File extensions for which the upload shall be triggered.",
     )
-
-    def __str__(self) -> str:
-        """Pretty print the KItemPropertyList"""
-        values = ", ".join(
-            [f"{key}: {value}" for key, value in self.__dict__.items()]
-        )
-        return f"{{{values}}}"
-
-    def __repr__(self) -> str:
-        """Pretty print the Apps"""
-        return str(self)
 
 
 class JobStatus(BaseModel):
@@ -150,6 +139,10 @@ class App(KItemProperty):
                 f"Could not fetch app input schema: {response.text}"
             )
         return response.json()
+
+    # OVERRIDE
+    def __str__(self):
+        return print_model(self, "app")
 
 
 class Job(BaseModel):

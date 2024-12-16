@@ -20,9 +20,11 @@ logger = logging.Logger(__name__)
 class NumericalDataType(float):
     """Custom Base data type for custom properties"""
 
-    def __init__(self, value) -> None:  # pylint: disable=unused-argument
-        self._kitem: "Optional[KItem]" = None
-        self._name: "Optional[str]" = None
+    def __new__(cls, value):
+        obj = super().__new__(cls, value)
+        obj._kitem = None
+        obj._name = None
+        return obj
 
     def __str__(self) -> str:
         """Pretty print the numerical datatype"""
@@ -58,7 +60,10 @@ class NumericalDataType(float):
         """
         if not isinstance(v, (float, int)):
             raise TypeError(f"Expected float or int, got {type(v)}")
-        return cls(v)
+        obj = super().__new__(cls, v)
+        obj._kitem = None
+        obj._name = None
+        return obj
 
     def __repr__(self) -> str:
         return str(self)

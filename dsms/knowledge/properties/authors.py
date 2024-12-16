@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import Field, model_serializer
 
 from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
+from dsms.knowledge.utils import print_model
 
 if TYPE_CHECKING:
     from typing import Callable
@@ -28,6 +29,10 @@ class Author(KItemProperty):
             for key, value in self.__dict__.items()
             if key != "id"
         }
+
+    # OVERRIDE
+    def __str__(self):
+        return print_model(self, "author")
 
 
 class AuthorsProperty(KItemPropertyList):

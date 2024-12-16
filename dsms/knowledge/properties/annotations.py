@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from pydantic import Field
 
 from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
-from dsms.knowledge.utils import _make_annotation_schema
+from dsms.knowledge.utils import _make_annotation_schema, print_model
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict
@@ -21,6 +21,10 @@ class Annotation(KItemProperty):
     namespace: str = Field(
         ..., description="Namespace of the annotation", max_length=100
     )
+
+    # OVERRIDE
+    def __str__(self) -> str:
+        return print_model(self, "annotation")
 
 
 class AnnotationsProperty(KItemPropertyList):

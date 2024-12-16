@@ -6,7 +6,7 @@ import pandas as pd
 from pydantic import Field
 
 from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
-from dsms.knowledge.utils import _get_dataframe_column, _is_number
+from dsms.knowledge.utils import _get_dataframe_column, _is_number, print_model
 
 from dsms.knowledge.semantics.units import (  # isort:skip
     get_conversion_factor,
@@ -34,21 +34,8 @@ class Column(KItemProperty):
         ..., description="Name of the column in the data series."
     )
 
-    def __repr__(self) -> str:
-        """Pretty print the numerical datatype"""
-        if self.kitem and self.kitem.dsms.config.display_units:
-            try:
-                unit = f"\tunit={self.get_unit().get('symbol')}\n\t\t"
-                string = str(self)
-                string = string[:-1] + unit + string[-1:]
-            except Exception as error:
-                logger.debug(
-                    "Could not fetch unit from `%i`: %i", self.name, error.args
-                )
-                string = str(self)
-        else:
-            string = str(self)
-        return string
+    def __str__(self) -> str:
+        return print_model(self, "column")
 
     def get(self) -> "List[Any]":
         """

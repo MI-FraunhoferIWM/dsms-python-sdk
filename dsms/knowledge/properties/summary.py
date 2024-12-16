@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
+from dsms.knowledge.utils import print_model
+
 if TYPE_CHECKING:
     from typing import Set
 
@@ -33,16 +35,9 @@ class Summary(BaseModel):
         super().__setattr__(name, value)
         self._mark_as_updated()
 
-    def __str__(self) -> str:
-        """Pretty print the custom properties"""
-        fields = ", ".join(
-            [
-                f"{key}={value}"
-                for key, value in self.__dict__.items()
-                if key not in self.exclude
-            ]
-        )
-        return f"{self.__class__.__name__}({fields})"
+    # OVERIDE
+    def __str__(self):
+        return print_model(self, "summary")
 
     def __repr__(self) -> str:
         """Pretty print the custom properties"""

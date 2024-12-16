@@ -94,7 +94,7 @@ class KType(BaseModel):
 
     def __repr__(self) -> str:
         """Print the KType"""
-        return print_ktype(self)
+        return str(self)
 
     def __str__(self) -> str:
         """Print the KType"""

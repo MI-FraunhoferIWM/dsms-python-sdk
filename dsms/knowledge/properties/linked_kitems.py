@@ -26,7 +26,7 @@ from dsms.knowledge.properties.authors import Author  # isort:skip
 from dsms.knowledge.properties.contacts import ContactInfo  # isort:skip
 from dsms.knowledge.properties.external_links import ExternalLink  # isort:skip
 from dsms.knowledge.properties.user_groups import UserGroup  # isort:skip
-from dsms.knowledge.utils import _get_kitem  # isort:skip
+from dsms.knowledge.utils import _get_kitem, print_model  # isort:skip
 
 
 if TYPE_CHECKING:
@@ -50,10 +50,7 @@ class LinkedLinkedKItem(BaseModel):
 
     def __str__(self) -> str:
         """Pretty print the linked KItems of the linked KItem"""
-        values = ",\n\t\t\t".join(
-            [f"{key}: {value}" for key, value in self.__dict__.items()]
-        )
-        return f"{{\n\t\t\t{values}\n\t\t}}"
+        return print_model(self, "linked_kitem")
 
     def __repr__(self) -> str:
         """Pretty print the linked KItems of the linked KItem"""
@@ -152,14 +149,7 @@ class LinkedKItem(KItemProperty):
     # OVERRIDE
     def __str__(self) -> str:
         """Pretty print the linked KItem"""
-        values = "\n\t\t\t".join(
-            [
-                f"{key}: {value}"
-                for key, value in self.__dict__.items()
-                if key not in self.exclude
-            ]
-        )
-        return f"\n\t\t\t{values}\n\t\t"
+        return print_model(self, "linked_kitem")
 
     # OVERRIDE
     def __repr__(self) -> str:

@@ -59,6 +59,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _make_annotation_schema,
     _refresh_kitem,
     _transform_custom_properties_schema,
+    print_model,
 )
 
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
@@ -262,17 +263,7 @@ class KItem(BaseModel):
 
     def __str__(self) -> str:
         """Pretty print the kitem fields"""
-        fields = ", \n".join(
-            [
-                f"\n\t{key} = {value}"
-                for key, value in self.__dict__.items()
-                if (
-                    key not in self.model_config["exclude"]
-                    and key not in self.dsms.config.hide_properties
-                )
-            ]
-        )
-        return f"{self.__class__.__name__}(\n{fields}\n)"
+        return print_model(self, "kitem")
 
     def __repr__(self) -> str:
         """Pretty print the kitem Fields"""
@@ -587,11 +578,12 @@ class KItem(BaseModel):
                 **value, kitem=self
             )
         elif not isinstance(
-            self.custom_properties, KItemCustomPropertiesModel
+            self.custom_properties, (KItemCustomPropertiesModel, type(None))
         ):
             raise TypeError(
                 "Custom properties must be either a dictionary or a "
-                "KItemCustomPropertiesModel."
+                "KItemCustomPropertiesModel. Not a "
+                f"{type(self.custom_properties)}: {self.custom_properties}"
             )
         return self
 

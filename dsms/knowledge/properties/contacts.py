@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field
 
 from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
+from dsms.knowledge.utils import print_model
 
 if TYPE_CHECKING:
     from typing import Callable
@@ -20,6 +21,10 @@ class ContactInfo(KItemProperty):
     user_id: Optional[UUID] = Field(
         None, description="User ID of the contact person"
     )
+
+    # OVERRIDE
+    def __str__(self) -> str:
+        return print_model(self, "contact")
 
 
 class ContactsProperty(KItemPropertyList):

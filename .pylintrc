@@ -79,6 +79,7 @@ disable= no-name-in-module,
     no-value-for-parameter,
     too-many-branches,
     too-many-lines,
+    too-many-statements,
 
 
 

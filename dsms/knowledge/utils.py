@@ -11,15 +11,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
+import oyaml as yaml
 import pandas as pd
 import segno
-import yaml
 from PIL import Image
 from requests import Response
-
-from pydantic import (  # isort: skip
-    BaseModel,
-)
 
 from dsms.core.logging import handler  # isort:skip
 
@@ -46,45 +42,28 @@ def _is_number(value):
         return False
 
 
-def print_webform(webform: BaseModel) -> str:
-    """
-    Helper function to pretty print a webform.
-
-    Args:
-        webform (BaseModel): The webform to print.
-
-    Returns:
-        str: A string representation of the webform.
-    """
-    if hasattr(webform, "model_fields"):
-        fields = [
-            f"\t\t{model_key}=dict({model_value})"
-            for model_key, model_value in webform.model_fields.items()
-            if model_key != "kitem"
-        ]
-        if fields:
-            fields = "\twebform={\n" + ",\n".join(fields) + "\n\t}"
-        else:
-            fields = "\twebform=None"
-    else:
-        fields = "\twebform=None"
-    return fields
+def print_model(self, key, exclude_extra: set = set()) -> str:
+    """Pretty print the ktype fields"""
+    exclude = (
+        self.model_config.get("exclude", set())
+        | exclude_extra
+        | self.dsms.config.hide_properties
+    )
+    dumped = self.model_dump(
+        exclude_none=True,
+        exclude_unset=True,
+        exclude=exclude,
+    )
+    dumped = {
+        key: (str(value) if isinstance(value, UUID) else value)
+        for key, value in dumped.items()
+    }
+    return yaml.dump({key: dumped})
 
 
 def print_ktype(self) -> str:
     """Pretty print the ktype fields"""
-    if hasattr(self, "value"):
-        fields = [
-            f"\t{key}={value}" if key != "webform" else print_webform(value)
-            for key, value in self.value.__dict__.items()
-        ]
-    else:
-        fields = [
-            f"\t{key}={value}" if key != "webform" else print_webform(value)
-            for key, value in self.__dict__.items()
-        ]
-    fields = ",\n".join(fields)
-    return f"{self.name}(\n{fields}\n)"
+    return print_model(self, "ktype")
 
 
 def _get_remote_ktypes() -> Enum:
@@ -989,8 +968,12 @@ def _map_data_type_to_widget(value):
         widget = Widget.NUMBER
     elif isinstance(value, bool):
         widget = Widget.CHECKBOX
+    elif isinstance(value, list):
+        widget = Widget.MULTI_SELECT
     else:
-        raise ValueError(f"Unsupported data type: {type(value)}")
+        raise ValueError(
+            f"Unsupported data type: {type(value)}. Value: {value}"
+        )
     return widget
 
 

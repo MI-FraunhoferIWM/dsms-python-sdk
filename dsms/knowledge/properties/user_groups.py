@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from pydantic import Field
 
 from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
+from dsms.knowledge.utils import print_model
 
 if TYPE_CHECKING:
     from typing import Callable
@@ -19,6 +20,10 @@ class UserGroup(KItemProperty):
     group_id: str = Field(
         ..., description="ID of the user group", max_length=100
     )
+
+    # OVERWRITE
+    def __str__(self):
+        return print_model(self, "user_group")
 
 
 class UserGroupsProperty(KItemPropertyList):

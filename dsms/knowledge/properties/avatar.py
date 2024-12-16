@@ -6,7 +6,7 @@ from PIL.Image import Image
 from pydantic import ConfigDict, Field
 
 from dsms.knowledge.properties.base import KItemProperty
-from dsms.knowledge.utils import _get_avatar, _make_avatar
+from dsms.knowledge.utils import _get_avatar, _make_avatar, print_model
 
 
 class Avatar(KItemProperty):
@@ -31,3 +31,7 @@ class Avatar(KItemProperty):
     def generate(self) -> "Image":
         """Generate avatar as PIL Image"""
         return _make_avatar(self.kitem, self.file, self.include_qr)
+
+    # OVERRIDE
+    def __str__(self):
+        return print_model(self, "avatar")
