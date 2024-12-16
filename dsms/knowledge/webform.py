@@ -65,15 +65,35 @@ class WebformMeasurementUnit(BaseModel):
     label: Optional[str] = Field(
         None, description="Label of the measurement unit"
     )
-    iri: Optional[AnyUrl] = Field(
+    iri: Optional[Union[str, AnyUrl]] = Field(
         None, description="IRI of the measurement unit"
     )
     symbol: Optional[str] = Field(
         None, description="Symbol of the measurement unit"
     )
-    namespace: Optional[AnyUrl] = Field(
+    namespace: Optional[Union[str, AnyUrl]] = Field(
         None, description="Namespace of the measurement unit"
     )
+
+    @model_validator(mode="after")
+    def check_measurement_unit(cls, self) -> "MeasurementUnit":
+        """
+        Validate and convert IRI and namespace fields to AnyUrl type.
+
+        This method is a model validator that runs after the model is initialized.
+        It ensures that the `iri` and `namespace` fields of the `MeasurementUnit`
+        are of type `AnyUrl`. If they are not, it attempts to convert them to
+        `AnyUrl`.
+
+        Returns:
+            MeasurementUnit: The validated and potentially modified instance.
+        """
+
+        if not isinstance(self.iri, AnyUrl):
+            self.iri = str(self.iri)
+        if not isinstance(self.namespace, AnyUrl):
+            self.namespace = str(self.namespace)
+        return self
 
 
 class WebformRangeOptions(BaseModel):
@@ -198,6 +218,25 @@ class RelationMapping(BaseWebformModel):
         description="Target class IRI if the type of relation is an object property",
     )
 
+    @model_serializer
+    def serialize(self) -> Dict[str, Any]:
+        """
+        Serialize the Input object to a dictionary representation.
+
+        This method transforms the Input instance into a dictionary, where the keys
+        are the attribute names and the values are the corresponding attribute values.
+        The "type" attribute is treated specially by storing its `value` instead of
+        the object itself.
+
+        Returns:
+            Dict[str, Any]: A dictionary representation of the Input object.
+        """
+        return {
+            key: (value.value if isinstance(value, Enum) else value)
+            for key, value in self.__dict__.items()
+            if key not in self.model_config["exclude"]
+        }
+
 
 class Input(BaseWebformModel):
     """Input fields in the sections in webform"""
@@ -235,6 +274,25 @@ class Input(BaseWebformModel):
         None, description="Placeholder for the input"
     )
 
+    @model_serializer
+    def serialize(self) -> Dict[str, Any]:
+        """
+        Serialize the Input object to a dictionary representation.
+
+        This method transforms the Input instance into a dictionary, where the keys
+        are the attribute names and the values are the corresponding attribute values.
+        The "type" attribute is treated specially by storing its `value` instead of
+        the object itself.
+
+        Returns:
+            Dict[str, Any]: A dictionary representation of the Input object.
+        """
+        return {
+            key: (value.value if isinstance(value, Enum) else value)
+            for key, value in self.__dict__.items()
+            if key not in self.model_config["exclude"]
+        }
+
 
 class Section(BaseWebformModel):
     """Section in webform"""
@@ -267,7 +325,7 @@ class Webform(BaseWebformModel):
 class MeasurementUnit(BaseWebformModel):
     """Measurement unit"""
 
-    iri: Optional[AnyUrl] = Field(
+    iri: Optional[Union[str, AnyUrl]] = Field(
         None,
         description="IRI of the annotation",
     )
@@ -279,9 +337,29 @@ class MeasurementUnit(BaseWebformModel):
         None,
         description="Symbol of the measurement unit",
     )
-    namespace: Optional[AnyUrl] = Field(
+    namespace: Optional[Union[str, AnyUrl]] = Field(
         None, description="Namespace of the measurement unit"
     )
+
+    @model_validator(mode="after")
+    def check_measurement_unit(cls, self) -> "MeasurementUnit":
+        """
+        Validate and convert IRI and namespace fields to AnyUrl type.
+
+        This method is a model validator that runs after the model is initialized.
+        It ensures that the `iri` and `namespace` fields of the `MeasurementUnit`
+        are of type `AnyUrl`. If they are not, it attempts to convert them to
+        `AnyUrl`.
+
+        Returns:
+            MeasurementUnit: The validated and potentially modified instance.
+        """
+
+        if not isinstance(self.iri, AnyUrl):
+            self.iri = str(self.iri)
+        if not isinstance(self.namespace, AnyUrl):
+            self.namespace = str(self.namespace)
+        return self
 
 
 class KnowledgeItemReference(BaseModel):
@@ -347,6 +425,39 @@ class Entry(BaseWebformModel):
         if isinstance(value, (int, float)):
             value = NumericalDataType(value)
         return value
+
+    def get_unit(self) -> "Dict[str, Any]":
+        """Get unit for the property"""
+        if not isinstance(self.value, NumericalDataType):
+            raise TypeError(
+                f"Cannot get unit for value {self.value} of type {type(self.value)}"
+            )
+        return self.value.get_unit()  # pylint: disable=no-member
+
+    def convert_to(
+        self,
+        unit_symbol_or_iri: str,
+        decimals: "Optional[int]" = None,
+        use_input_iri: bool = True,
+    ) -> Any:
+        """
+        Convert the data of the entry to a different unit.
+
+        Args:
+            unit_symbol_or_iri (str): Symbol or IRI of the unit to convert to.
+            decimals (Optional[int]): Number of decimals to round the result to. Defaults to None.
+            use_input_iri (bool): If True, use IRI for unit comparison. Defaults to False.
+
+        Returns:
+            Any: converted value of the entry
+        """
+        if not isinstance(self.value, NumericalDataType):
+            raise TypeError(
+                f"Cannot convert value {self.value} of type {type(self.value)}"
+            )
+        return self.value.convert_to(  # pylint: disable=no-member
+            unit_symbol_or_iri, decimals, use_input_iri
+        )
 
     @model_validator(mode="after")
     @classmethod
@@ -603,17 +714,19 @@ class KItemCustomPropertiesModel(BaseWebformModel):
 
         if not key in self.model_dump() and key != "kitem":
             for section in self.sections:  # pylint: disable=not-an-iterable
+                if section.name == key:
+                    target.append(section)
                 for entry in section.entries:
                     if entry.label == key:
                         target.append(entry)
             if len(target) == 0:
                 raise AttributeError(
-                    f"Custom properties model has no attribute '{key}'"
+                    f"Custom properties model has no entry or section '{key}'"
                 )
             if len(target) > 1:
                 raise AttributeError(
-                    f"""Custom properties model has multiple attributes
-                    '{key}'. Please specify section!"""
+                    f"""Custom properties model has multiple entries or sections for
+                    '{key}'. Please specify section via list indexing!"""
                 )
             target = target.pop()
         else:
