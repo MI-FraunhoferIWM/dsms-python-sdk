@@ -136,7 +136,7 @@ class LinkedKItem(KItemProperty):
     _kitem = PrivateAttr(default=None)
 
     # OVERRIDE
-    model_config = ConfigDict(exclude={}, arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def fetch(self) -> "KItem":
         """Fetch the linked KItem"""

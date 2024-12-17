@@ -28,7 +28,7 @@ class NumericalDataType(float):
 
     def __str__(self) -> str:
         """Pretty print the numerical datatype"""
-        if self.kitem.dsms.config.display_units:
+        if self.kitem.dsms.config.display_units:  # pylint: disable=no-member
             try:
                 string = f"{self.__float__()} {self.get_unit().get('symbol')}"
             except Exception as error:
@@ -69,32 +69,32 @@ class NumericalDataType(float):
         return str(self)
 
     @property
-    def kitem(cls) -> "Optional[KItem]":
+    def kitem(self) -> "Optional[KItem]":
         """Context of the current kitem for this property"""
-        return cls._kitem
+        return self._kitem
 
     @kitem.setter
-    def kitem(cls, value: "Optional[KItem]") -> None:
+    def kitem(self, value: "Optional[KItem]") -> None:
         """Setter for current KItem context"""
-        cls._kitem = value
+        self._kitem = value
 
     @property
-    def name(cls) -> str:
+    def name(self) -> str:
         """Context of the name for this property"""
-        return cls._name
+        return self._name
 
     @name.setter
-    def name(cls, value: str) -> None:
+    def name(self, value: str) -> None:
         """Setter for the name of the property"""
-        cls._name = value
+        self._name = value
 
     def get_unit(self) -> "Dict[str, Any]":
         """Get unit for the property"""
         return get_property_unit(
-            self.kitem.id,
+            self.kitem.id,  # pylint: disable=no-member
             self.name,
             is_dataframe_column=True,
-            autocomplete_symbol=self.kitem.dsms.config.autocomplete_units,
+            autocomplete_symbol=self.kitem.dsms.config.autocomplete_units,  # pylint: disable=no-member
         )
 
     def convert_to(

@@ -44,11 +44,7 @@ def _is_number(value):
 
 def print_model(self, key, exclude_extra: set = set()) -> str:
     """Pretty print the ktype fields"""
-    exclude = (
-        self.model_config.get("exclude", set())
-        | exclude_extra
-        | self.dsms.config.hide_properties
-    )
+    exclude = self.model_config.get("exclude", set()) | exclude_extra
     dumped = self.model_dump(
         exclude_none=True,
         exclude_unset=True,
@@ -212,16 +208,14 @@ def _delete_ktype(ktype: "KType") -> None:
 
 def _get_kitem_list() -> "List[KItem]":
     """Get all available KItems from the remote backend."""
-    from dsms.knowledge.kitem import (  # isort:skip
-        KItem,
-    )
+    from dsms.knowledge.kitem import KItem, KItemList  # isort:skip
 
     response = _perform_request("api/knowledge/kitems", "get")
     if not response.ok:
         raise ValueError(
             f"Something went wrong fetching the available kitems: {response.text}"
         )
-    return [KItem(**kitem) for kitem in response.json()]
+    return KItemList(KItem(**kitem) for kitem in response.json())
 
 
 def _kitem_exists(kitem: Union[Any, str, UUID]) -> bool:

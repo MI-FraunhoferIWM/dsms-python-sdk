@@ -231,13 +231,13 @@ class KItem(BaseModel):
         super().__init__(**kwargs)
 
         # add kitem to buffer
-        if not self.in_backend and self.id not in self.context.buffers.created:
+        if not self.in_backend and self.id not in self.session.buffers.created:
             logger.debug(
                 "Marking KItem with ID `%s` as created and updated during KItem initialization.",
                 self.id,
             )
-            self.context.buffers.created.update({self.id: self})
-            self.context.buffers.updated.update({self.id: self})
+            self.session.buffers.created.update({self.id: self})
+            self.session.buffers.updated.update({self.id: self})
 
         self._set_kitem_for_properties()
 
@@ -252,18 +252,20 @@ class KItem(BaseModel):
         self._set_kitem_for_properties()
 
         if (
-            self.id not in self.context.buffers.updated
+            self.id not in self.session.buffers.updated
             and not name.startswith("_")
         ):
             logger.debug(
                 "Setting KItem with ID `%s` as updated during KItem.__setattr__",
                 self.id,
             )
-            self.context.buffers.updated.update({self.id: self})
+            self.session.buffers.updated.update({self.id: self})
 
     def __str__(self) -> str:
         """Pretty print the kitem fields"""
-        return print_model(self, "kitem")
+        return print_model(
+            self, "kitem", exclude_extra=self.dsms.config.hide_properties
+        )
 
     def __repr__(self) -> str:
         """Pretty print the kitem Fields"""
@@ -573,10 +575,12 @@ class KItem(BaseModel):
                     """A flat dictionary was provided for custom properties.
                     Will be transformed into `KItemCustomPropertiesModel`."""
                 )
-
+            was_in_buffer = self.id in self.session.buffers.updated
             self.custom_properties = KItemCustomPropertiesModel(
                 **value, kitem=self
             )
+            if not was_in_buffer:
+                self.session.buffers.updated.pop(self.id)
         elif not isinstance(
             self.custom_properties, (KItemCustomPropertiesModel, type(None))
         ):
@@ -589,7 +593,7 @@ class KItem(BaseModel):
 
     def _set_kitem_for_properties(self) -> None:
         """Set kitem for CustomProperties and KProperties in order to
-        remain the context for the buffer if any of these properties is changed.
+        remain the session for the buffer if any of these properties is changed.
         """
         for prop in self.__dict__.values():
             if (
@@ -613,13 +617,13 @@ class KItem(BaseModel):
 
     @property
     def dsms(cls) -> "DSMS":
-        """DSMS context getter"""
-        return cls.context.dsms
+        """DSMS session getter"""
+        return cls.session.dsms
 
     @dsms.setter
     def dsms(cls, value: "DSMS") -> None:
-        """DSMS context setter"""
-        cls.context.dsms = value
+        """DSMS session setter"""
+        cls.session.dsms = value
 
     @property
     def subgraph(cls) -> Optional[Graph]:
@@ -629,7 +633,7 @@ class KItem(BaseModel):
         )
 
     @property
-    def context(cls) -> "Session":
+    def session(cls) -> "Session":
         """Getter for Session"""
         from dsms import (  # isort:skip
             Session,
@@ -641,7 +645,7 @@ class KItem(BaseModel):
     def url(cls) -> str:
         """URL of the KItem"""
         return cls.access_url or urljoin(
-            str(cls.context.dsms.config.host_url),
+            str(cls.session.dsms.config.host_url),
             f"knowledge/{cls._get_ktype_as_str()}/{cls.slug}",
         )
 
@@ -661,3 +665,15 @@ class KItem(BaseModel):
         else:
             raise TypeError(f"Datatype for KType is unknown: {type(ktype)}")
         return ktype
+
+
+class KItemList(list):
+    """List of KItems"""
+
+    def __str__(self):
+        """Pretty print the KItemList"""
+        return "\n".join([str(item) for item in self])
+
+    def __repr__(self):
+        """Pretty print the KItemList"""
+        return str(self)

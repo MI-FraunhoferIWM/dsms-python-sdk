@@ -178,7 +178,7 @@ class BaseWebformModel(BaseModel):
         This method sets an attribute of the model and logs the operation.
         If the attribute being set is `kitem`, it directly assigns the value.
         For other attributes, it marks the associated `kitem` as updated in the
-        context buffers if it exists.
+        session buffers if it exists.
 
         Args:
             key (str): The name of the attribute to set.
@@ -196,7 +196,7 @@ class BaseWebformModel(BaseModel):
                 "Setting related kitem with id `%s` as updated",
                 self.kitem.id,
             )
-            self.kitem.context.buffers.updated.update(
+            self.kitem.session.buffers.updated.update(
                 {self.kitem.id: self.kitem}
             )
 
