@@ -394,6 +394,7 @@ class Entry(BaseWebformModel):
     relationMapping: Optional[RelationMapping] = Field(
         None, description="Relation mapping of the entry"
     )
+    required: Optional[bool] = Field(False, description="Required input")
 
     def __setattr__(self, key, value) -> None:
         """

@@ -448,11 +448,12 @@ class KItem(BaseModel):
         from dsms import Session
 
         if isinstance(value, str):
-            value = Session.ktypes.get(value)
-            if not value:
+            ktype = Session.ktypes.get(value)
+            if not ktype:
                 raise TypeError(
                     f"KType for `ktype_id={value}` does not exist."
                 )
+            value = ktype
 
         return value.id
 

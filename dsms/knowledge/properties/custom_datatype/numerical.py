@@ -45,7 +45,9 @@ class NumericalDataType(float):
         yield cls.validate
 
     @classmethod
-    def validate(cls, v: "Any") -> "NumericalDataType":
+    def validate(
+        cls, v: "Any", *args, **kwargs  # pylint: disable=W0613
+    ) -> "NumericalDataType":
         """
         Validate the input value as a valid NumericalDataType.
 
@@ -59,7 +61,7 @@ class NumericalDataType(float):
             TypeError: If the input value is not a float or int.
         """
         if not isinstance(v, (float, int)):
-            raise TypeError(f"Expected float or int, got {type(v)}")
+            raise TypeError(f"Expected float or int, got {type(v)}: {v}")
         obj = super().__new__(cls, v)
         obj._kitem = None
         obj._name = None
