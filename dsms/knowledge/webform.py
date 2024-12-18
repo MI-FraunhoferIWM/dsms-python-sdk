@@ -11,9 +11,9 @@ from pydantic import (  # isort:skip
     BaseModel,
     ConfigDict,
     Field,
-    field_validator,
     model_serializer,
     model_validator,
+    AliasChoices,
 )
 
 from dsms.knowledge.utils import (  # isort:skip
@@ -22,9 +22,11 @@ from dsms.knowledge.utils import (  # isort:skip
     print_model,
 )
 
-from dsms.knowledge.properties.custom_datatype import (  # isort:skip
-    NumericalDataType,
+from dsms.knowledge.semantics.units.utils import (  # isort:skip
+    get_conversion_factor,
+    get_property_unit,
 )
+
 from dsms.core.logging import handler  # isort:skip
 
 if TYPE_CHECKING:
@@ -57,6 +59,14 @@ class WebformSelectOption(BaseModel):
     label: Optional[str] = Field(None, description="Label of the option")
     value: Optional[Any] = Field(None, description="Value of the option")
     disabled: Optional[bool] = Field(False, description="Disabled option")
+
+    def __str__(self) -> str:
+        """Pretty print the model fields"""
+        return print_model(self, "select option")
+
+    def __repr__(self) -> str:
+        """Pretty print the model fields"""
+        return str(self)
 
 
 class WebformMeasurementUnit(BaseModel):
@@ -95,6 +105,14 @@ class WebformMeasurementUnit(BaseModel):
             self.namespace = str(self.namespace)
         return self
 
+    def __str__(self) -> str:
+        """Pretty print the model fields"""
+        return print_model(self, "webform measurement unit")
+
+    def __repr__(self) -> str:
+        """Pretty print the model fields"""
+        return str(self)
+
 
 class WebformRangeOptions(BaseModel):
     """Range options"""
@@ -105,6 +123,14 @@ class WebformRangeOptions(BaseModel):
     range: Optional[Union[int, float]] = Field(
         False, description="Range value"
     )
+
+    def __str__(self) -> str:
+        """Pretty print the model fields"""
+        return print_model(self, "range options")
+
+    def __repr__(self) -> str:
+        """Pretty print the model fields"""
+        return str(self)
 
 
 class RelationMappingType(Enum):
@@ -218,6 +244,14 @@ class RelationMapping(BaseWebformModel):
         description="Target class IRI if the type of relation is an object property",
     )
 
+    def __str__(self) -> str:
+        """Pretty print the model fields"""
+        return print_model(self, "relation mapping")
+
+    def __repr__(self) -> str:
+        """Pretty print the model fields"""
+        return str(self)
+
     @model_serializer
     def serialize(self) -> Dict[str, Any]:
         """
@@ -293,6 +327,14 @@ class Input(BaseWebformModel):
             if key not in self.model_config["exclude"]
         }
 
+    def __str__(self) -> str:
+        """Pretty print the model fields"""
+        return print_model(self, "input")
+
+    def __repr__(self) -> str:
+        """Pretty print the model fields"""
+        return str(self)
+
 
 class Section(BaseWebformModel):
     """Section in webform"""
@@ -305,6 +347,14 @@ class Section(BaseWebformModel):
         [], description="List of inputs in the section"
     )
     hidden: Optional[bool] = Field(False, description="Hidden section")
+
+    def __str__(self) -> str:
+        """Pretty print the model fields"""
+        return print_model(self, "section")
+
+    def __repr__(self) -> str:
+        """Pretty print the model fields"""
+        return str(self)
 
 
 class Webform(BaseWebformModel):
@@ -320,6 +370,14 @@ class Webform(BaseWebformModel):
         [], description="Class mapping"
     )
     sections: List[Section] = Field([], description="List of sections")
+
+    def __str__(self) -> str:
+        """Pretty print the model fields"""
+        return print_model(self, "webform")
+
+    def __repr__(self) -> str:
+        """Pretty print the model fields"""
+        return str(self)
 
 
 class MeasurementUnit(BaseWebformModel):
@@ -340,6 +398,14 @@ class MeasurementUnit(BaseWebformModel):
     namespace: Optional[Union[str, AnyUrl]] = Field(
         None, description="Namespace of the measurement unit"
     )
+
+    def __str__(self) -> str:
+        """Pretty print the model fields"""
+        return print_model(self, "measurement_unit")
+
+    def __repr__(self) -> str:
+        """Pretty print the model fields"""
+        return str(self)
 
     @model_validator(mode="after")
     def check_measurement_unit(cls, self) -> "MeasurementUnit":
@@ -368,6 +434,14 @@ class KnowledgeItemReference(BaseModel):
     id: str = Field(..., description="ID of the knowledge item")
     name: str = Field(..., description="Name of the knowledge item")
 
+    def __str__(self) -> str:
+        """Pretty print the model fields"""
+        return print_model(self, "knowledge item reference")
+
+    def __repr__(self) -> str:
+        """Pretty print the model fields"""
+        return str(self)
+
 
 class Entry(BaseWebformModel):
     """
@@ -385,14 +459,21 @@ class Entry(BaseWebformModel):
             float,
             bool,
             List,
-            NumericalDataType,
         ]
     ] = Field(None, description="Value of the entry")
-    measurementUnit: Optional[MeasurementUnit] = Field(
-        None, description="Measurement unit of the entry"
+    measurement_unit: Optional[MeasurementUnit] = Field(
+        None,
+        description="Measurement unit of the entry",
+        alias=AliasChoices(
+            "measurementUnit", "measurement_unit", "measurementunit"
+        ),
     )
-    relationMapping: Optional[RelationMapping] = Field(
-        None, description="Relation mapping of the entry"
+    relation_mapping: Optional[RelationMapping] = Field(
+        None,
+        description="Relation mapping of the entry",
+        alias=AliasChoices(
+            "relationMapping", "relation_mapping", "relationmapping"
+        ),
     )
     required: Optional[bool] = Field(False, description="Required input")
 
@@ -420,29 +501,34 @@ class Entry(BaseWebformModel):
 
         super().__setattr__(key, value)
 
-    @field_validator("value")
-    @classmethod
-    def _validate_value(cls, value: Any) -> Any:
-        if isinstance(value, (int, float)):
-            value = NumericalDataType(value)
-        return value
+    def __str__(self) -> str:
+        """Pretty print the model fields"""
+        return print_model(self, "entry")
+
+    def __repr__(self) -> str:
+        """Pretty print the model fields"""
+        return str(self)
 
     def get_unit(self) -> "Dict[str, Any]":
         """Get unit for the property"""
-        if not isinstance(self.value, NumericalDataType):
-            raise TypeError(
-                f"Cannot get unit for value {self.value} of type {type(self.value)}"
-            )
-        return self.value.get_unit()  # pylint: disable=no-member
+        if not isinstance(self.value, (float, int)):
+            raise ValueError("Value must be a number")
+        return get_property_unit(
+            self.kitem.id,  # pylint: disable=no-member
+            self.label,
+            self.measurement_unit,
+            is_dataframe_column=True,
+            autocomplete_symbol=self.kitem.dsms.config.autocomplete_units,  # pylint: disable=no-member
+        )
 
     def convert_to(
         self,
         unit_symbol_or_iri: str,
         decimals: "Optional[int]" = None,
         use_input_iri: bool = True,
-    ) -> Any:
+    ) -> float:
         """
-        Convert the data of the entry to a different unit.
+        Convert the data of property to a different unit.
 
         Args:
             unit_symbol_or_iri (str): Symbol or IRI of the unit to convert to.
@@ -450,14 +536,17 @@ class Entry(BaseWebformModel):
             use_input_iri (bool): If True, use IRI for unit comparison. Defaults to False.
 
         Returns:
-            Any: converted value of the entry
+            float: converted value of the property
         """
-        if not isinstance(self.value, NumericalDataType):
-            raise TypeError(
-                f"Cannot convert value {self.value} of type {type(self.value)}"
-            )
-        return self.value.convert_to(  # pylint: disable=no-member
-            unit_symbol_or_iri, decimals, use_input_iri
+        if not isinstance(self.value, (float, int)):
+            raise ValueError("Value must be a number")
+        unit = self.get_unit()
+        if use_input_iri:
+            input_str = unit.get("iri")
+        else:
+            input_str = unit.get("symbol")
+        return self.value * get_conversion_factor(
+            input_str, unit_symbol_or_iri, decimals=decimals
         )
 
     @model_validator(mode="after")
@@ -497,7 +586,7 @@ class Entry(BaseWebformModel):
         ):
             dtype = str
         elif self.type in (Widget.NUMBER, Widget.SLIDER):
-            dtype = NumericalDataType
+            dtype = float
         elif self.type == Widget.CHECKBOX:
             dtype = bool
         elif self.type in (Widget.SELECT, Widget.RADIO, Widget.MULTI_SELECT):
@@ -537,11 +626,6 @@ class Entry(BaseWebformModel):
         if self.value is None and default_value is None and self.required:
             raise ValueError(f"Value for entry {self.label} is required")
 
-        # set name and kitem of numerical data type
-        if isinstance(self.value, NumericalDataType):
-            self.value.name = self.label
-            self.value.kitem = self.kitem
-
         return self
 
     @model_serializer
@@ -560,8 +644,6 @@ class Entry(BaseWebformModel):
         dumped = {}
         for key, value in self.__dict__.items():
             if key != "kitem":
-                if isinstance(value, NumericalDataType):
-                    value = float(value)
                 if key == "type":
                     value = value.value
                 dumped[key] = value
@@ -655,13 +737,47 @@ class CustomPropertiesSection(BaseWebformModel):
             if len(target) > 1:
                 raise AttributeError(
                     f"""Section with name `{self.name}`
-                    has multiple attributes '{key}'. Please specify section!"""
+                    has multiple attributes '{key}'.
+                    Please specify the concrete entry via indexing !"""
                 )
 
             target = target.pop()
         else:
             target = super().__getattr__(key)
         return target
+
+    def __getitem__(self, key):
+        """
+        Retrieve an entry from the section by its index.
+
+        Args:
+            key (int): The index of the entry to retrieve.
+
+        Returns:
+            Entry: The entry at the given index.
+
+        Raises:
+            IndexError: If the index is out of range.
+        """
+        return self.entries[key]  # pylint: disable=unsubscriptable-object
+
+    def __iter__(self):
+        """
+        Iterate over the entries of the section.
+
+        Yields:
+            Entry: The entries in the section.
+        """
+        yield from self.entries  # pylint: disable=not-an-iterable
+
+    def __len__(self):
+        """
+        Return the number of entries in the section.
+
+        Returns:
+            int: The number of entries in the section.
+        """
+        return len(self.entries)
 
     @model_validator(mode="before")
     @classmethod
@@ -681,6 +797,14 @@ class CustomPropertiesSection(BaseWebformModel):
                 if not "kitem" in entry:
                     entry["kitem"] = kitem
         return self
+
+    def __str__(self) -> str:
+        """Pretty print the model fields"""
+        return print_model(self, "section")
+
+    def __repr__(self) -> str:
+        """Pretty print the model fields"""
+        return str(self)
 
 
 class KItemCustomPropertiesModel(BaseWebformModel):
@@ -776,6 +900,39 @@ class KItemCustomPropertiesModel(BaseWebformModel):
         else:
             super().__setattr__(key, value)
 
+    def __iter__(self):
+        """
+        Iterate over the sections in the custom properties.
+
+        This method yields each section within the custom properties model,
+        allowing for iteration over all sections.
+
+        Yields:
+            CustomPropertiesSection: The next section in the custom properties.
+        """
+        yield from self.sections  # pylint: disable=not-an-iterable
+
+    def __len__(self):
+        """
+        Return the number of sections in the custom properties.
+
+        Returns:
+            int: The number of sections in the custom properties.
+        """
+        return len(self.sections)
+
+    def __getitem__(self, key):
+        """
+        Retrieve a section from the custom properties by its index.
+
+        Args:
+            key (int): The index of the section to retrieve.
+
+        Returns:
+            CustomPropertiesSection: The section at the specified index.
+        """
+        return self.sections[key]  # pylint: disable=unsubscriptable-object
+
     @model_validator(mode="before")
     @classmethod
     def set_kitem(cls, self: Dict[str, Any]) -> Dict[str, Any]:
@@ -794,3 +951,11 @@ class KItemCustomPropertiesModel(BaseWebformModel):
                 if not "kitem" in section:
                     section["kitem"] = kitem
         return self
+
+    def __str__(self) -> str:
+        """Pretty print the model fields"""
+        return print_model(self, "custom_properties")
+
+    def __repr__(self) -> str:
+        """Pretty print the model fields"""
+        return str(self)
