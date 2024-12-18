@@ -21,7 +21,7 @@ class Attachment(KItemProperty):
     )
 
     content: Optional[Union[str, bytes]] = Field(
-        None, description="Content of the file"
+        None, description="Content of the file", exclude=True
     )
 
     # OVERRIDE

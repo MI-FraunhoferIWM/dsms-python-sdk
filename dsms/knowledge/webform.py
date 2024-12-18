@@ -11,8 +11,8 @@ from pydantic import (  # isort:skip
     BaseModel,
     ConfigDict,
     Field,
-    model_serializer,
     model_validator,
+    AliasGenerator,
     AliasChoices,
 )
 
@@ -147,11 +147,18 @@ class BaseWebformModel(BaseModel):
     """Base webform model"""
 
     model_config = ConfigDict(
-        alias_generator=lambda field_name: to_camel(  # pylint: disable=W0108
-            field_name
+        alias_generator=AliasGenerator(
+            validation_alias=lambda field_name: AliasChoices(
+                to_camel(field_name), field_name  # pylint: disable=W0108
+            ),
+            serialization_alias=lambda field_name: to_camel(  # pylint: disable=W0108
+                field_name
+            ),
         ),
         exclude={"kitem"},
+        use_enum_values=True,
     )
+
     kitem: Optional[Any] = Field(
         None, description="Associated KItem instance", exclude=True, hide=True
     )
@@ -252,25 +259,6 @@ class RelationMapping(BaseWebformModel):
         """Pretty print the model fields"""
         return str(self)
 
-    @model_serializer
-    def serialize(self) -> Dict[str, Any]:
-        """
-        Serialize the Input object to a dictionary representation.
-
-        This method transforms the Input instance into a dictionary, where the keys
-        are the attribute names and the values are the corresponding attribute values.
-        The "type" attribute is treated specially by storing its `value` instead of
-        the object itself.
-
-        Returns:
-            Dict[str, Any]: A dictionary representation of the Input object.
-        """
-        return {
-            key: (value.value if isinstance(value, Enum) else value)
-            for key, value in self.__dict__.items()
-            if key not in self.model_config["exclude"]
-        }
-
 
 class Input(BaseWebformModel):
     """Input fields in the sections in webform"""
@@ -307,25 +295,6 @@ class Input(BaseWebformModel):
     placeholder: Optional[str] = Field(
         None, description="Placeholder for the input"
     )
-
-    @model_serializer
-    def serialize(self) -> Dict[str, Any]:
-        """
-        Serialize the Input object to a dictionary representation.
-
-        This method transforms the Input instance into a dictionary, where the keys
-        are the attribute names and the values are the corresponding attribute values.
-        The "type" attribute is treated specially by storing its `value` instead of
-        the object itself.
-
-        Returns:
-            Dict[str, Any]: A dictionary representation of the Input object.
-        """
-        return {
-            key: (value.value if isinstance(value, Enum) else value)
-            for key, value in self.__dict__.items()
-            if key not in self.model_config["exclude"]
-        }
 
     def __str__(self) -> str:
         """Pretty print the model fields"""
@@ -464,16 +433,10 @@ class Entry(BaseWebformModel):
     measurement_unit: Optional[MeasurementUnit] = Field(
         None,
         description="Measurement unit of the entry",
-        alias=AliasChoices(
-            "measurementUnit", "measurement_unit", "measurementunit"
-        ),
     )
     relation_mapping: Optional[RelationMapping] = Field(
         None,
         description="Relation mapping of the entry",
-        alias=AliasChoices(
-            "relationMapping", "relation_mapping", "relationmapping"
-        ),
     )
     required: Optional[bool] = Field(False, description="Required input")
 
@@ -579,27 +542,31 @@ class Entry(BaseWebformModel):
 
         # check if widget is mapped to a data type
         if self.type in (
-            Widget.TEXT,
-            Widget.FILE,
-            Widget.TEXTAREA,
-            Widget.VOCABULARY_TERM,
+            Widget.TEXT.value,
+            Widget.FILE.value,
+            Widget.TEXTAREA.value,
+            Widget.VOCABULARY_TERM.value,
         ):
             dtype = str
-        elif self.type in (Widget.NUMBER, Widget.SLIDER):
+        elif self.type in (Widget.NUMBER.value, Widget.SLIDER.value):
             dtype = (int, float)
-        elif self.type == Widget.CHECKBOX:
+        elif self.type == Widget.CHECKBOX.value:
             dtype = bool
-        elif self.type in (Widget.SELECT, Widget.RADIO, Widget.MULTI_SELECT):
-            if self.type == Widget.MULTI_SELECT:
+        elif self.type in (
+            Widget.SELECT.value,
+            Widget.RADIO.value,
+            Widget.MULTI_SELECT.value,
+        ):
+            if self.type == Widget.MULTI_SELECT.value:
                 dtype = list
             else:
                 dtype = str
             choices = [choice.value for choice in select_options]
-        elif self.type == Widget.KNOWLEDGE_ITEM:
+        elif self.type == Widget.KNOWLEDGE_ITEM.value:
             dtype = KnowledgeItemReference
         else:
             raise ValueError(
-                f"Widget type is not mapped to a data type: {self.widget}"
+                f"Widget type is not mapped to a data type: {self.type}"
             )
 
         # check if value is set
@@ -627,29 +594,6 @@ class Entry(BaseWebformModel):
             raise ValueError(f"Value for entry {self.label} is required")
 
         return self
-
-    @model_serializer
-    def serialize(self) -> Dict[str, Any]:
-        """
-        Serialize the Entry object to a dictionary representation.
-
-        This method transforms the Entry instance into a dictionary, where the keys
-        are the attribute names and the values are the corresponding attribute values.
-        The "type" attribute is treated specially by storing its `value` instead of
-        the object itself.
-
-        Returns:
-            Dict[str, Any]: A dictionary representation of the Entry object.
-        """
-        dumped = {}
-        for key, value in self.__dict__.items():
-            if key != "kitem":
-                if key == "type":
-                    value = value.value
-                if key in ("measurement_unit", "relation_mapping"):
-                    key = to_camel(key)
-                dumped[key] = value
-        return dumped
 
     @classmethod
     def _get_input_spec(cls, self: "Entry"):

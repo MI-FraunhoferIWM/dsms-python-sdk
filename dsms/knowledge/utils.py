@@ -181,6 +181,7 @@ def _update_ktype(ktype: "KType") -> Response:
     """Update a KType in the remote backend."""
     payload = ktype.model_dump(
         exclude_none=True,
+        by_alias=True,
     )
     logger.debug("Update KType for `%s` with body: %s", ktype.id, payload)
     response = _perform_request(
@@ -306,15 +307,9 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
         **differences,
     )
     if new_kitem.custom_properties:
-        custom_properties = new_kitem.custom_properties.model_dump()
-        # # a smarted detection whether the custom properties were updated is needed
-        # old_properties = old_kitem.get("custom_properties")
-        # if isinstance(old_properties, dict):
-        #     old_custom_properties = old_properties.get("content")
-        # else:
-        #     old_custom_properties = None
-        # if custom_properties != old_custom_properties:
-        #     payload.update(custom_properties={"content": custom_properties})
+        custom_properties = new_kitem.custom_properties.model_dump(
+            by_alias=True
+        )
         payload.update(custom_properties={"content": custom_properties})
     logger.debug(
         "Update KItem for `%s` with payload: %s", new_kitem.id, payload
@@ -957,13 +952,13 @@ def _map_data_type_to_widget(value):
     from dsms.knowledge.webform import Widget
 
     if isinstance(value, str):
-        widget = Widget.TEXT
+        widget = Widget.TEXT.value
     elif isinstance(value, (int, float)):
-        widget = Widget.NUMBER
+        widget = Widget.NUMBER.value
     elif isinstance(value, bool):
-        widget = Widget.CHECKBOX
+        widget = Widget.CHECKBOX.value
     elif isinstance(value, list):
-        widget = Widget.MULTI_SELECT
+        widget = Widget.MULTI_SELECT.value
     else:
         raise ValueError(
             f"Unsupported data type: {type(value)}. Value: {value}"
