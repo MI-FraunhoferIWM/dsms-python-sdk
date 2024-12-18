@@ -181,7 +181,7 @@ class KItem(BaseModel):
         [],
         description="User groups able to access the KItem.",
     )
-    custom_properties: Optional[Union[Any]] = Field(
+    custom_properties: Optional[Any] = Field(
         None, description="Custom properties associated to the KItem"
     )
 
