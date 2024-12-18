@@ -455,8 +455,8 @@ class Entry(BaseWebformModel):
         Union[
             str,
             int,
-            KnowledgeItemReference,
             float,
+            KnowledgeItemReference,
             bool,
             List,
         ]
@@ -586,7 +586,7 @@ class Entry(BaseWebformModel):
         ):
             dtype = str
         elif self.type in (Widget.NUMBER, Widget.SLIDER):
-            dtype = float
+            dtype = (int, float)
         elif self.type == Widget.CHECKBOX:
             dtype = bool
         elif self.type in (Widget.SELECT, Widget.RADIO, Widget.MULTI_SELECT):
