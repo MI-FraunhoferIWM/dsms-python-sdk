@@ -902,7 +902,7 @@ def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
                         "id": input_def.id,
                         "label": input_def.label,
                         "value": copy_properties.pop(input_def.label),
-                        "measurementUnit": input_def.measurement_unit,
+                        "measurement_unit": input_def.measurement_unit,
                         "type": input_def.widget,
                         **class_mapping,
                     }

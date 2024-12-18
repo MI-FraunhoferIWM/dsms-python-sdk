@@ -490,12 +490,12 @@ class Entry(BaseWebformModel):
             value (Any): The value to set for the attribute.
         """
         if key == "kitem":
-            if self.measurementUnit:
-                self.measurementUnit.kitem = (  # pylint: disable=assigning-non-slot
+            if self.measurement_unit:
+                self.measurement_unit.kitem = (  # pylint: disable=assigning-non-slot
                     value
                 )
-            if self.relationMapping:
-                self.relationMapping.kitem = (  # pylint: disable=assigning-non-slot
+            if self.relation_mapping:
+                self.relation_mapping.kitem = (  # pylint: disable=assigning-non-slot
                     value
                 )
 
@@ -646,6 +646,8 @@ class Entry(BaseWebformModel):
             if key != "kitem":
                 if key == "type":
                     value = value.value
+                if key in ("measurement_unit", "relation_mapping"):
+                    key = to_camel(key)
                 dumped[key] = value
         return dumped
 
