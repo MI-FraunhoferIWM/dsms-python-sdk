@@ -935,11 +935,11 @@ def _make_misc_section(custom_properties: dict):
     If the ktype_id is not found, return the custom_properties dictionary
     as is, wrapped in a section named "Misc".
     """
-    section = {"id": id_generator(), "name": "Misc", "entries": []}
+    section = {"id": generate_id(), "name": "Misc", "entries": []}
     for key, value in custom_properties.items():
         section["entries"].append(
             {
-                "id": id_generator(),
+                "id": generate_id(),
                 "label": key,
                 "value": value,
                 "type": _map_data_type_to_widget(value),
@@ -966,7 +966,42 @@ def _map_data_type_to_widget(value):
     return widget
 
 
-def id_generator(prefix: str = "id") -> str:
+def sectionize_metadata(metadata: List[Dict[str, Any]]) -> dict:
+    """
+    Convert a list of dictionaries representing metadata
+    entries into a DSMS schema dict.
+
+    The input should be a list of dictionaries,
+    where each dictionary represents a metadata entry.
+    The output is a dictionary in the DSMS schema,
+    with a single section named "General",
+    containing the given metadata entries.
+
+    If the input is empty, the function will
+    return an empty dictionary.
+
+    :param metadata: The metadata list to convert.
+    :return: A dictionary in the DSMS schema.
+    """
+    if metadata:
+        for metadatum in metadata:
+            metadatum["id"] = generate_id()
+        metadata = {
+            "sections": [
+                {
+                    "id": generate_id(),
+                    "name": "General",
+                    "entries": metadata,
+                }
+            ]
+        }
+    else:
+        metadata = {}
+
+    return metadata
+
+
+def generate_id(prefix: str = "id") -> str:
     # Generate a unique part using time and random characters
     """
     Generates a unique id using a combination of the current time and 6 random characters.

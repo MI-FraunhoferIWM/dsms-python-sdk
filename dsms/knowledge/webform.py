@@ -18,7 +18,7 @@ from pydantic import (  # isort:skip
 
 from dsms.knowledge.utils import (  # isort:skip
     _map_data_type_to_widget,
-    id_generator,
+    generate_id,
     print_model,
 )
 
@@ -264,7 +264,7 @@ class Input(BaseWebformModel):
     """Input fields in the sections in webform"""
 
     id: Optional[str] = Field(
-        default_factory=id_generator, description="ID of the input"
+        default_factory=generate_id, description="ID of the input"
     )
     label: Optional[str] = Field(None, description="Label of the input")
     widget: Optional[Widget] = Field(None, description="Widget of the input")
@@ -309,7 +309,7 @@ class Section(BaseWebformModel):
     """Section in webform"""
 
     id: Optional[str] = Field(
-        default_factory=id_generator, description="ID of the section"
+        default_factory=generate_id, description="ID of the section"
     )
     name: Optional[str] = Field(None, description="Name of the section")
     inputs: List[Input] = Field(
@@ -417,7 +417,7 @@ class Entry(BaseWebformModel):
     Entry in a custom properties section
     """
 
-    id: str = Field(default_factory=id_generator)
+    id: str = Field(default_factory=generate_id)
     type: Optional[Widget] = Field(None, description="Type of the entry")
     label: str = Field(..., description="Label of the entry")
     value: Optional[
@@ -611,7 +611,7 @@ class CustomPropertiesSection(BaseWebformModel):
     Section for custom properties
     """
 
-    id: Optional[str] = Field(default_factory=id_generator)
+    id: Optional[str] = Field(default_factory=generate_id)
     name: str = Field(..., description="Name of the section")
     entries: List[Entry] = Field([], description="Entries of the section")
 
