@@ -21,7 +21,7 @@ from dsms.core.logging import handler  # isort:skip
 
 from dsms.core.utils import _name_to_camel, _perform_request  # isort:skip
 
-from dsms.knowledge.search import SearchResult  # isort:skip
+from dsms.knowledge.search import SearchResult, KItemListModel  # isort:skip
 
 if TYPE_CHECKING:
     from dsms.apps import AppConfig
@@ -207,16 +207,28 @@ def _delete_ktype(ktype: "KType") -> None:
     Session.dsms.ktypes = _get_remote_ktypes()
 
 
-def _get_kitem_list() -> "List[KItem]":
+def _get_kitem_list(limit=10, offset=0) -> "KItemListModel":
     """Get all available KItems from the remote backend."""
-    from dsms.knowledge.kitem import KItem, KItemList  # isort:skip
+    from dsms.knowledge.kitem import KItem  # isort:skip
 
-    response = _perform_request("api/knowledge/kitems", "get")
+    response = _perform_request(
+        "api/knowledge/kitems",
+        "get",
+        params={
+            "limit": limit,
+            "offset": offset,
+        },
+    )
     if not response.ok:
         raise ValueError(
             f"Something went wrong fetching the available kitems: {response.text}"
         )
-    return KItemList(KItem(**kitem) for kitem in response.json())
+    payload = response.json()
+    kitems = {
+        "kitems": [KItem(**kitem) for kitem in payload["kitems"]],
+        "total_count": payload["total_count"],
+    }
+    return KItemListModel(**kitems)
 
 
 def _kitem_exists(kitem: Union[Any, str, UUID]) -> bool:
@@ -680,6 +692,7 @@ def _search(
     ktypes: "Optional[List[Union[Enum, KType]]]" = [],
     annotations: "Optional[List[str]]" = [],
     limit: "Optional[int]" = 10,
+    offset: "Optional[int]" = 0,
     allow_fuzzy: "Optional[bool]" = True,
 ) -> "List[SearchResult]":
     """Search for KItems in the remote backend"""
@@ -690,6 +703,7 @@ def _search(
         "ktypes": [ktype.value.id for ktype in ktypes],
         "annotations": [_make_annotation_schema(iri) for iri in annotations],
         "limit": limit,
+        "offset": offset,
     }
     response = _perform_request(
         "api/knowledge/kitems/search",

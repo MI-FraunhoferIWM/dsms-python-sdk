@@ -1,6 +1,7 @@
 """DSMS connection module"""
 
 import os
+import warnings
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List
 
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
     from dsms.core.session import Buffers
     from dsms.knowledge.kitem import KItem
     from dsms.knowledge.ktype import KType
-    from dsms.knowledge.search import SearchResult
+    from dsms.knowledge.search import KItemListModel, SearchResult
 
 
 class DSMS:
@@ -186,15 +187,35 @@ class DSMS:
         return header
 
     @property
-    def kitems(cls) -> "List[KItem]":
-        """KItems instantiated and available in the remote backend.
-        WARNING: This will download _all_ KItems in the backend owned
-        by the current user and may resolve into long response times.
-        The default timeout for requests is defined under the
-        `request_timeout`-attribute in the `Configuration`-class."""
+    def kitems(cls) -> "KItemListModel":
+        """
+        **DEPRECATED**
+
+        Return the first 10 KItems from the remote backend.
+
+        .. warning::
+            This property is deprecated and only returns the 10 first kitems.
+            Please use the `get_kitems`-method instead.
+
+        Returns:
+            KItemListModel: The first 10 KItems from the remote backend.
+        """
+        message = """`kitems`-property is deprecated and only returns the 10 first kitems.
+        Please use the `get_kitems`-method instead."""
+        warnings.warn(DeprecationWarning, message)
         return _get_kitem_list()
 
-    @property
+    def get_kitems(limit=10, offset=0) -> "KItemListModel":
+        """
+        Get all available KItems from the remote backend.
+
+        Args:
+            limit (int): The amount of KItems to be returned. Defaults to 10.
+            offset (int): The offset in the list of KItems. Defaults to 0.
+
+        """
+        return _get_kitem_list(limit, offset)
+
     def app_configs(cls) -> "List[AppConfig]":
         """Return available app configs in the DSMS"""
         from dsms.apps import AppConfig

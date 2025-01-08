@@ -666,15 +666,3 @@ class KItem(BaseModel):
         else:
             raise TypeError(f"Datatype for KType is unknown: {type(ktype)}")
         return ktype
-
-
-class KItemList(list):
-    """List of KItems"""
-
-    def __str__(self):
-        """Pretty print the KItemList"""
-        return "\n".join([str(item) for item in self])
-
-    def __repr__(self):
-        """Pretty print the KItemList"""
-        return str(self)

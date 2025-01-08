@@ -141,6 +141,7 @@ class RelationMappingType(Enum):
     OBJECT_PROPERY = "object_property"
     DATA_PROPERTY = "data_property"
     ANNOTATION_PROPERTY = "annotation_property"
+    PROPERTY = "property"
 
 
 class BaseWebformModel(BaseModel):
@@ -425,9 +426,8 @@ class Entry(BaseWebformModel):
             str,
             int,
             float,
-            KnowledgeItemReference,
             bool,
-            List,
+            List[Any],
         ]
     ] = Field(None, description="Value of the entry")
     measurement_unit: Optional[MeasurementUnit] = Field(
@@ -558,12 +558,12 @@ class Entry(BaseWebformModel):
             Widget.MULTI_SELECT.value,
         ):
             if self.type == Widget.MULTI_SELECT.value:
-                dtype = list
+                dtype = str
             else:
                 dtype = str
             choices = [choice.value for choice in select_options]
         elif self.type == Widget.KNOWLEDGE_ITEM.value:
-            dtype = KnowledgeItemReference
+            dtype = (KnowledgeItemReference, type(self.kitem))
         else:
             raise ValueError(
                 f"Widget type is not mapped to a data type: {self.type}"
