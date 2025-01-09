@@ -44,17 +44,34 @@ def _is_number(value):
 
 def print_model(self, key, exclude_extra: set = set()) -> str:
     """Pretty print the ktype fields"""
+    dumped = dump_model(self, exclude_extra)
+    return yaml.dump({key: dumped})
+
+
+def dump_model(self, exclude_extra: set = set()) -> Dict[str, Any]:
+    """
+    Dump the model fields into a dictionary format with optional exclusions.
+
+    This method converts the model's fields into a dictionary while allowing
+    specific fields to be excluded. UUID fields are converted to string
+    representation.
+
+    Args:
+        exclude_extra (set): Additional fields to exclude from the dump.
+
+    Returns:
+        Dict[str, Any]: A dictionary of the model fields with specified exclusions.
+    """
     exclude = self.model_config.get("exclude", set()) | exclude_extra
     dumped = self.model_dump(
         exclude_none=True,
         exclude_unset=True,
         exclude=exclude,
     )
-    dumped = {
+    return {
         key: (str(value) if isinstance(value, UUID) else value)
         for key, value in dumped.items()
     }
-    return yaml.dump({key: dumped})
 
 
 def print_ktype(self) -> str:
@@ -721,10 +738,13 @@ def _search(
         raise RuntimeError(
             f"""Something went wrong while searching for KItems: {response.text}"""
         ) from excep
-    return [
-        SearchResult(hit=KItem(**item.get("hit")), fuzzy=item.get("fuzzy"))
-        for item in dumped
-    ]
+    return SearchResult(
+        hits=[
+            {"kitem": KItem(**item.get("kitem")), "fuzzy": item.get("fuzzy")}
+            for item in dumped.get("hits")
+        ],
+        total_count=dumped.get("total_count"),
+    )
 
 
 def _slugify(input_string: str, replacement: str = ""):

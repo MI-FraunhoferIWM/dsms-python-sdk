@@ -30,6 +30,8 @@ if TYPE_CHECKING:
     from dsms.knowledge.ktype import KType
     from dsms.knowledge.search import KItemListModel, SearchResult
 
+warnings.simplefilter("always", DeprecationWarning)
+
 
 class DSMS:
     """
@@ -187,7 +189,7 @@ class DSMS:
         return header
 
     @property
-    def kitems(cls) -> "KItemListModel":
+    def kitems(self) -> "KItemListModel":
         """
         **DEPRECATED**
 
@@ -202,10 +204,10 @@ class DSMS:
         """
         message = """`kitems`-property is deprecated and only returns the 10 first kitems.
         Please use the `get_kitems`-method instead."""
-        warnings.warn(DeprecationWarning, message)
+        warnings.warn(message, DeprecationWarning)
         return _get_kitem_list()
 
-    def get_kitems(limit=10, offset=0) -> "KItemListModel":
+    def get_kitems(self, limit=10, offset=0) -> "KItemListModel":
         """
         Get all available KItems from the remote backend.
 
@@ -214,7 +216,7 @@ class DSMS:
             offset (int): The offset in the list of KItems. Defaults to 0.
 
         """
-        return _get_kitem_list(limit, offset)
+        return _get_kitem_list(limit=limit, offset=offset)
 
     def app_configs(cls) -> "List[AppConfig]":
         """Return available app configs in the DSMS"""

@@ -133,9 +133,7 @@ class KType(BaseModel):
         """Serialize ktype."""
         return {
             key: (
-                value.dict(  # pylint: disable=no-member
-                    exclude_none=False, by_alias=False
-                )
+                value.model_dump(exclude_none=False, by_alias=False)
                 if key == "webform"
                 and value is not None
                 and not isinstance(value, dict)

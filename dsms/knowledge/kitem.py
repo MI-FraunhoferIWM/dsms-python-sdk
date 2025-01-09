@@ -134,7 +134,7 @@ class KItem(BaseModel):
     )
     slug: Optional[str] = Field(
         None,
-        description="Slug of the KContext.dsms",
+        description="Slug of the KItem",
         min_length=4,
         max_length=1000,
     )

@@ -558,12 +558,12 @@ class Entry(BaseWebformModel):
             Widget.MULTI_SELECT.value,
         ):
             if self.type == Widget.MULTI_SELECT.value:
-                dtype = str
+                dtype = list
             else:
                 dtype = str
             choices = [choice.value for choice in select_options]
         elif self.type == Widget.KNOWLEDGE_ITEM.value:
-            dtype = (KnowledgeItemReference, type(self.kitem))
+            dtype = (KnowledgeItemReference, type(self.kitem), list)
         else:
             raise ValueError(
                 f"Widget type is not mapped to a data type: {self.type}"
