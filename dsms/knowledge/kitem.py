@@ -205,10 +205,6 @@ class KItem(BaseModel):
         None, description="Context ID of the KItem"
     )
 
-    access_url: Optional[str] = Field(
-        None, description="Access URL of the KItem", exclude=True
-    )
-
     model_config = ConfigDict(
         extra="forbid",
         validate_assignment=True,
@@ -645,7 +641,7 @@ class KItem(BaseModel):
     @property
     def url(cls) -> str:
         """URL of the KItem"""
-        return cls.access_url or urljoin(
+        return urljoin(
             str(cls.session.dsms.config.host_url),
             f"knowledge/{cls._get_ktype_as_str()}/{cls.slug}",
         )

@@ -3,6 +3,7 @@
 import logging
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from uuid import UUID
 
 from pydantic.alias_generators import to_camel
 
@@ -12,6 +13,7 @@ from pydantic import (  # isort:skip
     ConfigDict,
     Field,
     model_validator,
+    field_validator,
     AliasGenerator,
     AliasChoices,
 )
@@ -31,6 +33,7 @@ from dsms.core.logging import handler  # isort:skip
 
 if TYPE_CHECKING:
     from dsms.knowledge.ktype import KType
+
 
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
@@ -401,8 +404,15 @@ class MeasurementUnit(BaseWebformModel):
 class KnowledgeItemReference(BaseModel):
     """Reference to a knowledge item if linked in the custom properties"""
 
-    id: str = Field(..., description="ID of the knowledge item")
+    id: Union[str, UUID] = Field(..., description="ID of the knowledge item")
     name: str = Field(..., description="Name of the knowledge item")
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    @field_validator("id")
+    @classmethod
+    def _validate_uuid(cls, value: Union[str, UUID]) -> str:
+        return str(value)
 
     def __str__(self) -> str:
         """Pretty print the model fields"""
@@ -427,7 +437,8 @@ class Entry(BaseWebformModel):
             int,
             float,
             bool,
-            List[Any],
+            KnowledgeItemReference,
+            Any,
         ]
     ] = Field(None, description="Value of the entry")
     measurement_unit: Optional[MeasurementUnit] = Field(
@@ -463,6 +474,9 @@ class Entry(BaseWebformModel):
                 )
 
         super().__setattr__(key, value)
+
+        if key == "value":
+            self.model_validate(self)
 
     def __str__(self) -> str:
         """Pretty print the model fields"""
@@ -516,6 +530,7 @@ class Entry(BaseWebformModel):
     @classmethod
     def _validate_inputs(cls, self: "Entry") -> "Entry":
         spec = cls._get_input_spec(self)
+
         if spec:
             if len(spec) == 0:
                 raise ValueError(
@@ -529,13 +544,23 @@ class Entry(BaseWebformModel):
             self.type = spec.widget
             default_value = spec.value
             select_options = spec.select_options
+            range_options = spec.range_options
+            if range_options:
+                is_range = range_options.range
+            else:
+                is_range = False
+            multiple_selection = spec.multiple_selection
         elif self.type and not spec:
             default_value = None
             select_options = []
+            is_range = False
+            multiple_selection = False
         else:
             self.type = _map_data_type_to_widget(self.value)
             default_value = None
             select_options = []
+            is_range = False
+            multiple_selection = False
 
         dtype = None
         choices = None
@@ -574,10 +599,19 @@ class Entry(BaseWebformModel):
             self.value = default_value
 
         # check if value is of correct type
-        if self.value is not None and not isinstance(self.value, dtype):
-            raise ValueError(
-                f"Value of type {type(self.value)} is not of type {dtype}"
-            )
+        if self.value is not None and is_range:
+            for val in self.value:
+                if not isinstance(val, dtype):
+                    raise ValueError(
+                        f"Value of type {type(val)} is not of type {dtype}"
+                    )
+        else:
+            if self.value is not None and not isinstance(self.value, dtype):
+                raise ValueError(
+                    f"Value of type {type(self.value)} is not of type {dtype}"
+                )
+
+        # check if value is a valid choice (if choices are set)
         if self.value is not None and choices is not None:
             error_message = f"""Value {self.value} is not a valid choice for entry {self.label}.
             Valid choices are: {choices}"""
@@ -590,8 +624,48 @@ class Entry(BaseWebformModel):
             else:
                 if self.value not in choices:
                     raise ValueError(error_message)
+
+        # check if value is required
         if self.value is None and default_value is None and self.required:
             raise ValueError(f"Value for entry {self.label} is required")
+
+        # special case for knowledge item
+        if self.value is not None and self.type == Widget.KNOWLEDGE_ITEM.value:
+            value = (
+                self.value
+            )  # assign to a local variable to avoid circular validation
+            if multiple_selection and not isinstance(value, list):
+                raise ValueError(
+                    f"Value of type {type(value)} is not of type list"
+                )
+            if not multiple_selection and isinstance(value, list):
+                raise ValueError(
+                    f"Value of type list is not allowed for entry {self.label}"
+                )
+            is_updated = False
+            if isinstance(value, list):
+                kitems = []
+                is_updated = False
+                for val in value:
+                    if isinstance(val, dict):
+                        val = KnowledgeItemReference(**val)
+                        is_updated = True
+                    if not isinstance(val, KnowledgeItemReference):
+                        val = KnowledgeItemReference(id=val.id, name=val.name)
+                        is_updated = True
+                    kitems.append(val)
+                value = kitems
+            else:
+                if not isinstance(value, KnowledgeItemReference):
+                    value = KnowledgeItemReference(
+                        id=value.id, name=value.name
+                    )
+                    is_updated = True
+                if isinstance(value, dict):
+                    value = KnowledgeItemReference(**value)
+                    is_updated = True
+            if is_updated:
+                self.value = value
 
         return self
 

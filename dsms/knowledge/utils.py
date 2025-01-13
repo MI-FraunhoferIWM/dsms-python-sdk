@@ -920,20 +920,12 @@ def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
         for section_def in webform.sections:
             for input_def in section_def.inputs:
                 if input_def.label in copy_properties:
-                    if input_def.class_mapping:
-                        class_mapping = {
-                            "classMapping": {"iri": input_def.class_mapping}
-                        }
-                    else:
-                        class_mapping = {}
-
                     entry = {
                         "id": input_def.id,
                         "label": input_def.label,
                         "value": copy_properties.pop(input_def.label),
                         "measurement_unit": input_def.measurement_unit,
                         "type": input_def.widget,
-                        **class_mapping,
                     }
                     section_name = section_def.name
                     if section_name not in transformed_sections:
