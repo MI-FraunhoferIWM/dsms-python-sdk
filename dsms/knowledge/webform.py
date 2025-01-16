@@ -528,7 +528,7 @@ class Entry(BaseWebformModel):
         logger.debug("Entry value: %s", self.value)
 
         # in this case we assume that a webform was defined for
-        # the specific entry
+        # the knowledge type for this specific entry
         if spec:
             logger.debug("Found input spec for entry: %s", self.label)
             if len(spec) == 0:
@@ -552,8 +552,8 @@ class Entry(BaseWebformModel):
             logger.debug("Widget type from spec: %s", self.type)
         # in this case we assume that a webform was not defined
         # but the user explicitly set the widget type
-        # this might be e.g. the case when a kitem is pulled
-        # from the remote backend
+        # this might be e.g. the case when a kitem without a webform
+        # is pulled from the remote backend
         elif self.type and not spec:
             logger.debug("Did not find input spec for entry: %s", self.label)
             logger.debug("Using user-provided widget type: %s", self.type)
