@@ -968,28 +968,55 @@ def _make_misc_section(custom_properties: dict):
                 "id": generate_id(),
                 "label": key,
                 "value": value,
-                "type": _map_data_type_to_widget(value),
             }
         )
     return section
 
 
 def _map_data_type_to_widget(value):
-    from dsms.knowledge.webform import Widget
+    from dsms import KItem
+    from dsms.knowledge.webform import KnowledgeItemReference, Widget
 
-    if isinstance(value, str):
-        widget = Widget.TEXT.value
-    elif isinstance(value, (int, float)):
-        widget = Widget.NUMBER.value
-    elif isinstance(value, bool):
-        widget = Widget.CHECKBOX.value
-    elif isinstance(value, list):
-        widget = Widget.MULTI_SELECT.value
+    widget = None
+    is_list = isinstance(value, list)
+    if isinstance(value, list):
+        is_list = True
+        types = []
+        for val in value:
+            dtype = type(val)
+            if isinstance(val, str):
+                types.append(Widget.MULTI_SELECT.value)
+            if isinstance(val, (KItem, KnowledgeItemReference, dict)):
+                types.append(Widget.KNOWLEDGE_ITEM.value)
+            if isinstance(val, (int, float)):
+                types.append(Widget.SLIDER.value)
+        types = set(types)
+        if len(types) > 1:
+            raise ValueError(
+                f"More than one widget type detected from data ({value}): {types} "
+            )
+        if len(types) == 0:
+            raise ValueError(f"No widget type detected from data ({value}).")
+        widget = types.pop()
     else:
-        raise ValueError(
-            f"Unsupported data type: {type(value)}. Value: {value}"
-        )
-    return widget
+        dtype = type(value)
+        if isinstance(value, str):
+            widget = Widget.TEXT.value
+            dtype = type(value)
+        elif isinstance(value, (int, float)):
+            widget = Widget.NUMBER.value
+        elif isinstance(value, bool):
+            widget = Widget.CHECKBOX.value
+
+        elif isinstance(value, (KItem, KnowledgeItemReference, dict)):
+            raise ValueError(
+                "KItems in the custom properties should be wrapped into a list."
+            )
+        else:
+            raise ValueError(
+                f"Unsupported data type: {type(value)}. Value: {value}"
+            )
+    return widget, is_list, dtype
 
 
 def sectionize_metadata(metadata: List[Dict[str, Any]]) -> dict:

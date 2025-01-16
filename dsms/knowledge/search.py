@@ -110,6 +110,10 @@ class KItemListModel(BaseModel):
         """
         return self.kitems[key]
 
+    def __iter__(self) -> "Generator[KItem]":
+        """Iterate over the KItems in the list."""
+        yield from self.kitems
+
     def __str__(self):
         """Pretty print the KItemList"""
         from dsms.knowledge.utils import dump_model

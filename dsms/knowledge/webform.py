@@ -1,6 +1,7 @@
 """Webform model"""
 
 import logging
+import warnings
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
@@ -46,7 +47,6 @@ class Widget(Enum):
     TEXT = "Text"
     FILE = "File"
     TEXTAREA = "Textarea"
-    VOCABULARY_TERM = "Vocabulary term"
     NUMBER = "Number"
     SLIDER = "Slider"
     CHECKBOX = "Checkbox"
@@ -59,8 +59,8 @@ class Widget(Enum):
 class WebformSelectOption(BaseModel):
     """Choices in webform"""
 
-    label: Optional[str] = Field(None, description="Label of the option")
-    value: Optional[Any] = Field(None, description="Value of the option")
+    key: Optional[str] = Field(None, description="Label of the option")
+    label: Optional[Any] = Field(None, description="Value of the option")
     disabled: Optional[bool] = Field(False, description="Disabled option")
 
     def __str__(self) -> str:
@@ -406,6 +406,8 @@ class KnowledgeItemReference(BaseModel):
 
     id: Union[str, UUID] = Field(..., description="ID of the knowledge item")
     name: str = Field(..., description="Name of the knowledge item")
+    ktype_id: str = Field(..., description="ID of the knowledge type")
+    slug: str = Field(..., description="Slug of the knowledge item")
 
     model_config = ConfigDict(validate_assignment=True)
 
@@ -431,16 +433,7 @@ class Entry(BaseWebformModel):
     id: str = Field(default_factory=generate_id)
     type: Optional[Widget] = Field(None, description="Type of the entry")
     label: str = Field(..., description="Label of the entry")
-    value: Optional[
-        Union[
-            str,
-            int,
-            float,
-            bool,
-            KnowledgeItemReference,
-            Any,
-        ]
-    ] = Field(None, description="Value of the entry")
+    value: Optional[Any] = Field(None, description="Value of the entry")
     measurement_unit: Optional[MeasurementUnit] = Field(
         None,
         description="Measurement unit of the entry",
@@ -531,7 +524,13 @@ class Entry(BaseWebformModel):
     def _validate_inputs(cls, self: "Entry") -> "Entry":
         spec = cls._get_input_spec(self)
 
+        logger.debug("Entry label: %s", self.label)
+        logger.debug("Entry value: %s", self.value)
+
+        # in this case we assume that a webform was defined for
+        # the specific entry
         if spec:
+            logger.debug("Found input spec for entry: %s", self.label)
             if len(spec) == 0:
                 raise ValueError(
                     f"Could not find input spec for entry {self.label}"
@@ -546,126 +545,177 @@ class Entry(BaseWebformModel):
             select_options = spec.select_options
             range_options = spec.range_options
             if range_options:
-                is_range = range_options.range
+                is_list = range_options.range
             else:
-                is_range = False
-            multiple_selection = spec.multiple_selection
+                is_list = False
+            dtype = None
+            logger.debug("Widget type from spec: %s", self.type)
+        # in this case we assume that a webform was not defined
+        # but the user explicitly set the widget type
+        # this might be e.g. the case when a kitem is pulled
+        # from the remote backend
         elif self.type and not spec:
+            logger.debug("Did not find input spec for entry: %s", self.label)
+            logger.debug("Using user-provided widget type: %s", self.type)
             default_value = None
             select_options = []
-            is_range = False
-            multiple_selection = False
+            is_list = None
+            dtype = None
+        # in this case we assume that a webform was not defined
+        # and the user did not explicitly set the widget type
+        # this might be e.g. the case when a new kitem is instanciated
+        # in the session by a flat dict (e.g. {"foo": "bar"})
         else:
-            self.type = _map_data_type_to_widget(self.value)
+            logger.debug("Did not find input spec for entry: %s", self.label)
+            self.type, is_list, dtype = _map_data_type_to_widget(self.value)
+            logger.debug("Guessed widget type: %s", self.type)
             default_value = None
             select_options = []
-            is_range = False
-            multiple_selection = False
 
-        dtype = None
-        choices = None
+        logger.debug("Entry is_list: %s", is_list)
+        if dtype:
+            logger.debug("Guessed data type: %s", dtype)
 
-        # check if widget is mapped to a data type
-        if self.type in (
-            Widget.TEXT.value,
-            Widget.FILE.value,
-            Widget.TEXTAREA.value,
-            Widget.VOCABULARY_TERM.value,
-        ):
-            dtype = str
-        elif self.type in (Widget.NUMBER.value, Widget.SLIDER.value):
-            dtype = (int, float)
-        elif self.type == Widget.CHECKBOX.value:
-            dtype = bool
-        elif self.type in (
-            Widget.SELECT.value,
-            Widget.RADIO.value,
-            Widget.MULTI_SELECT.value,
-        ):
-            if self.type == Widget.MULTI_SELECT.value:
-                dtype = list
-            else:
+        choices = [choice.label for choice in select_options] or None
+        logger.debug("Entry choices: %s", choices)
+
+        # if the widget not is guessed from the data type,
+        # check if widget is mapped to the correct data type
+        if not dtype:
+            logger.debug("Guessing data type from widget type")
+            if self.type in (
+                Widget.TEXT.value,
+                Widget.FILE.value,
+                Widget.TEXTAREA.value,
+            ):
                 dtype = str
-            choices = [choice.value for choice in select_options]
-        elif self.type == Widget.KNOWLEDGE_ITEM.value:
-            dtype = (KnowledgeItemReference, type(self.kitem), list)
-        else:
-            raise ValueError(
-                f"Widget type is not mapped to a data type: {self.type}"
-            )
+            elif self.type in (Widget.NUMBER.value, Widget.SLIDER.value):
+                dtype = (int, float)
+            elif self.type == Widget.CHECKBOX.value:
+                dtype = bool
+            elif self.type in (
+                Widget.SELECT.value,
+                Widget.RADIO.value,
+                Widget.MULTI_SELECT.value,
+            ):
+                if self.type == Widget.MULTI_SELECT.value:
+                    is_list = True
+                dtype = str
+            elif self.type == Widget.KNOWLEDGE_ITEM.value:
+                dtype = (type(self.kitem), KnowledgeItemReference, dict)
+                is_list = True
+            else:
+                raise ValueError(
+                    f"Widget type is not mapped to a data type: {self.type}"
+                )
+
+            logger.debug("Guessed data type: %s", dtype)
 
         # check if value is set
         if self.value is None and default_value is not None:
+            logger.debug(
+                "Value is not set, setting default value: %s", default_value
+            )
             self.value = default_value
 
-        # check if value is of correct type
-        if self.value is not None and is_range:
-            for val in self.value:
-                if not isinstance(val, dtype):
+        # check whether strict validation is enabled
+        if self.kitem.dsms.config.strict_validation:
+            # check if value is of correct type
+            error_message = "Value of type {} is not of type {}."
+            if is_list is True:
+                error_message += f""" Widget of type ´{self.type}`
+                is requiring a value of type `List[{dtype}]`."""
+                if not isinstance(self.value, list):
                     raise ValueError(
-                        f"Value of type {type(val)} is not of type {dtype}"
+                        error_message.format(type(self.value), dtype)
                     )
-        else:
-            if self.value is not None and not isinstance(self.value, dtype):
-                raise ValueError(
-                    f"Value of type {type(self.value)} is not of type {dtype}"
-                )
-
-        # check if value is a valid choice (if choices are set)
-        if self.value is not None and choices is not None:
-            error_message = f"""Value {self.value} is not a valid choice for entry {self.label}.
-            Valid choices are: {choices}"""
-            # in case of multi-select
-            if isinstance(self.value, list):
-                for value in self.value:
-                    if value not in choices:
-                        raise ValueError(error_message)
-            # in case of single-select
+                for val in self.value:
+                    if not isinstance(val, dtype):
+                        raise ValueError(
+                            error_message.format(type(val), dtype)
+                        )
+            elif is_list is False:
+                error_message += f""" Widget of type ´{self.type}`
+                is requiring a value of type `{dtype}`."""
+                if self.value is not None and not isinstance(
+                    self.value, dtype
+                ):
+                    raise ValueError(
+                        error_message.format(type(self.value), dtype)
+                    )
             else:
-                if self.value not in choices:
-                    raise ValueError(error_message)
-
-        # check if value is required
-        if self.value is None and default_value is None and self.required:
-            raise ValueError(f"Value for entry {self.label} is required")
-
-        # special case for knowledge item
-        if self.value is not None and self.type == Widget.KNOWLEDGE_ITEM.value:
-            value = (
-                self.value
-            )  # assign to a local variable to avoid circular validation
-            if multiple_selection and not isinstance(value, list):
-                raise ValueError(
-                    f"Value of type {type(value)} is not of type list"
+                warnings.warn(
+                    f"No webform was defined for entry `{self.label}`. "
+                    "Cannot check if value is of correct type."
                 )
-            if not multiple_selection and isinstance(value, list):
-                raise ValueError(
-                    f"Value of type list is not allowed for entry {self.label}"
-                )
-            is_updated = False
-            if isinstance(value, list):
+
+            # check if value is a valid choice (if choices are set)
+            if self.value is not None and choices is not None:
+                logger.debug("Checking if value is a valid choice")
+                error_message = f"""Value {self.value} is not a valid choice for entry {self.label}.
+                Valid choices are: {choices}"""
+                # in case of multi-select
+                if is_list is True:
+                    for value in self.value:
+                        if value not in choices:
+                            raise ValueError(error_message)
+                # in case of single-select
+                elif is_list is False:
+                    if self.value not in choices:
+                        raise ValueError(error_message)
+                else:
+                    warnings.warn(
+                        f"No webform was defined for entry `{self.label}`. "
+                        "Cannot check if value is a valid choice."
+                    )
+
+                # check if value is required
+                logger.debug("Checking if value is required")
+                if (
+                    self.value is None
+                    and default_value is None
+                    and self.required
+                ):
+                    raise ValueError(
+                        f"Value for entry {self.label} is required"
+                    )
+
+            # special case for knowledge item
+            if (
+                self.value is not None
+                and self.type == Widget.KNOWLEDGE_ITEM.value
+            ):
+                logger.debug("Checking if value is a valid knowledge item")
                 kitems = []
                 is_updated = False
-                for val in value:
+                if not isinstance(self.value, list):
+                    raise ValueError(
+                        f"""Value for entry `{self.label}` for widget of type `knowledge item`
+                        is not a list. Got {type(self.value)}."""
+                    )
+                for val in self.value:
                     if isinstance(val, dict):
                         val = KnowledgeItemReference(**val)
                         is_updated = True
                     if not isinstance(val, KnowledgeItemReference):
-                        val = KnowledgeItemReference(id=val.id, name=val.name)
+                        val = KnowledgeItemReference(
+                            id=val.id,
+                            name=val.name,
+                            ktype_id=val.ktype_id,
+                            slug=val.slug,
+                        )
                         is_updated = True
                     kitems.append(val)
-                value = kitems
-            else:
-                if not isinstance(value, KnowledgeItemReference):
-                    value = KnowledgeItemReference(
-                        id=value.id, name=value.name
-                    )
-                    is_updated = True
-                if isinstance(value, dict):
-                    value = KnowledgeItemReference(**value)
-                    is_updated = True
-            if is_updated:
-                self.value = value
+                if is_updated:
+                    self.value = kitems
+        else:
+            warnings.warn(
+                """
+                Strict validation is disabled.
+                Will not strictly type check the custom properties.
+                This also will take place when values are re-assigned.
+                """
+            )
 
         return self
 

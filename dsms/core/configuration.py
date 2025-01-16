@@ -54,6 +54,13 @@ class Configuration(BaseSettings):
         description="Whether the SSL of the DSMS shall be verified during connection.",
     )
 
+    strict_validation: bool = Field(
+        True,
+        description="""Whether the validation of custom properties shall be strict.
+        Disabling this might be helpful when e.g. the schema of a KType has been changed
+        and the custom properties are not compatible anymore and should be updated accordingly.""",
+    )
+
     username: Optional[SecretStr] = Field(
         None,
         description="User name for connecting to the DSMS instance",
@@ -160,6 +167,24 @@ class Configuration(BaseSettings):
         for key in val:
             if key not in KItem.model_fields:  # pylint: disable=E1135
                 raise KeyError(f"Property `{key}` not in KItem schema")
+        return val
+
+    @field_validator("strict_validation")
+    def validate_strictness(cls, val: bool) -> bool:
+        """
+        Validate the strictness of the custom properties validation.
+
+        If strict validation is disabled, custom properties are not validated
+        against the schema. Instead, the custom properties are allowed to have
+        any value.
+
+        :param val: If True, use strict validation for custom properties.
+        :return: The validated value.
+        """
+        if not val:
+            warnings.warn(
+                "Strict validation for custom properties is disabled."
+            )
         return val
 
     @field_validator("token")
