@@ -201,10 +201,6 @@ class KItem(BaseModel):
         default_factory=Avatar, description="KItem avatar interface"
     )
 
-    context_id: Optional[Union[UUID, str]] = Field(
-        None, description="Context ID of the KItem"
-    )
-
     model_config = ConfigDict(
         validate_assignment=True,
         validate_default=True,

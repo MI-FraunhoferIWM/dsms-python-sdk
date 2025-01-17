@@ -29,12 +29,6 @@ class KType(BaseModel):
     name: Optional[str] = Field(
         None, description="Human readable name of the KType.", max_length=50
     )
-    context: Optional[bool] = Field(
-        False, description="Identifies if the ktype is a context ktype"
-    )
-    context_schema: Optional[list] = Field(
-        [], description="Schema of the context ktype"
-    )
     webform: Optional[Webform] = Field(
         None, description="Form data of the KType."
     )
