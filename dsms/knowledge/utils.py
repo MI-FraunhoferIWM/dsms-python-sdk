@@ -920,11 +920,17 @@ def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
         for section_def in webform.sections:
             for input_def in section_def.inputs:
                 if input_def.label in copy_properties:
+                    if input_def.measurement_unit:
+                        measurement_unit = (
+                            input_def.measurement_unit.model_dump()
+                        )
+                    else:
+                        measurement_unit = None
                     entry = {
                         "id": input_def.id,
                         "label": input_def.label,
                         "value": copy_properties.pop(input_def.label),
-                        "measurement_unit": input_def.measurement_unit,
+                        "measurement_unit": measurement_unit,
                         "type": input_def.widget,
                     }
                     section_name = section_def.name
