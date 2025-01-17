@@ -123,9 +123,7 @@ class WebformRangeOptions(BaseModel):
     min: Optional[Union[int, float]] = Field(0, description="Minimum value")
     max: Optional[Union[int, float]] = Field(0, description="Maximum value")
     step: Optional[Union[int, float]] = Field(0, description="Step value")
-    range: Optional[Union[int, float]] = Field(
-        False, description="Range value"
-    )
+    range: Optional[bool] = Field(False, description="Range value")
 
     def __str__(self) -> str:
         """Pretty print the model fields"""
