@@ -218,6 +218,7 @@ class DSMS:
         """
         return _get_kitem_list(limit=limit, offset=offset)
 
+    @property
     def app_configs(cls) -> "List[AppConfig]":
         """Return available app configs in the DSMS"""
         from dsms.apps import AppConfig

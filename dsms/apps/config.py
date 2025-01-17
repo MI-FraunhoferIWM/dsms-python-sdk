@@ -104,7 +104,7 @@ class AppConfig(BaseModel):
 
     def __str__(self) -> str:
         """Pretty print the kitem Fields"""
-        return print_model(self, "app")
+        return print_model(self, "app", exclude_extra={"specification"})
 
     def __repr__(self) -> str:
         """Pretty print the kitem Fields"""
