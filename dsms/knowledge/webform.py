@@ -479,8 +479,6 @@ class Entry(BaseWebformModel):
 
     def get_unit(self) -> "Dict[str, Any]":
         """Get unit for the property"""
-        if not isinstance(self.value, (float, int)):
-            raise ValueError("Value must be a number")
         return get_property_unit(
             self.kitem.id,  # pylint: disable=no-member
             self.label,
@@ -494,6 +492,7 @@ class Entry(BaseWebformModel):
         unit_symbol_or_iri: str,
         decimals: "Optional[int]" = None,
         use_input_iri: bool = True,
+        val: "Optional[Union[int, float]]" = None,
     ) -> float:
         """
         Convert the data of property to a different unit.
@@ -506,16 +505,27 @@ class Entry(BaseWebformModel):
         Returns:
             float: converted value of the property
         """
-        if not isinstance(self.value, (float, int)):
-            raise ValueError("Value must be a number")
-        unit = self.get_unit()
-        if use_input_iri:
-            input_str = unit.get("iri")
+        value = val or self.value
+        if isinstance(value, list):
+            converted = []
+            for iterval in value:
+                converted.append(
+                    self.convert_to(
+                        unit_symbol_or_iri, decimals, use_input_iri, iterval
+                    )
+                )
         else:
-            input_str = unit.get("symbol")
-        return self.value * get_conversion_factor(
-            input_str, unit_symbol_or_iri, decimals=decimals
-        )
+            if not isinstance(value, (float, int)):
+                raise ValueError("Value must be a number")
+            unit = self.get_unit()
+            if use_input_iri:
+                input_str = unit.get("iri")
+            else:
+                input_str = unit.get("symbol")
+            converted = value * get_conversion_factor(
+                input_str, unit_symbol_or_iri, decimals=decimals
+            )
+        return converted
 
     @model_validator(mode="after")
     @classmethod
