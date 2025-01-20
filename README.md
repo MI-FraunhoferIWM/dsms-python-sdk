@@ -37,6 +37,16 @@ The SDK provides a general Python interface to a remote DSMS deployment, allowin
 Please have a look at our documentation on _readthedocs_:
 https://dsms-python-sdk.readthedocs.io
 
+## Compatibility
+
+Please take the compability of the SDK version with the DSMS version into account:
+
+| SDK Version | DSMS Version |
+| --- | --- |
+| <2.0.0 | <2.0.0 |
+| >=2.0.0,<3.0.0 | >=2.0.0, <3.0.0 |
+| >=3.0.0 | >=3.0.0 |
+
 ## Tutorials
 
 Please have a look at our tutorials on _readthedocs_:

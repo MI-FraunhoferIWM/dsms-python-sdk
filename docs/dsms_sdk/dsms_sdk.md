@@ -48,6 +48,16 @@ Before using DSMS-SDK make sure to register an account in a DSMS Instance of you
 
 After following the above steps, you could use either of the two ways to install DSMS-SDK to your machine.
 
+### Compatibility
+
+Please take the compability of the SDK version with the DSMS version into account:
+
+| SDK Version | DSMS Version |
+| --- | --- |
+| <2.0.0 | <2.0.0 |
+| >=2.0.0,<3.0.0 | >=2.0.0, <3.0.0 |
+| >=3.0.0 | >=3.0.0 |
+
 #### Method 1: Via PyPI
 
 To install the [DSMS Python SDK](https://pypi.org/project/dsms-sdk/), you can use the Python Package Index (PyPI). Copy the below command to install DSMS SDK from PyPI:
