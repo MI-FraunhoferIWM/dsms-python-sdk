@@ -128,6 +128,9 @@ class KItem(BaseModel):
         description="ID of the KItem",
     )
     ktype_id: Union[Enum, str] = Field(..., description="Type ID of the KItem")
+    ktype: Optional[Union[Enum, KType]] = Field(
+        None, description="KType of the KItem", exclude=True
+    )
     in_backend: bool = Field(
         False,
         description="Whether the KItem was already created in the backend.",
@@ -183,10 +186,6 @@ class KItem(BaseModel):
     )
     custom_properties: Optional[Any] = Field(
         None, description="Custom properties associated to the KItem"
-    )
-
-    ktype: Optional[Union[str, Enum, KType]] = Field(
-        None, description="KType of the KItem", exclude=True
     )
 
     dataframe: Optional[
@@ -445,26 +444,39 @@ class KItem(BaseModel):
                     f"KType for `ktype_id={value}` does not exist."
                 )
             value = ktype
+        if not hasattr(value, "id"):
+            raise TypeError(
+                "Not a valid KType. Provided Enum does not have an `id`."
+            )
 
         return value.id
 
     @field_validator("ktype")
     @classmethod
     def validate_ktype(
-        cls, value: Optional[Union[KType, str, Enum]], info: ValidationInfo
+        cls, value: Optional[Union[KType, Enum]], info: ValidationInfo
     ) -> KType:
         """Validate the ktype of the KItem"""
         from dsms import Session
 
-        if not value:
-            value = info.data.get("ktype_id")
+        ktype_id = info.data.get("ktype_id")
 
-        if isinstance(value, str):
-            value = Session.ktypes.get(value)
+        if not value:
+            value = Session.ktypes.get(ktype_id)
             if not value:
                 raise TypeError(
-                    f"KType for `ktype_id={value}` does not exist."
+                    f"KType for `ktype_id={ktype_id}` does not exist."
                 )
+        if not hasattr(value, "id"):
+            raise TypeError(
+                "Not a valid KType. Provided Enum does not have an `id`."
+            )
+
+        if value.id != ktype_id:
+            raise TypeError(
+                f"KType for `ktype_id={ktype_id}` does not match "
+                f"the provided `ktype`."
+            )
 
         return value
 
@@ -484,16 +496,11 @@ class KItem(BaseModel):
         from dsms import Session
 
         ktype_id = info.data["ktype_id"]
-        kitem_id = info.data.get("id")
+        kitem_id = info.data["id"]
+        name = info.data["name"]
         kitem_exists = info.data.get("in_backend")
         if not isinstance(kitem_exists, bool):
             kitem_exists = cls.in_backend
-
-        if isinstance(ktype_id, str):
-            ktype = ktype_id
-        else:
-            ktype = ktype_id.id
-        name = info.data.get("name")
 
         if not value:
             value = _slugify(name)
@@ -503,7 +510,7 @@ class KItem(BaseModel):
                 )
             if Session.dsms.config.individual_slugs:
                 value += f"-{str(kitem_id).split('-', maxsplit=1)[0]}"
-        if not kitem_exists and not _slug_is_available(ktype, value):
+        if not kitem_exists and not _slug_is_available(ktype_id, value):
             raise ValueError(f"Slug for `{value}` is already taken.")
         return value
 
@@ -638,22 +645,13 @@ class KItem(BaseModel):
         """URL of the KItem"""
         return urljoin(
             str(self.session.dsms.config.host_url),
-            f"knowledge/{self._get_ktype_as_str()}/{self.slug}",
+            f"knowledge/{self.ktype_id}/{self.slug}",
         )
 
     def is_a(self, to_be_compared: KType) -> bool:
         """Check the KType of the KItem"""
-        return self.ktype_id == to_be_compared.id  # pylint: disable=no-member
+        return self.ktype.id == to_be_compared.id  # pylint: disable=no-member
 
     def refresh(self) -> None:
         """Refresh the KItem"""
         _refresh_kitem(self)
-
-    def _get_ktype_as_str(self) -> str:
-        if isinstance(self.ktype_id, str):
-            ktype = self.ktype_id
-        elif isinstance(self.ktype_id, Enum):
-            ktype = self.ktype_id.id  # pylint: disable=no-member
-        else:
-            raise TypeError(f"Datatype for KType is unknown: {type(ktype)}")
-        return ktype

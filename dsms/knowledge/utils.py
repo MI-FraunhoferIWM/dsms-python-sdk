@@ -757,7 +757,7 @@ def _slugify(input_string: str, replacement: str = ""):
     return slug
 
 
-def _slug_is_available(ktype_id: Union[str, UUID], value: str) -> bool:
+def _slug_is_available(ktype_id: str, value: str) -> bool:
     """Check whether the id of a KItem is available in the DSMS or not"""
     response = _perform_request(
         f"api/knowledge/kitems/{ktype_id}/{value}", "head"
