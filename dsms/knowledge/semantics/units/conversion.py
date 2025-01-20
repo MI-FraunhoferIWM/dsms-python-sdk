@@ -119,13 +119,13 @@ def _get_factor_from_uri(uri: str) -> int:
 
 @lru_cache
 def _get_qudt_graph(ontology_ref: str) -> Graph:
-    from dsms import Context
+    from dsms import Session
 
-    url = getattr(Context.dsms.config, ontology_ref)
-    encoding = Context.dsms.config.encoding
+    url = getattr(Session.dsms.config, ontology_ref)
+    encoding = Session.dsms.config.encoding
     graph = Graph()
 
-    response = requests.get(url, timeout=Context.dsms.config.request_timeout)
+    response = requests.get(url, timeout=Session.dsms.config.request_timeout)
     if response.status_code != 200:
         raise RuntimeError(
             f"Could not download QUDT ontology. Please check URI: {url}"

@@ -7,11 +7,21 @@ from enum import Enum
 from typing import Callable, Optional, Set, Union
 
 import requests
-from pydantic import AnyUrl, ConfigDict, Field, SecretStr, field_validator
-from pydantic_core.core_schema import ValidationInfo
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .utils import get_callable
+from pydantic_core.core_schema import ValidationInfo  # isort: skip
+from pydantic_settings import BaseSettings, SettingsConfigDict  # isort: skip
+
+
+from pydantic import (  # isort: skip
+    AliasChoices,
+    AnyUrl,
+    ConfigDict,
+    Field,
+    SecretStr,
+    field_validator,
+)
+
+from .utils import get_callable  # isort: skip
 
 MODULE_REGEX = r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*:[a-zA-Z_][a-zA-Z0-9_]*$"
 DEFAULT_UNIT_SPARQL = "dsms.knowledge.semantics.units.sparql:UnitSparqlQuery"
@@ -42,6 +52,13 @@ class Configuration(BaseSettings):
     ssl_verify: bool = Field(
         True,
         description="Whether the SSL of the DSMS shall be verified during connection.",
+    )
+
+    strict_validation: bool = Field(
+        True,
+        description="""Whether the validation of custom properties shall be strict.
+        Disabling this might be helpful when e.g. the schema of a KType has been changed
+        and the custom properties are not compatible anymore and should be updated accordingly.""",
     )
 
     username: Optional[SecretStr] = Field(
@@ -121,7 +138,9 @@ class Configuration(BaseSettings):
     )
 
     loglevel: Optional[Union[Loglevel, str]] = Field(
-        None, description="Set level of logging messages"
+        None,
+        description="Set level of logging messages",
+        alias=AliasChoices("loglevel", "log_level"),
     )
 
     model_config = ConfigDict(use_enum_values=True)
@@ -146,8 +165,26 @@ class Configuration(BaseSettings):
         from dsms import KItem
 
         for key in val:
-            if key not in KItem.model_fields:
+            if key not in KItem.model_fields:  # pylint: disable=E1135
                 raise KeyError(f"Property `{key}` not in KItem schema")
+        return val
+
+    @field_validator("strict_validation")
+    def validate_strictness(cls, val: bool) -> bool:
+        """
+        Validate the strictness of the custom properties validation.
+
+        If strict validation is disabled, custom properties are not validated
+        against the schema. Instead, the custom properties are allowed to have
+        any value.
+
+        :param val: If True, use strict validation for custom properties.
+        :return: The validated value.
+        """
+        if not val:
+            warnings.warn(
+                "Strict validation for custom properties is disabled."
+            )
         return val
 
     @field_validator("token")

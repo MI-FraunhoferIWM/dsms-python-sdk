@@ -7,7 +7,7 @@ from pydantic import ConfigDict, Field
 
 from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 from dsms.knowledge.properties.utils import _str_to_dict
-from dsms.knowledge.utils import _get_attachment
+from dsms.knowledge.utils import _get_attachment, print_model
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List
@@ -16,10 +16,12 @@ if TYPE_CHECKING:
 class Attachment(KItemProperty):
     """Attachment uploaded by a  certain user."""
 
-    name: str = Field(..., description="File name of the attachment")
+    name: str = Field(
+        ..., description="File name of the attachment", max_length=100
+    )
 
     content: Optional[Union[str, bytes]] = Field(
-        None, description="Content of the file"
+        None, description="Content of the file", exclude=True
     )
 
     # OVERRIDE
@@ -31,20 +33,7 @@ class Attachment(KItemProperty):
 
     # OVERRIDE
     def __str__(self) -> str:
-        """Pretty print the Attachment"""
-        values = ",\n\t\t\t".join(
-            [
-                f"{key}: {value}"
-                for key, value in self.__dict__.items()
-                if key not in self.exclude
-            ]
-        )
-        return f"{{\n\t\t\t{values}\n\t\t}}"
-
-    # OVERRIDE
-    def __repr__(self) -> str:
-        """Pretty print the Attachment"""
-        return str(self)
+        return print_model(self, "attachment")
 
     def download(self, as_bytes: bool = False) -> "Union[str, bytes]":
         """Download attachment file"""
@@ -60,12 +49,12 @@ class AttachmentsProperty(KItemPropertyList):
 
     # OVERRIDE
     @property
-    def k_property_item(cls) -> "Callable":
+    def k_property_item(self) -> "Callable":
         return Attachment
 
     # OVERRIDE
     @property
-    def k_property_helper(cls) -> "Callable":
+    def k_property_helper(self) -> "Callable":
         """Helper for constructing attachment property"""
         return _str_to_dict
 
@@ -109,10 +98,10 @@ class AttachmentsProperty(KItemPropertyList):
             super().insert(index, item)
 
     @property
-    def by_name(cls) -> "List[str]":
+    def by_name(self) -> "List[str]":
         "Return list of names of attachments"
         return {
             Path(attachment.name).stem
             + Path(attachment.name).suffix: attachment
-            for attachment in cls
+            for attachment in self
         }

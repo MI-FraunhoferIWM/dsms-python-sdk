@@ -6,16 +6,21 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
+from dsms.knowledge.utils import print_model
+
 if TYPE_CHECKING:
     from typing import Set
 
-    from dsms import Context
+    from dsms import Session
 
 
 class Summary(BaseModel):
     """Model for the custom properties of the KItem"""
 
-    id: Optional[UUID] = Field(None, description="ID of the KItem")
+    id: Optional[UUID] = Field(
+        None,
+        description="ID of the KItem",
+    )
     text: str = Field(..., description="Summary text of the KItem")
     kitem: Optional[Any] = Field(
         None, description="KItem related to the summary", exclude=True
@@ -30,16 +35,9 @@ class Summary(BaseModel):
         super().__setattr__(name, value)
         self._mark_as_updated()
 
-    def __str__(self) -> str:
-        """Pretty print the custom properties"""
-        fields = ", ".join(
-            [
-                f"{key}={value}"
-                for key, value in self.__dict__.items()
-                if key not in self.exclude
-            ]
-        )
-        return f"{self.__class__.__name__}({fields})"
+    # OVERIDE
+    def __str__(self):
+        return print_model(self, "summary")
 
     def __repr__(self) -> str:
         """Pretty print the custom properties"""
@@ -53,25 +51,25 @@ class Summary(BaseModel):
             self.context.buffers.updated.update({self.id: self.kitem})
 
     @property
-    def id(cls) -> Optional[UUID]:
+    def id(self) -> Optional[UUID]:
         """Identifier of the KItem related to the CustomProperies"""
-        if not cls.kitem:
+        if not self.kitem:
             raise ValueError("KItem not defined yet.")
-        return cls.kitem.id  # pylint: disable=E1101
+        return self.kitem.id  # pylint: disable=E1101
 
     @property
-    def context(cls) -> "Context":
-        """Getter for Context"""
+    def context(self) -> "Session":
+        """Getter for Session"""
         from dsms import (  # isort:skip
-            Context,
+            Session,
         )
 
-        return Context
+        return Session
 
     @property
-    def exclude(cls) -> "Optional[Set[str]]":
+    def exclude(self) -> "Optional[Set[str]]":
         """Fields to be excluded from the JSON-schema"""
-        return cls.model_config.get("exclude")
+        return self.model_config.get("exclude")
 
     @model_serializer
     def serialize(self) -> str:

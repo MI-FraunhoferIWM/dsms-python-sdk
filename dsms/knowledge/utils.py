@@ -2,40 +2,30 @@
 import base64
 import io
 import logging
+import random
 import re
-import warnings
+import string
+import time
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
+import oyaml as yaml
 import pandas as pd
 import segno
-import yaml
 from PIL import Image
 from requests import Response
-
-from pydantic import (  # isort: skip
-    BaseModel,
-    ConfigDict,
-    Field,
-    create_model,
-    model_validator,
-)
 
 from dsms.core.logging import handler  # isort:skip
 
 from dsms.core.utils import _name_to_camel, _perform_request  # isort:skip
 
-from dsms.knowledge.properties.custom_datatype import (  # isort:skip
-    NumericalDataType,
-)
-
-from dsms.knowledge.search import SearchResult  # isort:skip
+from dsms.knowledge.search import SearchResult, KItemListModel  # isort:skip
 
 if TYPE_CHECKING:
     from dsms.apps import AppConfig
-    from dsms.core.context import Buffers
+    from dsms.core.session import Buffers
     from dsms.knowledge import KItem, KType
     from dsms.knowledge.properties import Attachment
 
@@ -52,129 +42,47 @@ def _is_number(value):
         return False
 
 
-def _create_custom_properties_model(
-    value: Optional[Dict[str, Any]]
-) -> BaseModel:
-    """Convert the dict with the model schema into a pydantic model."""
-    from dsms import KItem
+def print_model(self, key, exclude_extra: set = set()) -> str:
+    """Pretty print the ktype fields"""
+    dumped = dump_model(self, exclude_extra)
+    return yaml.dump({key: dumped})
 
-    fields = {}
-    if isinstance(value, dict):
-        for item in value.get("sections"):
-            for form_input in item.get("inputs"):
-                label = form_input.get("label")
-                dtype = form_input.get("widget")
-                default = form_input.get("defaultValue")
-                slug = _slugify(label)
-                if dtype in ("Text", "File", "Textarea", "Vocabulary term"):
-                    dtype = Optional[str]
-                elif dtype in ("Number", "Slider"):
-                    dtype = Optional[NumericalDataType]
-                elif dtype == "Checkbox":
-                    dtype = Optional[bool]
-                elif dtype in ("Select", "Radio"):
-                    choices = Enum(
-                        _name_to_camel(label) + "Choices",
-                        {
-                            _name_to_camel(choice["value"]): choice["value"]
-                            for choice in form_input.get("choices")
-                        },
-                    )
-                    dtype = Optional[choices]
-                elif dtype == "Knowledge item":
-                    warnings.warn(
-                        "knowledge item not fully supported for KTypes yet."
-                    )
-                    dtype = Optional[str]
 
-                fields[slug] = (dtype, default or None)
-    fields["kitem"] = (
-        Optional[KItem],
-        Field(None, exclude=True),
+def dump_model(self, exclude_extra: set = set()) -> Dict[str, Any]:
+    """
+    Dump the model fields into a dictionary format with optional exclusions.
+
+    This method converts the model's fields into a dictionary while allowing
+    specific fields to be excluded. UUID fields are converted to string
+    representation.
+
+    Args:
+        exclude_extra (set): Additional fields to exclude from the dump.
+
+    Returns:
+        Dict[str, Any]: A dictionary of the model fields with specified exclusions.
+    """
+    exclude = self.model_config.get("exclude", set()) | exclude_extra
+    dumped = self.model_dump(
+        exclude_none=True,
+        exclude_unset=True,
+        exclude=exclude,
     )
-
-    config = ConfigDict(
-        extra="allow", arbitrary_types_allowed=True, exclude={"kitem"}
-    )
-    validators = {
-        "validate_model": model_validator(mode="before")(_validate_model)
+    return {
+        key: (str(value) if isinstance(value, UUID) else value)
+        for key, value in dumped.items()
     }
-    model = create_model(
-        "CustomPropertiesModel",
-        __config__=config,
-        __validators__=validators,
-        **fields,
-    )
-    setattr(model, "__str__", _print_properties)
-    setattr(model, "__repr__", _print_properties)
-    setattr(model, "__setattr__", __setattr_property__)
-    logger.debug("Create custom properties model with fields: %s", fields)
-    return model
 
 
-def _print_properties(self: Any) -> str:
-    fields = ", \n".join(
-        [
-            f"\t\t{key}: {value}"
-            for key, value in self.model_dump().items()
-            if key not in self.model_config["exclude"]
-        ]
-    )
-    return f"{{\n{fields}\n\t}}"
-
-
-def __setattr_property__(self, key, value) -> None:
-    logger.debug(
-        "Setting property for custom property with key `%s` with value `%s`.",
-        key,
-        value,
-    )
-    if _is_number(value):
-        # convert to convertable numeric object
-        value = _create_numerical_dtype(key, value, self.kitem)
-        # mark as updated
-    if key != "kitem" and self.kitem:
-        logger.debug(
-            "Setting related kitem for custom properties with id `%s` as updated",
-            self.kitem.id,
-        )
-        self.kitem.context.buffers.updated.update({self.kitem.id: self.kitem})
-    elif key == "kitem":
-        # set kitem for convertable numeric datatype
-        for prop in self.model_dump().values():
-            if isinstance(prop, NumericalDataType) and not prop.kitem:
-                prop.kitem = value
-    # reassignment of extra fields does not work, seems to be a bug?
-    # have this workaround:
-    if key in self.__pydantic_extra__:
-        self.__pydantic_extra__[key] = value
-    super(BaseModel, self).__setattr__(key, value)
-
-
-def _create_numerical_dtype(
-    key: str, value: Union[int, float], kitem: "KItem"
-) -> NumericalDataType:
-    value = NumericalDataType(value)
-    value.name = key
-    value.kitem = kitem
-    return value
-
-
-def _validate_model(
-    cls, values: Dict[str, Any]  # pylint: disable=unused-argument
-) -> Dict[str, Any]:
-    for key, value in values.items():
-        if _is_number(value):
-            values[key] = _create_numerical_dtype(
-                key, value, values.get("kitem")
-            )
-    return values
+def print_ktype(self) -> str:
+    """Pretty print the ktype fields"""
+    return print_model(self, "ktype")
 
 
 def _get_remote_ktypes() -> Enum:
     """Get the KTypes from the remote backend"""
     from dsms import (  # isort:skip
-        Context,
+        Session,
         KType,
     )
 
@@ -184,27 +92,160 @@ def _get_remote_ktypes() -> Enum:
             f"Something went wrong fetching the remote ktypes: {response.text}"
         )
 
-    Context.ktypes = {ktype["id"]: KType(**ktype) for ktype in response.json()}
+    Session.ktypes = {ktype["id"]: KType(**ktype) for ktype in response.json()}
 
     ktypes = Enum(
-        "KTypes", {_name_to_camel(key): key for key in Context.ktypes}
+        "KTypes",
+        {_name_to_camel(key): value for key, value in Session.ktypes.items()},
     )
+
+    def custom_getattr(self, name) -> None:
+        """
+        Custom getattr method for the Enum of KTypes.
+
+        When a KType field is accessed, first check if the field is an attribute of the
+        underlying KType object (self.value). If it is, return that.
+        Otherwise, call the super method to access the Enum field.
+
+        This is needed because the Enum object is not a KType object, but has all the same
+        fields. This allows us to access the fields of the KType object as if it were an
+        Enum.
+        """
+        if hasattr(self.value, name):
+            return getattr(self.value, name)
+        return super(ktypes, self).__getattr__(name)
+
+    def custom_setattr(self, name, value) -> None:
+        """
+        Custom setattr method for the Enum of KTypes.
+
+        When a KType field is set, first check if the field is an attribute of the
+        underlying KType object (self.value). If it is, set that.
+        Otherwise, call the super method to set the Enum field.
+
+        This is needed because the Enum object is not a KType object, but has all the same
+        fields. This allows us to set the fields of the KType object as if it were an
+        Enum.
+        """
+
+        if hasattr(self.value, name):
+            setattr(self.value, name, value)
+        else:
+            super(ktypes, self).__setattr__(name, value)
+
+    # Attach methods to the dynamically created Enum class
+    setattr(ktypes, "__getattr__", custom_getattr)
+    setattr(ktypes, "__setattr__", custom_setattr)
+    setattr(ktypes, "__str__", print_ktype)
+    setattr(ktypes, "__repr__", print_ktype)
+
     logger.debug("Got the following ktypes from backend: `%s`.", list(ktypes))
     return ktypes
 
 
-def _get_kitem_list() -> "List[KItem]":
-    """Get all available KItems from the remote backend."""
-    from dsms.knowledge.kitem import (  # isort:skip
-        KItem,
+def _ktype_exists(ktype: Union[Any, str, UUID]) -> bool:
+    """Check whether the KType exists in the remote backend"""
+    from dsms.knowledge.ktype import (  # isort:skip
+        KType,
     )
 
-    response = _perform_request("api/knowledge/kitems", "get")
+    if isinstance(ktype, KType):
+        route = f"api/knowledge-type/{ktype.id}"
+    else:
+        route = f"api/knowledge-type/{ktype}"
+    response = _perform_request(route, "get")
+    return response.ok
+
+
+def _create_new_ktype(ktype: "KType") -> None:
+    """Create a new KType in the remote backend"""
+    body = {
+        "name": ktype.name,
+        "id": str(ktype.id),
+    }
+    logger.debug("Create new KType with body: %s", body)
+    response = _perform_request("api/knowledge-type/", "post", json=body)
+    if not response.ok:
+        raise ValueError(
+            f"KType with id `{ktype.id}` could not be created in DSMS: {response.text}`"
+        )
+
+
+def _get_ktype(ktype_id: str, as_json=False) -> "Union[KType, Dict[str, Any]]":
+    """Get the KType for an instance with a certain ID from remote backend"""
+    from dsms import KType, Session
+
+    response = _perform_request(f"api/knowledge-type/{ktype_id}", "get")
+    if response.status_code == 404:
+        raise ValueError(
+            f"""KType with the id `{ktype_id}` does not exist in
+            DSMS-instance `{Session.dsms.config.host_url}`"""
+        )
+    if not response.ok:
+        raise ValueError(
+            f"""An error occured fetching the KType with id `{ktype_id}`:
+            `{response.text}`"""
+        )
+    body = response.json()
+    if as_json:
+        response = body
+    else:
+        response = KType(**body)
+    return response
+
+
+def _update_ktype(ktype: "KType") -> Response:
+    """Update a KType in the remote backend."""
+    payload = ktype.model_dump(
+        exclude_none=True,
+        by_alias=True,
+    )
+    logger.debug("Update KType for `%s` with body: %s", ktype.id, payload)
+    response = _perform_request(
+        f"api/knowledge-type/{ktype.id}", "put", json=payload
+    )
+    if not response.ok:
+        raise ValueError(
+            f"KType with uuid `{ktype.id}` could not be updated in DSMS: {response.text}`"
+        )
+    return response
+
+
+def _delete_ktype(ktype: "KType") -> None:
+    """Delete a KType in the remote backend"""
+    from dsms import Session
+
+    logger.debug("Delete KType with id: %s", ktype.id)
+    response = _perform_request(f"api/knowledge-type/{ktype.id}", "delete")
+    if not response.ok:
+        raise ValueError(
+            f"KItem with uuid `{ktype.id}` could not be deleted from DSMS: `{response.text}`"
+        )
+    Session.dsms.ktypes = _get_remote_ktypes()
+
+
+def _get_kitem_list(limit=10, offset=0) -> "KItemListModel":
+    """Get all available KItems from the remote backend."""
+    from dsms.knowledge.kitem import KItem  # isort:skip
+
+    response = _perform_request(
+        "api/knowledge/kitems",
+        "get",
+        params={
+            "limit": limit,
+            "offset": offset,
+        },
+    )
     if not response.ok:
         raise ValueError(
             f"Something went wrong fetching the available kitems: {response.text}"
         )
-    return [KItem(**kitem) for kitem in response.json()]
+    payload = response.json()
+    kitems = {
+        "kitems": [KItem(**kitem) for kitem in payload["kitems"]],
+        "total_count": payload["total_count"],
+    }
+    return KItemListModel(**kitems)
 
 
 def _kitem_exists(kitem: Union[Any, str, UUID]) -> bool:
@@ -225,13 +266,13 @@ def _get_kitem(
     uuid: Union[str, UUID], as_json=False
 ) -> "Union[KItem, Dict[str, Any]]":
     """Get the KItem for a instance with a certain ID from remote backend"""
-    from dsms import Context, KItem
+    from dsms import KItem, Session
 
     response = _perform_request(f"api/knowledge/kitems/{uuid}", "get")
     if response.status_code == 404:
         raise ValueError(
             f"""KItem with uuid `{uuid}` does not exist in
-            DSMS-instance `{Context.dsms.config.host_url}`"""
+            DSMS-instance `{Session.dsms.config.host_url}`"""
         )
     if not response.ok:
         raise ValueError(
@@ -284,6 +325,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "created_at",
             "external_links",
             "dataframe",
+            "access_url",
         },
         exclude_none=True,
     )
@@ -294,15 +336,9 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
         **differences,
     )
     if new_kitem.custom_properties:
-        custom_properties = new_kitem.custom_properties.model_dump()
-        # # a smarted detection whether the custom properties were updated is needed
-        # old_properties = old_kitem.get("custom_properties")
-        # if isinstance(old_properties, dict):
-        #     old_custom_properties = old_properties.get("content")
-        # else:
-        #     old_custom_properties = None
-        # if custom_properties != old_custom_properties:
-        #     payload.update(custom_properties={"content": custom_properties})
+        custom_properties = new_kitem.custom_properties.model_dump(
+            by_alias=True
+        )
         payload.update(custom_properties={"content": custom_properties})
     logger.debug(
         "Update KItem for `%s` with payload: %s", new_kitem.id, payload
@@ -533,9 +569,7 @@ def _commit_created(
         elif isinstance(obj, AppConfig):
             _create_or_update_app_spec(obj)
         elif isinstance(obj, KType):
-            raise NotImplementedError(
-                "Committing of KTypes not implemented yet."
-            )
+            _create_new_ktype(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed."
@@ -554,9 +588,7 @@ def _commit_updated(
         elif isinstance(obj, AppConfig):
             _create_or_update_app_spec(obj, overwrite=True)
         elif isinstance(obj, KType):
-            raise NotImplementedError(
-                "Committing of KTypes not implemented yet."
-            )
+            _commit_updated_ktype(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed."
@@ -593,6 +625,25 @@ def _commit_updated_kitem(new_kitem: "KItem") -> None:
         new_kitem.refresh()
 
 
+def _commit_updated_ktype(new_ktype: "KType") -> None:
+    """Commit the updated KTypes"""
+    from dsms import Session
+
+    old_ktype = _get_ktype(new_ktype.id, as_json=True)
+    logger.debug(
+        "Fetched data from old KType with id `%s`: %s",
+        new_ktype.id,
+        old_ktype,
+    )
+    if old_ktype:
+        _update_ktype(new_ktype)
+        logger.debug(
+            "Fetching updated KType from remote backend: %s", new_ktype.id
+        )
+        new_ktype.refresh()
+        Session.dsms.ktypes = _get_remote_ktypes()
+
+
 def _commit_deleted(
     buffer: "Dict[str, Union[KItem, KType, AppConfig]]",
 ) -> None:
@@ -605,10 +656,10 @@ def _commit_deleted(
             _delete_kitem(obj)
         elif isinstance(obj, AppConfig):
             _delete_app_spec(obj.name)
-        elif isinstance(obj, KType):
-            raise NotImplementedError(
-                "Deletion of KTypes not implemented yet."
-            )
+        elif isinstance(obj, KType) or (
+            isinstance(obj, Enum) and isinstance(obj.value, KType)
+        ):
+            _delete_ktype(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed or deleted."
@@ -628,6 +679,18 @@ def _refresh_kitem(kitem: "KItem") -> None:
     kitem.dataframe = _inspect_dataframe(kitem.id)
 
 
+def _refresh_ktype(ktype: "KType") -> None:
+    """Refresh the KItem"""
+    for key, value in _get_ktype(ktype.id, as_json=True).items():
+        logger.debug(
+            "Set updated property `%s` for KType with id `%s` after commiting: %s",
+            key,
+            ktype.id,
+            value,
+        )
+        setattr(ktype, key, value)
+
+
 def _split_iri(iri: str) -> List[str]:
     if "#" in iri:
         namspace, name = iri.rsplit("#", 1)
@@ -637,15 +700,16 @@ def _split_iri(iri: str) -> List[str]:
 
 
 def _make_annotation_schema(iri: str) -> Dict[str, Any]:
-    namespace, name = _split_iri(iri)
-    return {"namespace": namespace, "name": name, "iri": iri}
+    namespace, label = _split_iri(iri)
+    return {"namespace": namespace, "label": label, "iri": iri}
 
 
 def _search(
     query: Optional[str] = None,
-    ktypes: "Optional[List[KType]]" = [],
+    ktypes: "Optional[List[Union[Enum, KType]]]" = [],
     annotations: "Optional[List[str]]" = [],
     limit: "Optional[int]" = 10,
+    offset: "Optional[int]" = 0,
     allow_fuzzy: "Optional[bool]" = True,
 ) -> "List[SearchResult]":
     """Search for KItems in the remote backend"""
@@ -653,9 +717,10 @@ def _search(
 
     payload = {
         "search_term": query or "",
-        "ktypes": [ktype.value for ktype in ktypes],
+        "ktypes": [ktype.value.id for ktype in ktypes],
         "annotations": [_make_annotation_schema(iri) for iri in annotations],
         "limit": limit,
+        "offset": offset,
     }
     response = _perform_request(
         "api/knowledge/kitems/search",
@@ -673,10 +738,13 @@ def _search(
         raise RuntimeError(
             f"""Something went wrong while searching for KItems: {response.text}"""
         ) from excep
-    return [
-        SearchResult(hit=KItem(**item.get("hit")), fuzzy=item.get("fuzzy"))
-        for item in dumped
-    ]
+    return SearchResult(
+        hits=[
+            {"kitem": KItem(**item.get("kitem")), "fuzzy": item.get("fuzzy")}
+            for item in dumped.get("hits")
+        ],
+        total_count=dumped.get("total_count"),
+    )
 
 
 def _slugify(input_string: str, replacement: str = ""):
@@ -689,7 +757,7 @@ def _slugify(input_string: str, replacement: str = ""):
     return slug
 
 
-def _slug_is_available(ktype_id: Union[str, UUID], value: str) -> bool:
+def _slug_is_available(ktype_id: str, value: str) -> bool:
     """Check whether the id of a KItem is available in the DSMS or not"""
     response = _perform_request(
         f"api/knowledge/kitems/{ktype_id}/{value}", "head"
@@ -703,7 +771,7 @@ def _get_dataframe_column(kitem_id: str, column_id: int) -> List[Any]:
     """Download the column of a dataframe container of a certain kitem"""
 
     response = _perform_request(
-        f"api/knowledge/data_api/{kitem_id}/column-{column_id}", "get"
+        f"api/knowledge/data/{kitem_id}/column-{column_id}", "get"
     )
     if not response.ok:
         message = f"""Something went wrong fetch column id `{column_id}`
@@ -714,7 +782,7 @@ def _get_dataframe_column(kitem_id: str, column_id: int) -> List[Any]:
 
 def _inspect_dataframe(kitem_id: str) -> Optional[List[Dict[str, Any]]]:
     """Get column info for the dataframe container of a certain kitem"""
-    response = _perform_request(f"api/knowledge/data_api/{kitem_id}", "get")
+    response = _perform_request(f"api/knowledge/data/{kitem_id}", "get")
     if not response.ok and response.status_code == 404:
         dataframe = None
     elif not response.ok and response.status_code != 404:
@@ -734,7 +802,7 @@ def _update_dataframe(kitem_id: str, data: pd.DataFrame):
         data.to_json(buffer, indent=2)
         buffer.seek(0)
         response = _perform_request(
-            f"api/knowledge/data_api/{kitem_id}", "put", files={"data": buffer}
+            f"api/knowledge/data/{kitem_id}", "put", files={"data": buffer}
         )
         if not response.ok:
             raise RuntimeError(
@@ -744,7 +812,7 @@ def _update_dataframe(kitem_id: str, data: pd.DataFrame):
 
 def _delete_dataframe(kitem_id: str) -> Response:
     logger.debug("Delete DataFrame for kitem with id `%s`.", kitem_id)
-    return _perform_request(f"api/knowledge/data_api/{kitem_id}", "delete")
+    return _perform_request(f"api/knowledge/data/{kitem_id}", "delete")
 
 
 def _commit_avatar(kitem) -> None:
@@ -843,3 +911,170 @@ def _delete_app_spec(name: str) -> None:
         message = f"Something went wrong deleting app spec with name `{name}`: {response.text}"
         raise RuntimeError(message)
     return response.text
+
+
+def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
+    if webform:
+        copy_properties = custom_properties.copy()
+        transformed_sections = {}
+        for section_def in webform.sections:
+            for input_def in section_def.inputs:
+                if input_def.label in copy_properties:
+                    if input_def.measurement_unit:
+                        measurement_unit = (
+                            input_def.measurement_unit.model_dump()
+                        )
+                    else:
+                        measurement_unit = None
+                    entry = {
+                        "id": input_def.id,
+                        "label": input_def.label,
+                        "value": copy_properties.pop(input_def.label),
+                        "measurement_unit": measurement_unit,
+                        "type": input_def.widget,
+                    }
+                    section_name = section_def.name
+                    if section_name not in transformed_sections:
+                        section = {
+                            "id": section_def.id,
+                            "name": section_name,
+                            "entries": [],
+                        }
+                        transformed_sections[section_name] = section
+                    transformed_sections[section_name]["entries"].append(entry)
+        if copy_properties:
+            logger.info(
+                "Some custom properties were not found in the webform: %s",
+                copy_properties,
+            )
+            transformed_sections["General"] = _make_misc_section(
+                copy_properties
+            )
+        response = {"sections": list(transformed_sections.values())}
+    else:
+        response = _transform_from_flat_schema(custom_properties)
+    return response
+
+
+def _transform_from_flat_schema(
+    custom_properties: Dict[str, Any]
+) -> Dict[str, Any]:
+    return {"sections": [_make_misc_section(custom_properties)]}
+
+
+def _make_misc_section(custom_properties: dict):
+    """
+    If the ktype_id is not found, return the custom_properties dictionary
+    as is, wrapped in a section named "Misc".
+    """
+    section = {"id": generate_id(), "name": "Misc", "entries": []}
+    for key, value in custom_properties.items():
+        section["entries"].append(
+            {
+                "id": generate_id(),
+                "label": key,
+                "value": value,
+            }
+        )
+    return section
+
+
+def _map_data_type_to_widget(value):
+    from dsms import KItem
+    from dsms.knowledge.webform import KnowledgeItemReference, Widget
+
+    widget = None
+    is_list = isinstance(value, list)
+    if isinstance(value, list):
+        is_list = True
+        types = []
+        for val in value:
+            dtype = type(val)
+            if isinstance(val, str):
+                types.append(Widget.MULTI_SELECT.value)
+            if isinstance(val, (KItem, KnowledgeItemReference, dict)):
+                types.append(Widget.KNOWLEDGE_ITEM.value)
+            if isinstance(val, (int, float)):
+                types.append(Widget.SLIDER.value)
+        types = set(types)
+        if len(types) > 1:
+            raise ValueError(
+                f"More than one widget type detected from data ({value}): {types} "
+            )
+        if len(types) == 0:
+            raise ValueError(f"No widget type detected from data ({value}).")
+        widget = types.pop()
+    else:
+        dtype = type(value)
+        if isinstance(value, str):
+            widget = Widget.TEXT.value
+            dtype = type(value)
+        elif isinstance(value, (int, float)):
+            widget = Widget.NUMBER.value
+        elif isinstance(value, bool):
+            widget = Widget.CHECKBOX.value
+
+        elif isinstance(value, (KItem, KnowledgeItemReference, dict)):
+            raise ValueError(
+                "KItems in the custom properties should be wrapped into a list."
+            )
+        else:
+            raise ValueError(
+                f"Unsupported data type: {type(value)}. Value: {value}"
+            )
+    return widget, is_list, dtype
+
+
+def make_custom_properties_schema(metadata: List[Dict[str, Any]]) -> dict:
+    """
+    Convert a list of dictionaries representing metadata
+    entries into a DSMS schema dict.
+
+    The input should be a list of dictionaries,
+    where each dictionary represents a metadata entry.
+    The output is a dictionary in the DSMS schema,
+    with a single section named "General",
+    containing the given metadata entries.
+
+    If the input is empty, the function will
+    return an empty dictionary.
+
+    :param metadata: The metadata list to convert.
+    :return: A dictionary in the DSMS schema.
+    """
+    if metadata:
+        for metadatum in metadata:
+            metadatum["id"] = generate_id()
+        metadata = {
+            "sections": [
+                {
+                    "id": generate_id(),
+                    "name": "General",
+                    "entries": metadata,
+                }
+            ]
+        }
+    else:
+        metadata = {}
+
+    return metadata
+
+
+def generate_id(prefix: str = "id") -> str:
+    # Generate a unique part using time and random characters
+    """
+    Generates a unique id using a combination of the current time and 6 random characters.
+
+    Args:
+    prefix (str): The prefix to use for the generated id. Defaults to "id".
+
+    Returns:
+    str: The generated id.
+    """
+    unique_part = f"{int(time.time() * 1000)}"  # Milliseconds since epoch
+    random_part = "".join(
+        random.choices(string.ascii_lowercase + string.digits, k=6)  # nosec
+    )
+    # Combine prefix, unique part, and random part
+    generated_id = f"{prefix}{unique_part}{random_part}"
+    return generated_id

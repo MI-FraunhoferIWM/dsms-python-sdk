@@ -161,3 +161,6 @@ cython_debug/
 
 .vscode/
 examples/basic_usage.ipynb
+
+#Test files
+test.py

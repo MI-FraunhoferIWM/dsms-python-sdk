@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, model_serializer
 
 from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
-from dsms.knowledge.utils import _perform_request
+from dsms.knowledge.utils import _perform_request, print_model
 
 if TYPE_CHECKING:
     from typing import Callable
@@ -23,17 +23,6 @@ class AdditionalProperties(BaseModel):
         None,
         description="File extensions for which the upload shall be triggered.",
     )
-
-    def __str__(self) -> str:
-        """Pretty print the KItemPropertyList"""
-        values = ", ".join(
-            [f"{key}: {value}" for key, value in self.__dict__.items()]
-        )
-        return f"{{{values}}}"
-
-    def __repr__(self) -> str:
-        """Pretty print the Apps"""
-        return str(self)
 
 
 class JobStatus(BaseModel):
@@ -64,11 +53,17 @@ class App(KItemProperty):
         None, description="ID of the KItem App"
     )
     executable: str = Field(
-        ..., description="Name of the executable related to the app"
+        ...,
+        description="Name of the executable related to the app",
+        max_length=400,
     )
-    title: str = Field(..., description="Title of the appilcation")
+    title: str = Field(
+        ..., description="Title of the appilcation", max_length=50
+    )
     description: Optional[str] = Field(
-        None, description="Description of the appilcation"
+        None,
+        description="Description of the appilcation",
+        max_length=1000,
     )
     tags: Optional[dict] = Field(
         None, description="Tags related to the appilcation"
@@ -145,6 +140,10 @@ class App(KItemProperty):
             )
         return response.json()
 
+    # OVERRIDE
+    def __str__(self):
+        return print_model(self, "app")
+
 
 class Job(BaseModel):
     """Job running an app"""
@@ -193,20 +192,20 @@ class AppsProperty(KItemPropertyList):
 
     # OVERRIDE
     @property
-    def k_property_item(cls) -> "Callable":
+    def k_property_item(self) -> "Callable":
         """App data model"""
         return App
 
     @property
-    def k_property_helper(cls) -> None:
+    def k_property_helper(self) -> None:
         """Not defined for Apps"""
 
     @property
-    def by_title(cls) -> Dict[str, App]:
+    def by_title(self) -> Dict[str, App]:
         """Get apps by title"""
-        return {app.title: app for app in cls}
+        return {app.title: app for app in self}
 
     @property
-    def by_exe(cls) -> Dict[str, App]:
+    def by_exe(self) -> Dict[str, App]:
         """Get apps by executable"""
-        return {app.executable: app for app in cls}
+        return {app.executable: app for app in self}

@@ -15,32 +15,32 @@ class BaseSparqlQuery(ABC):
     """Abstract class for DSMS Sparql Query"""
 
     def __init__(self, **kwargs: "Dict[str, Any]") -> None:
-        from dsms import Context
+        from dsms import Session
 
         self._kwargs = kwargs
         self._results: "Optional[Dict[str, Any]]" = None
-        self._dsms: "DSMS" = Context.dsms
+        self._dsms: "DSMS" = Session.dsms
 
         self.execute()
 
     @property
-    def kwargs(cls) -> "Dict[str, Any]":
+    def kwargs(self) -> "Dict[str, Any]":
         """Return kwargs passed during initialization"""
-        return cls._kwargs
+        return self._kwargs
 
     @property
-    def dsms(cls) -> "Dict[str, Any]":
+    def dsms(self) -> "Dict[str, Any]":
         """Return dsms context"""
-        return cls._dsms
+        return self._dsms
 
     @property
-    def results(cls) -> "Optional[Dict[str, Any]]":
+    def results(self) -> "Optional[Dict[str, Any]]":
         """Return query results"""
-        return cls._results
+        return self._results
 
     @property
     @abstractmethod
-    def result_mappings(cls) -> "Dict[str, Any]":
+    def result_mappings(self) -> "Dict[str, Any]":
         """
         Define a mapping between the output keys and the output datatype.
         E.g. {'foo': int, 'bar': str, 'foobar': MyCustomClass}
@@ -48,13 +48,13 @@ class BaseSparqlQuery(ABC):
 
     @property
     @abstractmethod
-    def query(cls) -> str:
+    def query(self) -> str:
         """
         Define sparql query by using the kwargs defined during initialization.
         """
 
     @abstractmethod
-    def postprocess_result(cls, row: "Dict[str, Any]") -> "Dict[str, Any]":
+    def postprocess_result(self, row: "Dict[str, Any]") -> "Dict[str, Any]":
         """
         Define a function that postprocesses the result of the indivudal row in the
         sparql result. This might e.g. be some string operations etc.

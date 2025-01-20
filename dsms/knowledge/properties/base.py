@@ -24,7 +24,7 @@ logger.propagate = False
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Iterable, List, Set, Union
 
-    from dsms import Context, KItem
+    from dsms import KItem, Session
 
 
 class KItemProperty(BaseModel):
@@ -43,16 +43,9 @@ class KItemProperty(BaseModel):
 
     _kitem = PrivateAttr(default=None)
 
+    @abstractmethod
     def __str__(self) -> str:
         """Pretty print the KItemProperty"""
-        values = ",\n\t\t\t".join(
-            [
-                f"{key}: {value}"
-                for key, value in self.__dict__.items()
-                if key not in self.exclude
-            ]
-        )
-        return f"{{\n\t\t\t{values}\n\t\t}}"
 
     def __repr__(self) -> str:
         """Pretty print the KItemProperty"""
@@ -78,29 +71,34 @@ class KItemProperty(BaseModel):
         return hash(str(self))
 
     @property
-    def kitem(cls) -> "KItem":
+    def kitem(self) -> "KItem":
         """KItem related to the KItemProperty"""
-        return cls._kitem
+        return self._kitem
+
+    @property
+    def dsms(self) -> "KItem":
+        """DSMS instance related to the KItemProperty"""
+        return self.kitem.dsms
 
     @kitem.setter
-    def kitem(cls, item: "KItem") -> None:
+    def kitem(self, item: "KItem") -> None:
         """Set KItem related to the KItemProperty"""
-        cls._kitem = item
-        cls.id = item.id
+        self._kitem = item
+        self.id = item.id
 
     @property
-    def exclude(cls) -> "Optional[Set[str]]":
+    def exclude(self) -> "Optional[Set[str]]":
         """Fields to be excluded from the JSON-schema"""
-        return cls.model_config.get("exclude")
+        return self.model_config.get("exclude")
 
     @property
-    def context(cls) -> "Context":
-        """Getter for Context"""
+    def context(self) -> "Session":
+        """Getter for Session"""
         from dsms import (  # isort:skip
-            Context,
+            Session,
         )
 
-        return Context
+        return Session
 
     @model_serializer
     def serialize(self):
@@ -120,25 +118,14 @@ class KItemPropertyList(list):
 
     @property
     @abstractmethod
-    def k_property_item(cls) -> "Callable":
+    def k_property_item(self) -> "Callable":
         """Return the KItemProperty-class"""
 
     @property
     @abstractmethod
-    def k_property_helper(cls) -> "Optional[Callable]":
+    def k_property_helper(self) -> "Optional[Callable]":
         """Optional helper for transforming a given
         input into the k property item"""
-
-    def __str__(self) -> str:
-        """Pretty print the KItemPropertyList"""
-        values = ", \n".join(["\t\t" + repr(value) for value in self])
-        if values:
-            values = f"\n{values}\n\t"
-        return f"[{values}]"
-
-    def __repr__(self) -> str:
-        """Pretty print the KItemPropertyList"""
-        return str(self)
 
     def __hash__(self) -> int:
         return hash(str(self))
@@ -270,27 +257,27 @@ class KItemPropertyList(list):
             self.context.buffers.updated.update({self._kitem.id: self._kitem})
 
     @property
-    def context(cls) -> "Context":
-        """Getter for Context"""
+    def context(self) -> "Session":
+        """Getter for Session"""
         from dsms import (  # isort:skip
-            Context,
+            Session,
         )
 
-        return Context
+        return Session
 
     @property
-    def kitem(cls) -> "KItem":
+    def kitem(self) -> "KItem":
         """KItem context of the field"""
-        return cls._kitem
+        return self._kitem
 
     @kitem.setter
-    def kitem(cls, value: "KItem") -> None:
+    def kitem(self, value: "KItem") -> None:
         """KItem setter"""
-        cls._kitem = value
-        for item in cls:
-            item.kitem = cls.kitem
+        self._kitem = value
+        for item in self:
+            item.kitem = self.kitem
 
     @property
-    def values(cls) -> "List[Dict[str, Any]]":
+    def values(self) -> "List[Dict[str, Any]]":
         """Values of the KItemPropertyList"""
-        return list(cls)
+        return list(self)

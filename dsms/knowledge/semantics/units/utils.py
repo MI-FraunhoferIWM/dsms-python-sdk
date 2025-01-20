@@ -68,56 +68,63 @@ def get_conversion_factor(
 def get_property_unit(
     kitem_id: "Union[str, UUID]",
     property_name: str,
+    measurement_unit: "Optional[Any]" = None,
     is_dataframe_column: bool = False,
     autocomplete_symbol: bool = True,
 ) -> "Dict[str, Any]":
     """
-    Retrieve the unit associated with a given property of a KIitem.
+    Get unit for a given property name.
+
+    This function queries the unit for a given property name with respect to the
+    semantics applied. If `measurement_unit` is not `None`, it will be returned
+    as is. If `measurement_unit` is `None`, the function will try to get the unit
+    from the QUDT-based semantics. If no unit is found, a `ValueError` is raised.
 
     Args:
-        kitem (KItem): The identifier of the KItem.
-        property_name (str): The name of the property of the KItem  for which
-            the unit is to be retrieved.
-        is_dataframe_column (bool, optional): Indicates whether the property is an DataFrame
-            column or a custom property. Defaults to False.
-        autocomplete_symbol (bool, optional): Whether the symbol of a unit shall be
-            fetched automatically from the ontology when it is not given next to the
-            URI.
+        kitem_id (Union[str, UUID]): ID of the KItem.
+        property_name (str): Name of the property.
+        measurement_unit (Optional[Any], optional): Measurement unit. Defaults to None.
+        is_dataframe_column (bool, optional): Whether the property is a dataframe column.
+            Defaults to False.
+        autocomplete_symbol (bool, optional): Whether to autocomplete the unit symbol.
+            Defaults to True.
 
     Returns:
-        Dict[str, Any]: A dictionary with the symbol and iri of the unit associated
-            with the specified property.
+        Dict[str, Any]: The unit as a dictionary.
 
     Raises:
-        ValueError: If unable to retrieve the unit for the property due to any errors or if
-            the property does not have a unit or has more than one unit associated with it.
+        ValueError: If no unit is found.
     """
-    from dsms import Context
+    from dsms import Session
 
-    units_sparql_object = Context.dsms.config.units_sparql_object
-    if not issubclass(units_sparql_object, BaseUnitSparqlQuery):
-        raise TypeError(
-            f"´{units_sparql_object}´ must be a subclass of `{BaseUnitSparqlQuery}`"
-        )
-    try:
-        query = units_sparql_object(
-            kitem_id=kitem_id,
-            property_name=property_name,
-            is_dataframe_column=is_dataframe_column,
-            autocomplete_symbol=autocomplete_symbol,
-        )
-    except Exception as error:
-        raise ValueError(
-            f"Something went wrong catching the unit for property `{property_name}`."
-        ) from error
-    if len(query.results) == 0:
-        raise ValueError(
-            f"""Property `{property_name}` does not own any
-            unit with respect to the semantics applied."""
-        )
-    if len(query.results) > 1:
-        raise ValueError(
-            f"""Property `{property_name}` owns more than one
-            unit with respect to the semantics applied."""
-        )
-    return query.results.pop()
+    if not measurement_unit:
+        units_sparql_object = Session.dsms.config.units_sparql_object
+        if not issubclass(units_sparql_object, BaseUnitSparqlQuery):
+            raise TypeError(
+                f"´{units_sparql_object}´ must be a subclass of `{BaseUnitSparqlQuery}`"
+            )
+        try:
+            query = units_sparql_object(
+                kitem_id=kitem_id,
+                property_name=property_name,
+                is_dataframe_column=is_dataframe_column,
+                autocomplete_symbol=autocomplete_symbol,
+            )
+        except Exception as error:
+            raise ValueError(
+                f"Something went wrong catching the unit for property `{property_name}`."
+            ) from error
+        if len(query.results) == 0:
+            raise ValueError(
+                f"""Property `{property_name}` does not own any
+                unit with respect to the semantics applied."""
+            )
+        if len(query.results) > 1:
+            raise ValueError(
+                f"""Property `{property_name}` owns more than one
+                unit with respect to the semantics applied."""
+            )
+        unit = query.results.pop()
+    else:
+        unit = measurement_unit.model_dump()
+    return unit

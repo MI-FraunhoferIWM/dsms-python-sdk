@@ -1,7 +1,7 @@
 """Knowledge Item implementation of the DSMS"""
 
-import json
 import logging
+import warnings
 from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
@@ -58,12 +58,16 @@ from dsms.knowledge.utils import (  # isort:skip
     _inspect_dataframe,
     _make_annotation_schema,
     _refresh_kitem,
+    _transform_custom_properties_schema,
+    print_model,
 )
 
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
 
+from dsms.knowledge.webform import KItemCustomPropertiesModel  # isort:skip
+
 if TYPE_CHECKING:
-    from dsms import Context
+    from dsms import Session
     from dsms.core.dsms import DSMS
 
 logger = logging.getLogger(__name__)
@@ -116,18 +120,26 @@ class KItem(BaseModel):
     """
 
     # public
-    name: str = Field(..., description="Human readable name of the KItem")
+    name: str = Field(
+        ..., description="Human readable name of the KItem", max_length=300
+    )
     id: Optional[UUID] = Field(
         default_factory=uuid4,
         description="ID of the KItem",
     )
     ktype_id: Union[Enum, str] = Field(..., description="Type ID of the KItem")
+    ktype: Optional[Union[Enum, KType]] = Field(
+        None, description="KType of the KItem", exclude=True
+    )
     in_backend: bool = Field(
         False,
         description="Whether the KItem was already created in the backend.",
     )
     slug: Optional[str] = Field(
-        None, description="Slug of the KContext.dsms", min_length=4
+        None,
+        description="Slug of the KItem",
+        min_length=4,
+        max_length=1000,
     )
     annotations: List[Union[str, Annotation]] = Field(
         [], description="Annotations of the KItem"
@@ -175,9 +187,6 @@ class KItem(BaseModel):
     custom_properties: Optional[Any] = Field(
         None, description="Custom properties associated to the KItem"
     )
-    ktype: Optional[KType] = Field(
-        None, description="KType of the KItem", exclude=True
-    )
 
     dataframe: Optional[
         Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]
@@ -192,7 +201,6 @@ class KItem(BaseModel):
     )
 
     model_config = ConfigDict(
-        extra="forbid",
         validate_assignment=True,
         validate_default=True,
         exclude={"ktype", "avatar"},
@@ -213,13 +221,13 @@ class KItem(BaseModel):
         super().__init__(**kwargs)
 
         # add kitem to buffer
-        if not self.in_backend and self.id not in self.context.buffers.created:
+        if not self.in_backend and self.id not in self.session.buffers.created:
             logger.debug(
                 "Marking KItem with ID `%s` as created and updated during KItem initialization.",
                 self.id,
             )
-            self.context.buffers.created.update({self.id: self})
-            self.context.buffers.updated.update({self.id: self})
+            self.session.buffers.created.update({self.id: self})
+            self.session.buffers.updated.update({self.id: self})
 
         self._set_kitem_for_properties()
 
@@ -234,28 +242,20 @@ class KItem(BaseModel):
         self._set_kitem_for_properties()
 
         if (
-            self.id not in self.context.buffers.updated
+            self.id not in self.session.buffers.updated
             and not name.startswith("_")
         ):
             logger.debug(
                 "Setting KItem with ID `%s` as updated during KItem.__setattr__",
                 self.id,
             )
-            self.context.buffers.updated.update({self.id: self})
+            self.session.buffers.updated.update({self.id: self})
 
     def __str__(self) -> str:
         """Pretty print the kitem fields"""
-        fields = ", \n".join(
-            [
-                f"\n\t{key} = {value}"
-                for key, value in self.__dict__.items()
-                if (
-                    key not in self.model_config["exclude"]
-                    and key not in self.dsms.config.hide_properties
-                )
-            ]
+        return print_model(
+            self, "kitem", exclude_extra=self.dsms.config.hide_properties
         )
-        return f"{self.__class__.__name__}(\n{fields}\n)"
 
     def __repr__(self) -> str:
         """Pretty print the kitem Fields"""
@@ -411,11 +411,11 @@ class KItem(BaseModel):
     @classmethod
     def validate_created(cls, value: str) -> Any:
         """Convert the str for `created_at` in to a `datetime`-object"""
-        from dsms import Context
+        from dsms import Session
 
         if isinstance(value, str):
             value = datetime.strptime(
-                value, Context.dsms.config.datetime_format
+                value, Session.dsms.config.datetime_format
             )
         return value
 
@@ -423,31 +423,61 @@ class KItem(BaseModel):
     @classmethod
     def validate_updated(cls, value: str) -> Any:
         """Convert the str for `created_at` in to a `datetime`-object"""
-        from dsms import Context
+        from dsms import Session
 
         if isinstance(value, str):
             value = datetime.strptime(
-                value, Context.dsms.config.datetime_format
+                value, Session.dsms.config.datetime_format
             )
         return value
 
+    @field_validator("ktype_id")
+    @classmethod
+    def validate_ktype_id(cls, value: Union[str, Enum]) -> KType:
+        """Validate the ktype id of the KItem"""
+        from dsms import Session
+
+        if isinstance(value, str):
+            ktype = Session.ktypes.get(value)
+            if not ktype:
+                raise TypeError(
+                    f"KType for `ktype_id={value}` does not exist."
+                )
+            value = ktype
+        if not hasattr(value, "id"):
+            raise TypeError(
+                "Not a valid KType. Provided Enum does not have an `id`."
+            )
+
+        return value.id
+
     @field_validator("ktype")
     @classmethod
-    def validate_ktype(cls, value: KType, info: ValidationInfo) -> KType:
-        """Validate the data attribute of the KItem"""
-        from dsms import Context
+    def validate_ktype(
+        cls, value: Optional[Union[KType, Enum]], info: ValidationInfo
+    ) -> KType:
+        """Validate the ktype of the KItem"""
+        from dsms import Session
+
+        ktype_id = info.data.get("ktype_id")
 
         if not value:
-            ktype_id = info.data.get("ktype_id")
-            if not isinstance(ktype_id, str):
-                value = Context.ktypes.get(ktype_id.value)
-            else:
-                value = Context.ktypes.get(ktype_id)
-
+            value = Session.ktypes.get(ktype_id)
             if not value:
                 raise TypeError(
                     f"KType for `ktype_id={ktype_id}` does not exist."
                 )
+        if not hasattr(value, "id"):
+            raise TypeError(
+                "Not a valid KType. Provided Enum does not have an `id`."
+            )
+
+        if value.id != ktype_id:
+            raise TypeError(
+                f"KType for `ktype_id={ktype_id}` does not match "
+                f"the provided `ktype`."
+            )
+
         return value
 
     @field_validator("in_backend")
@@ -463,19 +493,14 @@ class KItem(BaseModel):
     @classmethod
     def validate_slug(cls, value: str, info: ValidationInfo) -> str:
         """Validate slug"""
-        from dsms import Context
+        from dsms import Session
 
         ktype_id = info.data["ktype_id"]
-        kitem_id = info.data.get("id")
+        kitem_id = info.data["id"]
+        name = info.data["name"]
         kitem_exists = info.data.get("in_backend")
         if not isinstance(kitem_exists, bool):
             kitem_exists = cls.in_backend
-
-        if not isinstance(ktype_id, str):
-            ktype = ktype_id.value
-        else:
-            ktype = ktype_id
-        name = info.data.get("name")
 
         if not value:
             value = _slugify(name)
@@ -483,9 +508,9 @@ class KItem(BaseModel):
                 raise ValueError(
                     "Slug length must have a minimum length of 4."
                 )
-            if Context.dsms.config.individual_slugs:
+            if Session.dsms.config.individual_slugs:
                 value += f"-{str(kitem_id).split('-', maxsplit=1)[0]}"
-        if not kitem_exists and not _slug_is_available(ktype, value):
+        if not kitem_exists and not _slug_is_available(ktype_id, value):
             raise ValueError(f"Slug for `{value}` is already taken.")
         return value
 
@@ -533,45 +558,53 @@ class KItem(BaseModel):
 
     @model_validator(mode="after")
     @classmethod
-    def validate_custom_properties(cls, self) -> "KItem":
-        """Validate the custom properties with respect to the KType of the KItem"""
-        if not isinstance(
-            self.custom_properties, (BaseModel, dict, type(None))
-        ):
-            raise TypeError(
-                f"""Custom properties must be one of the following types:
-                  {(BaseModel, dict, type(None))}. Not {type(self.custom_properties)}"""
-            )
-        # validate content with webform model
-        if self.ktype.webform and isinstance(self.custom_properties, dict):
-            content = (
+    def validate_custom_properties(cls, self: "KItem") -> "KItem":
+        """Validate custom properties"""
+
+        if isinstance(self.custom_properties, dict):
+            value = (
                 self.custom_properties.get("content") or self.custom_properties
             )
-            if isinstance(content, str):
-                try:
-                    content = json.loads(content)
-                except Exception as error:
-                    raise TypeError(
-                        f"Invalid type: {type(content)}"
-                    ) from error
-            was_in_buffer = self.id in self.context.buffers.updated
-            self.custom_properties = self.ktype.webform(**content)
-            # fix: find a better way to prehebit that properties are
-            # set in the buffer
+
+            if not value.get("sections"):
+                value = _transform_custom_properties_schema(
+                    value, self.ktype.webform
+                )
+                warnings.warn(
+                    """A flat dictionary was provided for custom properties.
+                    Will be transformed into `KItemCustomPropertiesModel`."""
+                )
+            was_in_buffer = self.id in self.session.buffers.updated
+            self.custom_properties = KItemCustomPropertiesModel(
+                **value, kitem=self
+            )
             if not was_in_buffer:
-                self.context.buffers.updated.pop(self.id)
-        # set kitem id for custom properties
-        if isinstance(self.custom_properties, BaseModel):
-            self.custom_properties.kitem = self
+                self.session.buffers.updated.pop(self.id)
+        elif not isinstance(
+            self.custom_properties, (KItemCustomPropertiesModel, type(None))
+        ):
+            raise TypeError(
+                "Custom properties must be either a dictionary or a "
+                "KItemCustomPropertiesModel. Not a "
+                f"{type(self.custom_properties)}: {self.custom_properties}"
+            )
         return self
 
     def _set_kitem_for_properties(self) -> None:
         """Set kitem for CustomProperties and KProperties in order to
-        remain the context for the buffer if any of these properties is changed.
+        remain the session for the buffer if any of these properties is changed.
         """
         for prop in self.__dict__.values():
             if (
-                isinstance(prop, (KItemPropertyList, Summary, Avatar))
+                isinstance(
+                    prop,
+                    (
+                        KItemPropertyList,
+                        Summary,
+                        Avatar,
+                        KItemCustomPropertiesModel,
+                    ),
+                )
                 and not prop.kitem
             ):
                 logger.debug(
@@ -582,54 +615,43 @@ class KItem(BaseModel):
                 prop.kitem = self
 
     @property
-    def dsms(cls) -> "DSMS":
-        """DSMS context getter"""
-        return cls.context.dsms
+    def dsms(self) -> "DSMS":
+        """DSMS session getter"""
+        return self.session.dsms
 
     @dsms.setter
-    def dsms(cls, value: "DSMS") -> None:
-        """DSMS context setter"""
-        cls.context.dsms = value
+    def dsms(self, value: "DSMS") -> None:
+        """DSMS session setter"""
+        self.session.dsms = value
 
     @property
-    def subgraph(cls) -> Optional[Graph]:
+    def subgraph(self) -> Optional[Graph]:
         """Getter for Subgraph"""
         return _get_subgraph(
-            cls.id, cls.dsms.config.kitem_repo, is_kitem_id=True
+            self.id, self.dsms.config.kitem_repo, is_kitem_id=True
         )
 
     @property
-    def context(cls) -> "Context":
-        """Getter for Context"""
+    def session(self) -> "Session":
+        """Getter for Session"""
         from dsms import (  # isort:skip
-            Context,
+            Session,
         )
 
-        return Context
+        return Session
 
     @property
-    def url(cls) -> str:
+    def url(self) -> str:
         """URL of the KItem"""
         return urljoin(
-            str(cls.context.dsms.config.host_url),
-            f"knowledge/{cls._get_ktype_as_str()}/{cls.slug}",
+            str(self.session.dsms.config.host_url),
+            f"knowledge/{self.ktype_id}/{self.slug}",
         )
 
     def is_a(self, to_be_compared: KType) -> bool:
         """Check the KType of the KItem"""
-        return (
-            self.ktype_id == to_be_compared.value  # pylint: disable=no-member
-        )
+        return self.ktype.id == to_be_compared.id  # pylint: disable=no-member
 
     def refresh(self) -> None:
         """Refresh the KItem"""
         _refresh_kitem(self)
-
-    def _get_ktype_as_str(self) -> str:
-        if isinstance(self.ktype_id, str):
-            ktype = self.ktype_id
-        elif isinstance(self.ktype_id, Enum):
-            ktype = self.ktype_id.value  # pylint: disable=no-member
-        else:
-            raise TypeError(f"Datatype for KType is unknown: {type(ktype)}")
-        return ktype

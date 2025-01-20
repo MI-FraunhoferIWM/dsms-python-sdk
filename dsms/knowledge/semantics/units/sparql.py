@@ -18,15 +18,15 @@ class UnitSparqlQuery(BaseUnitSparqlQuery):
 
     # OVERRIDE
     @property
-    def query(cls) -> str:
+    def query(self) -> str:
         """Construct sparql query for getting unit for dataframe column"""
-        kitem_id = cls.kwargs.get("kitem_id")
-        property_name = cls.kwargs.get("property_name")
+        kitem_id = self.kwargs.get("kitem_id")
+        property_name = self.kwargs.get("property_name")
         if not kitem_id:
             raise ValueError("KItem ID must be defined.")
         if not property_name:
             raise ValueError("Property name must be defined.")
-        url = urljoin(str(cls.dsms.config.host_url), str(kitem_id))
+        url = urljoin(str(self.dsms.config.host_url), str(kitem_id))
 
         return f"""prefix csvw: <http://www.w3.org/ns/csvw#>
             prefix dcat: <http://www.w3.org/ns/dcat#>
@@ -46,13 +46,13 @@ class UnitSparqlQuery(BaseUnitSparqlQuery):
         }}"""
 
     # OVERRIDE
-    def postprocess_result(cls, row: "Dict[str, Any]") -> "Dict[str, Any]":
+    def postprocess_result(self, row: "Dict[str, Any]") -> "Dict[str, Any]":
         """
         Define a function that postprocesses the result of the indivudal row in the
         sparql result. This might e.g. be some string operations etc.
         """
         if row.get("symbol") == "None":
             row["symbol"] = None
-        if cls.kwargs.get("autocomplete_symbol") and not row.get("symbol"):
+        if self.kwargs.get("autocomplete_symbol") and not row.get("symbol"):
             row["symbol"] = _get_symbol_from_uri(row.get("iri"))
         return row

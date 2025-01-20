@@ -26,7 +26,7 @@ from dsms.knowledge.properties.authors import Author  # isort:skip
 from dsms.knowledge.properties.contacts import ContactInfo  # isort:skip
 from dsms.knowledge.properties.external_links import ExternalLink  # isort:skip
 from dsms.knowledge.properties.user_groups import UserGroup  # isort:skip
-from dsms.knowledge.utils import _get_kitem  # isort:skip
+from dsms.knowledge.utils import _get_kitem, print_model  # isort:skip
 
 
 if TYPE_CHECKING:
@@ -50,10 +50,7 @@ class LinkedLinkedKItem(BaseModel):
 
     def __str__(self) -> str:
         """Pretty print the linked KItems of the linked KItem"""
-        values = ",\n\t\t\t".join(
-            [f"{key}: {value}" for key, value in self.__dict__.items()]
-        )
-        return f"{{\n\t\t\t{values}\n\t\t}}"
+        return print_model(self, "linked_kitem")
 
     def __repr__(self) -> str:
         """Pretty print the linked KItems of the linked KItem"""
@@ -139,7 +136,7 @@ class LinkedKItem(KItemProperty):
     _kitem = PrivateAttr(default=None)
 
     # OVERRIDE
-    model_config = ConfigDict(exclude={}, arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def fetch(self) -> "KItem":
         """Fetch the linked KItem"""
@@ -147,22 +144,12 @@ class LinkedKItem(KItemProperty):
 
     def is_a(self, to_be_compared: KType) -> bool:
         """Check the KType of the KItem"""
-        return (
-            self.ktype_id.value  # pylint: disable=no-member
-            == to_be_compared.value
-        )
+        return self.ktype_id == to_be_compared.id  # pylint: disable=no-member
 
     # OVERRIDE
     def __str__(self) -> str:
         """Pretty print the linked KItem"""
-        values = "\n\t\t\t".join(
-            [
-                f"{key}: {value}"
-                for key, value in self.__dict__.items()
-                if key not in self.exclude
-            ]
-        )
-        return f"\n\t\t\t{values}\n\t\t"
+        return print_model(self, "linked_kitem")
 
     # OVERRIDE
     def __repr__(self) -> str:
@@ -171,15 +158,15 @@ class LinkedKItem(KItemProperty):
 
     # OVERRIDE
     @property
-    def kitem(cls) -> "KItem":
+    def kitem(self) -> "KItem":
         """KItem related to the linked KItem"""
-        return cls._kitem
+        return self._kitem
 
     # OVERRIDE
     @kitem.setter
-    def kitem(cls, value: "KItem") -> None:
+    def kitem(self, value: "KItem") -> None:
         """Set KItem related to the linked KItem"""
-        cls._kitem = value
+        self._kitem = value
 
     @field_validator("attachments", mode="before")
     @classmethod
@@ -233,12 +220,12 @@ class LinkedKItemsProperty(KItemPropertyList):
 
     # OVERRIDE
     @property
-    def k_property_item(cls) -> "Callable":
+    def k_property_item(self) -> "Callable":
         return LinkedKItem
 
     # OVERRIDE
     @property
-    def k_property_helper(cls) -> "Callable":
+    def k_property_helper(self) -> "Callable":
         """Linked KItem helper function"""
         return _linked_kitem_helper
 
@@ -263,11 +250,11 @@ class LinkedKItemsProperty(KItemPropertyList):
     @property
     def by_ktype(self) -> "Dict[KType, List[KItem]]":
         """Get the kitems grouped by ktype"""
-        from dsms import Context
+        from dsms import Session
 
         grouped = {}
         for linked in self:
-            ktype = Context.dsms.ktypes[_name_to_camel(linked.ktype_id)]
+            ktype = Session.dsms.ktypes[_name_to_camel(linked.ktype_id)]
             if not ktype in grouped:
                 grouped[ktype] = []
             if not linked in grouped[ktype]:

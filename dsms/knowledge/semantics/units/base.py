@@ -32,6 +32,6 @@ class BaseUnitSparqlQuery(BaseSparqlQuery):
 
     # OVERRIDE
     @property
-    def result_mappings(cls) -> "Dict[str, Any]":
+    def result_mappings(self) -> "Dict[str, Any]":
         """Define mappings for the results of the units sparql queries"""
         return {"symbol": str, "iri": str}
