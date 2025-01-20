@@ -32,16 +32,16 @@ class AnnotationsProperty(KItemPropertyList):
 
     # OVERRIDE
     @property
-    def k_property_item(cls) -> "Callable":
+    def k_property_item(self) -> "Callable":
         """Annotation data model"""
         return Annotation
 
     @property
-    def k_property_helper(cls) -> None:
+    def k_property_helper(self) -> None:
         """Not defined for Affiliations"""
         return _make_annotation_schema
 
     @property
-    def by_iri(cls) -> "Dict[str, Any]":
+    def by_iri(self) -> "Dict[str, Any]":
         """Return dict of annotations per IRI"""
-        return {annotation.iri: annotation for annotation in cls}
+        return {annotation.iri: annotation for annotation in self}

@@ -71,28 +71,28 @@ class KItemProperty(BaseModel):
         return hash(str(self))
 
     @property
-    def kitem(cls) -> "KItem":
+    def kitem(self) -> "KItem":
         """KItem related to the KItemProperty"""
-        return cls._kitem
+        return self._kitem
 
     @property
-    def dsms(cls) -> "KItem":
+    def dsms(self) -> "KItem":
         """DSMS instance related to the KItemProperty"""
-        return cls.kitem.dsms
+        return self.kitem.dsms
 
     @kitem.setter
-    def kitem(cls, item: "KItem") -> None:
+    def kitem(self, item: "KItem") -> None:
         """Set KItem related to the KItemProperty"""
-        cls._kitem = item
-        cls.id = item.id
+        self._kitem = item
+        self.id = item.id
 
     @property
-    def exclude(cls) -> "Optional[Set[str]]":
+    def exclude(self) -> "Optional[Set[str]]":
         """Fields to be excluded from the JSON-schema"""
-        return cls.model_config.get("exclude")
+        return self.model_config.get("exclude")
 
     @property
-    def context(cls) -> "Session":
+    def context(self) -> "Session":
         """Getter for Session"""
         from dsms import (  # isort:skip
             Session,
@@ -118,12 +118,12 @@ class KItemPropertyList(list):
 
     @property
     @abstractmethod
-    def k_property_item(cls) -> "Callable":
+    def k_property_item(self) -> "Callable":
         """Return the KItemProperty-class"""
 
     @property
     @abstractmethod
-    def k_property_helper(cls) -> "Optional[Callable]":
+    def k_property_helper(self) -> "Optional[Callable]":
         """Optional helper for transforming a given
         input into the k property item"""
 
@@ -257,7 +257,7 @@ class KItemPropertyList(list):
             self.context.buffers.updated.update({self._kitem.id: self._kitem})
 
     @property
-    def context(cls) -> "Session":
+    def context(self) -> "Session":
         """Getter for Session"""
         from dsms import (  # isort:skip
             Session,
@@ -266,18 +266,18 @@ class KItemPropertyList(list):
         return Session
 
     @property
-    def kitem(cls) -> "KItem":
+    def kitem(self) -> "KItem":
         """KItem context of the field"""
-        return cls._kitem
+        return self._kitem
 
     @kitem.setter
-    def kitem(cls, value: "KItem") -> None:
+    def kitem(self, value: "KItem") -> None:
         """KItem setter"""
-        cls._kitem = value
-        for item in cls:
-            item.kitem = cls.kitem
+        self._kitem = value
+        for item in self:
+            item.kitem = self.kitem
 
     @property
-    def values(cls) -> "List[Dict[str, Any]]":
+    def values(self) -> "List[Dict[str, Any]]":
         """Values of the KItemPropertyList"""
-        return list(cls)
+        return list(self)

@@ -29,10 +29,10 @@ class AffiliationsProperty(KItemPropertyList):
 
     # OVERRIDE
     @property
-    def k_property_item(cls) -> "Callable":
+    def k_property_item(self) -> "Callable":
         return Affiliation
 
     @property
-    def k_property_helper(cls) -> "Callable":
+    def k_property_helper(self) -> "Callable":
         """Affiliation property helper"""
         return _str_to_dict

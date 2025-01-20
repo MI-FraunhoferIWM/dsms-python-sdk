@@ -49,12 +49,12 @@ class AttachmentsProperty(KItemPropertyList):
 
     # OVERRIDE
     @property
-    def k_property_item(cls) -> "Callable":
+    def k_property_item(self) -> "Callable":
         return Attachment
 
     # OVERRIDE
     @property
-    def k_property_helper(cls) -> "Callable":
+    def k_property_helper(self) -> "Callable":
         """Helper for constructing attachment property"""
         return _str_to_dict
 
@@ -98,10 +98,10 @@ class AttachmentsProperty(KItemPropertyList):
             super().insert(index, item)
 
     @property
-    def by_name(cls) -> "List[str]":
+    def by_name(self) -> "List[str]":
         "Return list of names of attachments"
         return {
             Path(attachment.name).stem
             + Path(attachment.name).suffix: attachment
-            for attachment in cls
+            for attachment in self
         }

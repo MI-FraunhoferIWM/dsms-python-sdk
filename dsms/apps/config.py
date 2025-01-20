@@ -174,7 +174,7 @@ class AppConfig(BaseModel):
         return _app_spec_exists(self.name)
 
     @property
-    def session(cls) -> "Session":
+    def session(self) -> "Session":
         """Getter for Session"""
         from dsms import (  # isort:skip
             Session,

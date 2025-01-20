@@ -192,20 +192,20 @@ class AppsProperty(KItemPropertyList):
 
     # OVERRIDE
     @property
-    def k_property_item(cls) -> "Callable":
+    def k_property_item(self) -> "Callable":
         """App data model"""
         return App
 
     @property
-    def k_property_helper(cls) -> None:
+    def k_property_helper(self) -> None:
         """Not defined for Apps"""
 
     @property
-    def by_title(cls) -> Dict[str, App]:
+    def by_title(self) -> Dict[str, App]:
         """Get apps by title"""
-        return {app.title: app for app in cls}
+        return {app.title: app for app in self}
 
     @property
-    def by_exe(cls) -> Dict[str, App]:
+    def by_exe(self) -> Dict[str, App]:
         """Get apps by executable"""
-        return {app.executable: app for app in cls}
+        return {app.executable: app for app in self}

@@ -100,17 +100,17 @@ class KType(BaseModel):
         return _ktype_exists(self)
 
     @property
-    def dsms(cls) -> "DSMS":
+    def dsms(self) -> "DSMS":
         """DSMS session getter"""
-        return cls.session.dsms
+        return self.session.dsms
 
     @dsms.setter
-    def dsms(cls, value: "DSMS") -> None:
+    def dsms(self, value: "DSMS") -> None:
         """DSMS session setter"""
-        cls.session.dsms = value
+        self.session.dsms = value
 
     @property
-    def session(cls) -> "Session":
+    def session(self) -> "Session":
         """Getter for Session"""
         from dsms import (  # isort:skip
             Session,

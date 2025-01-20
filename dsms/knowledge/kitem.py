@@ -608,24 +608,24 @@ class KItem(BaseModel):
                 prop.kitem = self
 
     @property
-    def dsms(cls) -> "DSMS":
+    def dsms(self) -> "DSMS":
         """DSMS session getter"""
-        return cls.session.dsms
+        return self.session.dsms
 
     @dsms.setter
-    def dsms(cls, value: "DSMS") -> None:
+    def dsms(self, value: "DSMS") -> None:
         """DSMS session setter"""
-        cls.session.dsms = value
+        self.session.dsms = value
 
     @property
-    def subgraph(cls) -> Optional[Graph]:
+    def subgraph(self) -> Optional[Graph]:
         """Getter for Subgraph"""
         return _get_subgraph(
-            cls.id, cls.dsms.config.kitem_repo, is_kitem_id=True
+            self.id, self.dsms.config.kitem_repo, is_kitem_id=True
         )
 
     @property
-    def session(cls) -> "Session":
+    def session(self) -> "Session":
         """Getter for Session"""
         from dsms import (  # isort:skip
             Session,
@@ -634,11 +634,11 @@ class KItem(BaseModel):
         return Session
 
     @property
-    def url(cls) -> str:
+    def url(self) -> str:
         """URL of the KItem"""
         return urljoin(
-            str(cls.session.dsms.config.host_url),
-            f"knowledge/{cls._get_ktype_as_str()}/{cls.slug}",
+            str(self.session.dsms.config.host_url),
+            f"knowledge/{self._get_ktype_as_str()}/{self.slug}",
         )
 
     def is_a(self, to_be_compared: KType) -> bool:

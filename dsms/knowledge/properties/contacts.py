@@ -32,10 +32,10 @@ class ContactsProperty(KItemPropertyList):
 
     # OVERRIDE
     @property
-    def k_property_item(cls) -> "Callable":
+    def k_property_item(self) -> "Callable":
         return ContactInfo
 
     # OVERRIDE
     @property
-    def k_property_helper(cls) -> None:
+    def k_property_helper(self) -> None:
         """Not defined for Contacts"""

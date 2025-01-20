@@ -1025,7 +1025,7 @@ def _map_data_type_to_widget(value):
     return widget, is_list, dtype
 
 
-def sectionize_metadata(metadata: List[Dict[str, Any]]) -> dict:
+def make_custom_properties_schema(metadata: List[Dict[str, Any]]) -> dict:
     """
     Convert a list of dictionaries representing metadata
     entries into a DSMS schema dict.

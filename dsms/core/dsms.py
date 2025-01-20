@@ -148,9 +148,9 @@ class DSMS:
         return self._sparql_interface
 
     @property
-    def ktypes(cls) -> "Enum":
+    def ktypes(self) -> "Enum":
         """Getter for the Enum of the KTypes defined in the DSMS instance."""
-        return cls._ktypes
+        return self._ktypes
 
     @ktypes.setter
     def ktypes(self, value: "Enum") -> None:
@@ -162,9 +162,9 @@ class DSMS:
         self._ktypes = value
 
     @property
-    def config(cls) -> Configuration:
+    def config(self) -> Configuration:
         """Property returning the DSMS Configuration"""
-        return cls._config
+        return self._config
 
     @config.setter
     def config(self, value) -> None:
@@ -178,11 +178,11 @@ class DSMS:
         verify_connection(self)
 
     @property
-    def headers(cls) -> Dict[str, Any]:
+    def headers(self) -> Dict[str, Any]:
         """Request headers for authorization"""
-        if cls.config.token:
+        if self.config.token:
             header = {
-                "Authorization": f"{cls.config.token.get_secret_value()}"
+                "Authorization": f"{self.config.token.get_secret_value()}"
             }
         else:
             header = {}
@@ -219,7 +219,7 @@ class DSMS:
         return _get_kitem_list(limit=limit, offset=offset)
 
     @property
-    def app_configs(cls) -> "List[AppConfig]":
+    def app_configs(self) -> "List[AppConfig]":
         """Return available app configs in the DSMS"""
         from dsms.apps import AppConfig
 
@@ -229,14 +229,14 @@ class DSMS:
         ]
 
     @property
-    def buffers(cls) -> "Buffers":
+    def buffers(self) -> "Buffers":
         """Return buffers of the DSMS session"""
-        return cls._session.buffers
+        return self._session.buffers
 
     @property
-    def context(cls) -> "Session":
+    def context(self) -> "Session":
         """Return DSMS session"""
-        return cls._session
+        return self._session
 
     @classmethod
     def __get_pydantic_core_schema__(cls):
