@@ -79,7 +79,7 @@ class KItemProperty(BaseModel):
     def dsms(self) -> "KItem":
         """DSMS instance related to the KItemProperty"""
         return self.kitem.dsms
-   
+
     @kitem.setter
     def kitem(self, item: "KItem") -> None:
         """Set KItem related to the KItemProperty"""

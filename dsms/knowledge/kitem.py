@@ -205,7 +205,7 @@ class KItem(BaseModel):
     avatar: Optional[Union[Avatar, Dict]] = Field(
         default_factory=Avatar, description="KItem avatar interface"
     )
-    
+
     model_config = ConfigDict(
         validate_assignment=True,
         validate_default=True,
