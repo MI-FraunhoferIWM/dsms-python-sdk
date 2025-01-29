@@ -669,3 +669,18 @@ class KItem(BaseModel):
     def refresh(self) -> None:
         """Refresh the KItem"""
         _refresh_kitem(self)
+
+    def export(self, format: Format) -> Any:
+        """Export kitems to different formats"""
+
+        if format == Format.HDF5:
+            from dsms.knowledge.kitem_wrapper import to_hdf5
+            return to_hdf5(self)
+        
+        elif format == Format.JSON:
+            # need to implement
+            return
+        
+        elif format == Format.YAML:
+            # need to implement
+            return

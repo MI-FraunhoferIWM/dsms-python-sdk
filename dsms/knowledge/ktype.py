@@ -138,16 +138,16 @@ class KType(BaseModel):
             for key, value in self.__dict__.items()
         }
     
-    def export(self, format: Format) -> Any:
-        """Export ktypes to different formats"""
+    # def export(self, format: Format) -> Any:
+    #     """Export ktypes to different formats"""
 
-        if format == Format.HDF5:
-            return 
+    #     if format == Format.HDF5:
+    #         return 
         
-        elif format == Format.JSON:
-            # need to implement
-            return
+    #     elif format == Format.JSON:
+    #         # need to implement
+    #         return
         
-        elif format == Format.YAML:
-            # need to implement
-            return
+    #     elif format == Format.YAML:
+    #         # need to implement
+    #         return
