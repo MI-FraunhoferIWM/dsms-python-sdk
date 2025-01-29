@@ -1,4 +1,6 @@
 """Core utils of the DSMS core"""
+import json
+import logging
 import re
 from importlib import import_module
 from typing import TYPE_CHECKING
@@ -8,8 +10,14 @@ from uuid import UUID
 import requests
 from requests import Response
 
+from dsms.core.logging import handler  # isort:skip
+
 if TYPE_CHECKING:
     from typing import Any, Callable
+
+logger = logging.getLogger(__name__)
+logger.addHandler(handler)
+logger.propagate = False
 
 
 def _kitem_id2uri(kitem_id: UUID) -> str:
@@ -47,6 +55,12 @@ def _perform_request(route: str, method: str, **kwargs: "Any") -> Response:
         **kwargs,
     )
     response.encoding = Session.dsms.config.encoding
+    try:
+        debug_text = json.dumps(response.json(), indent=2)
+    except Exception:
+        debug_text = response.text
+    logger.debug("Received the follow response from route `%s`:", route)
+    logger.debug(debug_text)
     return response
 
 

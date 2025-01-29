@@ -31,8 +31,8 @@ Introduction to DSMS
 
 Get Started with using DSMS-SDK.
 
-```{link-button} tutorials/1_introduction.html
-:text: Jump to the tutorial
+```{link-button} dsms_sdk/tutorials/1_introduction.html
+:text: Jump to the tutorials
 :classes: btn-outline-primary stretched-link
 
 

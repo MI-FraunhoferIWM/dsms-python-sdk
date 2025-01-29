@@ -97,12 +97,12 @@ class DataFrameContainer(KItemPropertyList):
 
     # OVERRIDE
     @property
-    def k_property_item(cls) -> "Callable":
+    def k_property_item(self) -> "Callable":
         return Column
 
     # OVERRIDE
     @property
-    def k_property_helper(cls) -> None:
+    def k_property_helper(self) -> None:
         """Not defined for DataFrame"""
 
     def to_df(self) -> pd.DataFrame:

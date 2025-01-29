@@ -30,10 +30,10 @@ class UserGroupsProperty(KItemPropertyList):
     """KItemPropertyList for user_groups"""
 
     @property
-    def k_property_item(cls) -> "Callable":
+    def k_property_item(self) -> "Callable":
         """UserGroup data model"""
         return UserGroup
 
     @property
-    def k_property_helper(cls) -> None:
+    def k_property_helper(self) -> None:
         """Not defined for User groups"""

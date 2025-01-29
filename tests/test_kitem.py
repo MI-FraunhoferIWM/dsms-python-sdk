@@ -101,25 +101,6 @@ def test_dsms_bad_object():
 
 
 @responses.activate
-def test_kitem_bad_kwarg(get_mock_kitem_ids, custom_address):
-    from pydantic import ValidationError
-
-    from dsms.core.dsms import DSMS
-    from dsms.knowledge.kitem import KItem
-
-    with pytest.warns(UserWarning, match="No authentication details"):
-        dsms = DSMS(host_url=custom_address)
-
-    with pytest.raises(ValidationError):
-        KItem(
-            id=get_mock_kitem_ids[0],
-            name="foo123",
-            foo="bar",
-            ktype_id=dsms.ktypes.Organization,
-        )
-
-
-@responses.activate
 def test_kitem_connection_error():
     from dsms.core.configuration import Configuration
     from dsms.core.dsms import DSMS

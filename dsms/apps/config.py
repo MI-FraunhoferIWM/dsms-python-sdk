@@ -104,7 +104,7 @@ class AppConfig(BaseModel):
 
     def __str__(self) -> str:
         """Pretty print the kitem Fields"""
-        return print_model(self, "app")
+        return print_model(self, "app", exclude_extra={"specification"})
 
     def __repr__(self) -> str:
         """Pretty print the kitem Fields"""
@@ -174,7 +174,7 @@ class AppConfig(BaseModel):
         return _app_spec_exists(self.name)
 
     @property
-    def session(cls) -> "Session":
+    def session(self) -> "Session":
         """Getter for Session"""
         from dsms import (  # isort:skip
             Session,

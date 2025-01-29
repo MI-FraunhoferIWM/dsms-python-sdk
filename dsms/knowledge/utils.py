@@ -21,7 +21,7 @@ from dsms.core.logging import handler  # isort:skip
 
 from dsms.core.utils import _name_to_camel, _perform_request  # isort:skip
 
-from dsms.knowledge.search import SearchResult  # isort:skip
+from dsms.knowledge.search import SearchResult, KItemListModel  # isort:skip
 
 if TYPE_CHECKING:
     from dsms.apps import AppConfig
@@ -44,17 +44,34 @@ def _is_number(value):
 
 def print_model(self, key, exclude_extra: set = set()) -> str:
     """Pretty print the ktype fields"""
+    dumped = dump_model(self, exclude_extra)
+    return yaml.dump({key: dumped})
+
+
+def dump_model(self, exclude_extra: set = set()) -> Dict[str, Any]:
+    """
+    Dump the model fields into a dictionary format with optional exclusions.
+
+    This method converts the model's fields into a dictionary while allowing
+    specific fields to be excluded. UUID fields are converted to string
+    representation.
+
+    Args:
+        exclude_extra (set): Additional fields to exclude from the dump.
+
+    Returns:
+        Dict[str, Any]: A dictionary of the model fields with specified exclusions.
+    """
     exclude = self.model_config.get("exclude", set()) | exclude_extra
     dumped = self.model_dump(
         exclude_none=True,
         exclude_unset=True,
         exclude=exclude,
     )
-    dumped = {
+    return {
         key: (str(value) if isinstance(value, UUID) else value)
         for key, value in dumped.items()
     }
-    return yaml.dump({key: dumped})
 
 
 def print_ktype(self) -> str:
@@ -207,16 +224,28 @@ def _delete_ktype(ktype: "KType") -> None:
     Session.dsms.ktypes = _get_remote_ktypes()
 
 
-def _get_kitem_list() -> "List[KItem]":
+def _get_kitem_list(limit=10, offset=0) -> "KItemListModel":
     """Get all available KItems from the remote backend."""
-    from dsms.knowledge.kitem import KItem, KItemList  # isort:skip
+    from dsms.knowledge.kitem import KItem  # isort:skip
 
-    response = _perform_request("api/knowledge/kitems", "get")
+    response = _perform_request(
+        "api/knowledge/kitems",
+        "get",
+        params={
+            "limit": limit,
+            "offset": offset,
+        },
+    )
     if not response.ok:
         raise ValueError(
             f"Something went wrong fetching the available kitems: {response.text}"
         )
-    return KItemList(KItem(**kitem) for kitem in response.json())
+    payload = response.json()
+    kitems = {
+        "kitems": [KItem(**kitem) for kitem in payload["kitems"]],
+        "total_count": payload["total_count"],
+    }
+    return KItemListModel(**kitems)
 
 
 def _kitem_exists(kitem: Union[Any, str, UUID]) -> bool:
@@ -680,6 +709,7 @@ def _search(
     ktypes: "Optional[List[Union[Enum, KType]]]" = [],
     annotations: "Optional[List[str]]" = [],
     limit: "Optional[int]" = 10,
+    offset: "Optional[int]" = 0,
     allow_fuzzy: "Optional[bool]" = True,
 ) -> "List[SearchResult]":
     """Search for KItems in the remote backend"""
@@ -690,6 +720,7 @@ def _search(
         "ktypes": [ktype.value.id for ktype in ktypes],
         "annotations": [_make_annotation_schema(iri) for iri in annotations],
         "limit": limit,
+        "offset": offset,
     }
     response = _perform_request(
         "api/knowledge/kitems/search",
@@ -707,10 +738,13 @@ def _search(
         raise RuntimeError(
             f"""Something went wrong while searching for KItems: {response.text}"""
         ) from excep
-    return [
-        SearchResult(hit=KItem(**item.get("hit")), fuzzy=item.get("fuzzy"))
-        for item in dumped
-    ]
+    return SearchResult(
+        hits=[
+            {"kitem": KItem(**item.get("kitem")), "fuzzy": item.get("fuzzy")}
+            for item in dumped.get("hits")
+        ],
+        total_count=dumped.get("total_count"),
+    )
 
 
 def _slugify(input_string: str, replacement: str = ""):
@@ -723,7 +757,7 @@ def _slugify(input_string: str, replacement: str = ""):
     return slug
 
 
-def _slug_is_available(ktype_id: Union[str, UUID], value: str) -> bool:
+def _slug_is_available(ktype_id: str, value: str) -> bool:
     """Check whether the id of a KItem is available in the DSMS or not"""
     response = _perform_request(
         f"api/knowledge/kitems/{ktype_id}/{value}", "head"
@@ -886,20 +920,18 @@ def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
         for section_def in webform.sections:
             for input_def in section_def.inputs:
                 if input_def.label in copy_properties:
-                    if input_def.class_mapping:
-                        class_mapping = {
-                            "classMapping": {"iri": input_def.class_mapping}
-                        }
+                    if input_def.measurement_unit:
+                        measurement_unit = (
+                            input_def.measurement_unit.model_dump()
+                        )
                     else:
-                        class_mapping = {}
-
+                        measurement_unit = None
                     entry = {
                         "id": input_def.id,
                         "label": input_def.label,
                         "value": copy_properties.pop(input_def.label),
-                        "measurement_unit": input_def.measurement_unit,
+                        "measurement_unit": measurement_unit,
                         "type": input_def.widget,
-                        **class_mapping,
                     }
                     section_name = section_def.name
                     if section_name not in transformed_sections:
@@ -942,31 +974,58 @@ def _make_misc_section(custom_properties: dict):
                 "id": generate_id(),
                 "label": key,
                 "value": value,
-                "type": _map_data_type_to_widget(value),
             }
         )
     return section
 
 
 def _map_data_type_to_widget(value):
-    from dsms.knowledge.webform import Widget
+    from dsms import KItem
+    from dsms.knowledge.webform import KnowledgeItemReference, Widget
 
-    if isinstance(value, str):
-        widget = Widget.TEXT.value
-    elif isinstance(value, (int, float)):
-        widget = Widget.NUMBER.value
-    elif isinstance(value, bool):
-        widget = Widget.CHECKBOX.value
-    elif isinstance(value, list):
-        widget = Widget.MULTI_SELECT.value
+    widget = None
+    is_list = isinstance(value, list)
+    if isinstance(value, list):
+        is_list = True
+        types = []
+        for val in value:
+            dtype = type(val)
+            if isinstance(val, str):
+                types.append(Widget.MULTI_SELECT.value)
+            if isinstance(val, (KItem, KnowledgeItemReference, dict)):
+                types.append(Widget.KNOWLEDGE_ITEM.value)
+            if isinstance(val, (int, float)):
+                types.append(Widget.SLIDER.value)
+        types = set(types)
+        if len(types) > 1:
+            raise ValueError(
+                f"More than one widget type detected from data ({value}): {types} "
+            )
+        if len(types) == 0:
+            raise ValueError(f"No widget type detected from data ({value}).")
+        widget = types.pop()
     else:
-        raise ValueError(
-            f"Unsupported data type: {type(value)}. Value: {value}"
-        )
-    return widget
+        dtype = type(value)
+        if isinstance(value, str):
+            widget = Widget.TEXT.value
+            dtype = type(value)
+        elif isinstance(value, (int, float)):
+            widget = Widget.NUMBER.value
+        elif isinstance(value, bool):
+            widget = Widget.CHECKBOX.value
+
+        elif isinstance(value, (KItem, KnowledgeItemReference, dict)):
+            raise ValueError(
+                "KItems in the custom properties should be wrapped into a list."
+            )
+        else:
+            raise ValueError(
+                f"Unsupported data type: {type(value)}. Value: {value}"
+            )
+    return widget, is_list, dtype
 
 
-def sectionize_metadata(metadata: List[Dict[str, Any]]) -> dict:
+def make_custom_properties_schema(metadata: List[Dict[str, Any]]) -> dict:
     """
     Convert a list of dictionaries representing metadata
     entries into a DSMS schema dict.

@@ -134,13 +134,16 @@ class KItem(BaseModel):
         description="ID of the KItem",
     )
     ktype_id: Union[Enum, str] = Field(..., description="Type ID of the KItem")
+    ktype: Optional[Union[Enum, KType]] = Field(
+        None, description="KType of the KItem", exclude=True
+    )
     in_backend: bool = Field(
         False,
         description="Whether the KItem was already created in the backend.",
     )
     slug: Optional[str] = Field(
         None,
-        description="Slug of the KContext.dsms",
+        description="Slug of the KItem",
         min_length=4,
         max_length=1000,
     )
@@ -191,10 +194,6 @@ class KItem(BaseModel):
         None, description="Custom properties associated to the KItem"
     )
 
-    ktype: Optional[Union[str, Enum, KType]] = Field(
-        None, description="KType of the KItem", exclude=True
-    )
-
     dataframe: Optional[
         Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]
     ] = Field(None, description="DataFrame interface.")
@@ -216,7 +215,6 @@ class KItem(BaseModel):
     )
 
     model_config = ConfigDict(
-        extra="forbid",
         validate_assignment=True,
         validate_default=True,
         exclude={"ktype", "avatar"},
@@ -460,26 +458,39 @@ class KItem(BaseModel):
                     f"KType for `ktype_id={value}` does not exist."
                 )
             value = ktype
+        if not hasattr(value, "id"):
+            raise TypeError(
+                "Not a valid KType. Provided Enum does not have an `id`."
+            )
 
         return value.id
 
     @field_validator("ktype")
     @classmethod
     def validate_ktype(
-        cls, value: Optional[Union[KType, str, Enum]], info: ValidationInfo
+        cls, value: Optional[Union[KType, Enum]], info: ValidationInfo
     ) -> KType:
         """Validate the ktype of the KItem"""
         from dsms import Session
 
-        if not value:
-            value = info.data.get("ktype_id")
+        ktype_id = info.data.get("ktype_id")
 
-        if isinstance(value, str):
-            value = Session.ktypes.get(value)
+        if not value:
+            value = Session.ktypes.get(ktype_id)
             if not value:
                 raise TypeError(
                     f"KType for `ktype_id={value}` does not exist."
                 )
+        if not hasattr(value, "id"):
+            raise TypeError(
+                "Not a valid KType. Provided Enum does not have an `id`."
+            )
+
+        if value.id != ktype_id:
+            raise TypeError(
+                f"KType for `ktype_id={ktype_id}` does not match "
+                f"the provided `ktype`."
+            )
 
         return value
 
@@ -499,16 +510,11 @@ class KItem(BaseModel):
         from dsms import Session
 
         ktype_id = info.data["ktype_id"]
-        kitem_id = info.data.get("id")
+        kitem_id = info.data["id"]
+        name = info.data["name"]
         kitem_exists = info.data.get("in_backend")
         if not isinstance(kitem_exists, bool):
             kitem_exists = cls.in_backend
-
-        if isinstance(ktype_id, str):
-            ktype = ktype_id
-        else:
-            ktype = ktype_id.id
-        name = info.data.get("name")
 
         if not value:
             value = _slugify(name)
@@ -518,7 +524,7 @@ class KItem(BaseModel):
                 )
             if Session.dsms.config.individual_slugs:
                 value += f"-{str(kitem_id).split('-', maxsplit=1)[0]}"
-        if not kitem_exists and not _slug_is_available(ktype, value):
+        if not kitem_exists and not _slug_is_available(ktype_id, value):
             raise ValueError(f"Slug for `{value}` is already taken.")
         return value
 
@@ -623,24 +629,24 @@ class KItem(BaseModel):
                 prop.kitem = self
 
     @property
-    def dsms(cls) -> "DSMS":
+    def dsms(self) -> "DSMS":
         """DSMS session getter"""
-        return cls.session.dsms
+        return self.session.dsms
 
     @dsms.setter
-    def dsms(cls, value: "DSMS") -> None:
+    def dsms(self, value: "DSMS") -> None:
         """DSMS session setter"""
-        cls.session.dsms = value
+        self.session.dsms = value
 
     @property
-    def subgraph(cls) -> Optional[Graph]:
+    def subgraph(self) -> Optional[Graph]:
         """Getter for Subgraph"""
         return _get_subgraph(
-            cls.id, cls.dsms.config.kitem_repo, is_kitem_id=True
+            self.id, self.dsms.config.kitem_repo, is_kitem_id=True
         )
 
     @property
-    def session(cls) -> "Session":
+    def session(self) -> "Session":
         """Getter for Session"""
         from dsms import (  # isort:skip
             Session,
@@ -649,52 +655,17 @@ class KItem(BaseModel):
         return Session
 
     @property
-    def url(cls) -> str:
+    def url(self) -> str:
         """URL of the KItem"""
-        return cls.access_url or urljoin(
-            str(cls.session.dsms.config.host_url),
-            f"knowledge/{cls._get_ktype_as_str()}/{cls.slug}",
+        return urljoin(
+            str(self.session.dsms.config.host_url),
+            f"knowledge/{self.ktype_id}/{self.slug}",
         )
 
     def is_a(self, to_be_compared: KType) -> bool:
         """Check the KType of the KItem"""
-        return self.ktype_id == to_be_compared.id  # pylint: disable=no-member
+        return self.ktype.id == to_be_compared.id  # pylint: disable=no-member
 
     def refresh(self) -> None:
         """Refresh the KItem"""
         _refresh_kitem(self)
-
-    def _get_ktype_as_str(self) -> str:
-        if isinstance(self.ktype_id, str):
-            ktype = self.ktype_id
-        elif isinstance(self.ktype_id, Enum):
-            ktype = self.ktype_id.id  # pylint: disable=no-member
-        else:
-            raise TypeError(f"Datatype for KType is unknown: {type(ktype)}")
-        return ktype
-
-    def export(self, format: Format) -> Any:
-        """Export kitems to different formats"""
-
-        if format == Format.HDF5:
-            from dsms.knowledge.kitem_wrapper import to_hdf5
-            return to_hdf5(self)
-        
-        elif format == Format.JSON:
-            # need to implement
-            return
-        
-        elif format == Format.YAML:
-            # need to implement
-            return
-
-class KItemList(list):
-    """List of KItems"""
-
-    def __str__(self):
-        """Pretty print the KItemList"""
-        return "\n".join([str(item) for item in self])
-
-    def __repr__(self):
-        """Pretty print the KItemList"""
-        return str(self)

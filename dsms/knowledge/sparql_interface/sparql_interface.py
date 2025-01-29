@@ -50,6 +50,6 @@ class SparqlInterface:
         _add_rdf(file_or_pathlike, self._dsms.config.encoding, repository)
 
     @property
-    def subgraph(cls) -> Subgraph:
+    def subgraph(self) -> Subgraph:
         """Subgraph interface for DSMS"""
-        return cls._subgraph
+        return self._subgraph

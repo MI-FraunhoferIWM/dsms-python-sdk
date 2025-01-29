@@ -158,15 +158,15 @@ class LinkedKItem(KItemProperty):
 
     # OVERRIDE
     @property
-    def kitem(cls) -> "KItem":
+    def kitem(self) -> "KItem":
         """KItem related to the linked KItem"""
-        return cls._kitem
+        return self._kitem
 
     # OVERRIDE
     @kitem.setter
-    def kitem(cls, value: "KItem") -> None:
+    def kitem(self, value: "KItem") -> None:
         """Set KItem related to the linked KItem"""
-        cls._kitem = value
+        self._kitem = value
 
     @field_validator("attachments", mode="before")
     @classmethod
@@ -220,12 +220,12 @@ class LinkedKItemsProperty(KItemPropertyList):
 
     # OVERRIDE
     @property
-    def k_property_item(cls) -> "Callable":
+    def k_property_item(self) -> "Callable":
         return LinkedKItem
 
     # OVERRIDE
     @property
-    def k_property_helper(cls) -> "Callable":
+    def k_property_helper(self) -> "Callable":
         """Linked KItem helper function"""
         return _linked_kitem_helper
 

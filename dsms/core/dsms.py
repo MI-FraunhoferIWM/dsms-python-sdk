@@ -1,6 +1,7 @@
 """DSMS connection module"""
 
 import os
+import warnings
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List
 
@@ -27,7 +28,9 @@ if TYPE_CHECKING:
     from dsms.core.session import Buffers
     from dsms.knowledge.kitem import KItem
     from dsms.knowledge.ktype import KType
-    from dsms.knowledge.search import SearchResult
+    from dsms.knowledge.search import KItemListModel, SearchResult
+
+warnings.simplefilter("always", DeprecationWarning)
 
 
 class DSMS:
@@ -134,10 +137,11 @@ class DSMS:
         ktypes: "Optional[List[Union[Enum, KType]]]" = [],
         annotations: "Optional[List[str]]" = [],
         limit: int = 10,
+        offset: int = 0,
         allow_fuzzy: "Optional[bool]" = True,
     ) -> "List[SearchResult]":
         """Search for KItems in the remote backend."""
-        return _search(query, ktypes, annotations, limit, allow_fuzzy)
+        return _search(query, ktypes, annotations, limit, offset, allow_fuzzy)
 
     @property
     def sparql_interface(self) -> SparqlInterface:
@@ -145,9 +149,18 @@ class DSMS:
         return self._sparql_interface
 
     @property
-    def ktypes(cls) -> "Enum":
+    def ktypes(self) -> "Enum":
         """Getter for the Enum of the KTypes defined in the DSMS instance."""
-        return cls._ktypes
+        return self._ktypes
+
+    @ktypes.setter
+    def ktypes(self, value: "Enum") -> None:
+        """Setter for the ktypes property of the DSMS instance.
+
+        Args:
+            value: the Enum object to be set as the ktypes property.
+        """
+        self._ktypes = value
 
     @ktypes.setter
     def ktypes(self, value: "Enum") -> None:
@@ -159,9 +172,9 @@ class DSMS:
         self._ktypes = value
 
     @property
-    def config(cls) -> Configuration:
+    def config(self) -> Configuration:
         """Property returning the DSMS Configuration"""
-        return cls._config
+        return self._config
 
     @config.setter
     def config(self, value) -> None:
@@ -175,27 +188,48 @@ class DSMS:
         verify_connection(self)
 
     @property
-    def headers(cls) -> Dict[str, Any]:
+    def headers(self) -> Dict[str, Any]:
         """Request headers for authorization"""
-        if cls.config.token:
+        if self.config.token:
             header = {
-                "Authorization": f"{cls.config.token.get_secret_value()}"
+                "Authorization": f"{self.config.token.get_secret_value()}"
             }
         else:
             header = {}
         return header
 
     @property
-    def kitems(cls) -> "List[KItem]":
-        """KItems instantiated and available in the remote backend.
-        WARNING: This will download _all_ KItems in the backend owned
-        by the current user and may resolve into long response times.
-        The default timeout for requests is defined under the
-        `request_timeout`-attribute in the `Configuration`-class."""
+    def kitems(self) -> "KItemListModel":
+        """
+        **DEPRECATED**
+
+        Return the first 10 KItems from the remote backend.
+
+        .. warning::
+            This property is deprecated and only returns the 10 first kitems.
+            Please use the `get_kitems`-method instead.
+
+        Returns:
+            KItemListModel: The first 10 KItems from the remote backend.
+        """
+        message = """`kitems`-property is deprecated and only returns the 10 first kitems.
+        Please use the `get_kitems`-method instead."""
+        warnings.warn(message, DeprecationWarning)
         return _get_kitem_list()
 
+    def get_kitems(self, limit=10, offset=0) -> "KItemListModel":
+        """
+        Get all available KItems from the remote backend.
+
+        Args:
+            limit (int): The amount of KItems to be returned. Defaults to 10.
+            offset (int): The offset in the list of KItems. Defaults to 0.
+
+        """
+        return _get_kitem_list(limit=limit, offset=offset)
+
     @property
-    def app_configs(cls) -> "List[AppConfig]":
+    def app_configs(self) -> "List[AppConfig]":
         """Return available app configs in the DSMS"""
         from dsms.apps import AppConfig
 
@@ -205,14 +239,14 @@ class DSMS:
         ]
 
     @property
-    def buffers(cls) -> "Buffers":
+    def buffers(self) -> "Buffers":
         """Return buffers of the DSMS session"""
-        return cls._session.buffers
+        return self._session.buffers
 
     @property
-    def context(cls) -> "Session":
+    def context(self) -> "Session":
         """Return DSMS session"""
-        return cls._session
+        return self._session
 
     @classmethod
     def __get_pydantic_core_schema__(cls):

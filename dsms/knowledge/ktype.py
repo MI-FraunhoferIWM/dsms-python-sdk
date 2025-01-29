@@ -8,7 +8,6 @@ from uuid import UUID
 from pydantic import BaseModel, Field, model_serializer
 
 from dsms.core.logging import handler
-from dsms.knowledge.kitem import Format
 from dsms.knowledge.utils import _ktype_exists, _refresh_ktype, print_ktype
 from dsms.knowledge.webform import Webform
 
@@ -29,12 +28,6 @@ class KType(BaseModel):
     )
     name: Optional[str] = Field(
         None, description="Human readable name of the KType.", max_length=50
-    )
-    context: Optional[bool] = Field(
-        False, description="Identifies if the ktype is a context ktype"
-    )
-    context_schema: Optional[list] = Field(
-        [], description="Schema of the context ktype"
     )
     webform: Optional[Webform] = Field(
         None, description="Form data of the KType."
@@ -107,17 +100,17 @@ class KType(BaseModel):
         return _ktype_exists(self)
 
     @property
-    def dsms(cls) -> "DSMS":
+    def dsms(self) -> "DSMS":
         """DSMS session getter"""
-        return cls.session.dsms
+        return self.session.dsms
 
     @dsms.setter
-    def dsms(cls, value: "DSMS") -> None:
+    def dsms(self, value: "DSMS") -> None:
         """DSMS session setter"""
-        cls.session.dsms = value
+        self.session.dsms = value
 
     @property
-    def session(cls) -> "Session":
+    def session(self) -> "Session":
         """Getter for Session"""
         from dsms import (  # isort:skip
             Session,
@@ -134,7 +127,7 @@ class KType(BaseModel):
         """Serialize ktype."""
         return {
             key: (
-                value.dict(  # pylint: disable=no-member
+                value.model_dump(  # pylint: disable=no-member
                     exclude_none=False, by_alias=False
                 )
                 if key == "webform"

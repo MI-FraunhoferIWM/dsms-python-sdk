@@ -51,14 +51,14 @@ class Summary(BaseModel):
             self.context.buffers.updated.update({self.id: self.kitem})
 
     @property
-    def id(cls) -> Optional[UUID]:
+    def id(self) -> Optional[UUID]:
         """Identifier of the KItem related to the CustomProperies"""
-        if not cls.kitem:
+        if not self.kitem:
             raise ValueError("KItem not defined yet.")
-        return cls.kitem.id  # pylint: disable=E1101
+        return self.kitem.id  # pylint: disable=E1101
 
     @property
-    def context(cls) -> "Session":
+    def context(self) -> "Session":
         """Getter for Session"""
         from dsms import (  # isort:skip
             Session,
@@ -67,9 +67,9 @@ class Summary(BaseModel):
         return Session
 
     @property
-    def exclude(cls) -> "Optional[Set[str]]":
+    def exclude(self) -> "Optional[Set[str]]":
         """Fields to be excluded from the JSON-schema"""
-        return cls.model_config.get("exclude")
+        return self.model_config.get("exclude")
 
     @model_serializer
     def serialize(self) -> str:
