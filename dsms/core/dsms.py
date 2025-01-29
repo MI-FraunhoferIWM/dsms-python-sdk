@@ -162,15 +162,6 @@ class DSMS:
         """
         self._ktypes = value
 
-    @ktypes.setter
-    def ktypes(self, value: "Enum") -> None:
-        """Setter for the ktypes property of the DSMS instance.
-
-        Args:
-            value: the Enum object to be set as the ktypes property.
-        """
-        self._ktypes = value
-
     @property
     def config(self) -> Configuration:
         """Property returning the DSMS Configuration"""

@@ -35,6 +35,7 @@ from dsms.core.logging import handler  # isort:skip
 if TYPE_CHECKING:
     from dsms.knowledge.ktype import KType
 
+
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.propagate = False

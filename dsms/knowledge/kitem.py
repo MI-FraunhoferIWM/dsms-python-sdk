@@ -205,15 +205,7 @@ class KItem(BaseModel):
     avatar: Optional[Union[Avatar, Dict]] = Field(
         default_factory=Avatar, description="KItem avatar interface"
     )
-
-    context_id: Optional[Union[UUID, str]] = Field(
-        None, description="Context ID of the KItem"
-    )
-
-    access_url: Optional[str] = Field(
-        None, description="Access URL of the KItem", exclude=True
-    )
-
+    
     model_config = ConfigDict(
         validate_assignment=True,
         validate_default=True,
@@ -479,7 +471,7 @@ class KItem(BaseModel):
             value = Session.ktypes.get(ktype_id)
             if not value:
                 raise TypeError(
-                    f"KType for `ktype_id={value}` does not exist."
+                    f"KType for `ktype_id={ktype_id}` does not exist."
                 )
         if not hasattr(value, "id"):
             raise TypeError(
