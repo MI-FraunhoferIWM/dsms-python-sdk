@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, model_serializer
 
 from dsms.core.logging import handler
+from dsms.knowledge.kitem import Format
 from dsms.knowledge.utils import _ktype_exists, _refresh_ktype, print_ktype
 from dsms.knowledge.webform import Webform
 
@@ -143,3 +144,17 @@ class KType(BaseModel):
             )
             for key, value in self.__dict__.items()
         }
+    
+    def export(self, format: Format) -> Any:
+        """Export ktypes to different formats"""
+
+        if format == Format.HDF5:
+            return 
+        
+        elif format == Format.JSON:
+            # need to implement
+            return
+        
+        elif format == Format.YAML:
+            # need to implement
+            return
