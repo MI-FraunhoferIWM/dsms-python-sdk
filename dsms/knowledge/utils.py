@@ -762,8 +762,6 @@ def _slug_is_available(ktype_id: str, value: str) -> bool:
     response = _perform_request(
         f"api/knowledge/kitems/{ktype_id}/{value}", "head"
     )
-    if response.status_code == 401:
-        raise RuntimeError("The access token has expired")
     return response.status_code == 404
 
 

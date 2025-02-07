@@ -74,6 +74,12 @@ class Configuration(BaseSettings):
         description="JWT bearer token for connecting to the DSMS instance",
     )
 
+    reauthenticate: bool = Field(
+        True,
+        description="""Whether to reauthenticate with username and password
+        when the token is expired.""",
+    )
+
     ping_dsms: bool = Field(
         True, description="Check whether the host is a DSMS instance or not."
     )
