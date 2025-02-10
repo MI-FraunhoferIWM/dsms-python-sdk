@@ -8,6 +8,7 @@ from urllib.parse import urljoin
 from uuid import UUID
 
 import requests
+from pydantic import SecretStr
 from requests import Response
 
 from dsms.core.logging import handler  # isort:skip
@@ -39,7 +40,9 @@ def _ping_dsms():
     return _perform_request("api/knowledge/docs", "get")
 
 
-def _perform_request(route: str, method: str, **kwargs: "Any") -> Response:
+def _perform_request(
+    route: str, method: str, retry=True, headers=None, **kwargs: "Any"
+) -> Response:
     """Perform a general request for a certain route and with a certain method.
     Kwargs are general arguments which can be passed to the `requests.request`-function.
     """
@@ -49,7 +52,7 @@ def _perform_request(route: str, method: str, **kwargs: "Any") -> Response:
     response = requests.request(
         method,
         url=urljoin(str(dsms.config.host_url), route),
-        headers=dsms.headers,
+        headers=headers or dsms.headers,
         timeout=dsms.config.request_timeout,
         verify=dsms.config.ssl_verify,
         **kwargs,
@@ -61,6 +64,38 @@ def _perform_request(route: str, method: str, **kwargs: "Any") -> Response:
         debug_text = response.text
     logger.debug("Received the follow response from route `%s`:", route)
     logger.debug(debug_text)
+    if (
+        response.status_code == 401
+        and dsms.config.enable_auto_reauth
+        and retry
+    ):
+        if dsms.config.username and dsms.config.password:
+            username = dsms.config.username.get_secret_value()
+            passwd = dsms.config.password.get_secret_value()
+            authorization = f"Basic {username}:{passwd}"
+            reauth = _perform_request(
+                "api/users/token",
+                "get",
+                retry=False,
+                headers={"Authorization": authorization},
+            )
+            if not reauth.ok:
+                raise RuntimeError(f"Reauthentication failed: {reauth.text}")
+            logger.debug("Reauthentication successful.")
+            token = reauth.json().get("token")
+            if "Bearer " not in token:
+                dsms.config.token = SecretStr(f"Bearer {token}")
+            else:
+                dsms.config.token = SecretStr(token)
+            response = _perform_request(
+                route, method, retry=False, headers=None, **kwargs
+            )
+        else:
+            logger.debug("No credentials found for reauthentication.")
+    else:
+        logger.debug(
+            "Reauthentication skipped. Either not needed or not enabled."
+        )
     return response
 
 

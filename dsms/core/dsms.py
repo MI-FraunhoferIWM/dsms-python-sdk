@@ -98,7 +98,8 @@ class DSMS:
             )
 
         self._sparql_interface = SparqlInterface(self)
-        self.ktypes = _get_remote_ktypes()
+        if self.config.auto_fetch_ktypes:
+            self.ktypes = _get_remote_ktypes()
 
     def __getitem__(self, key: str) -> "KItem":
         """Get KItem from remote DSMS instance."""
@@ -151,6 +152,8 @@ class DSMS:
     @property
     def ktypes(self) -> "Enum":
         """Getter for the Enum of the KTypes defined in the DSMS instance."""
+        if self._ktypes is None or self.config.always_refetch_ktypes:
+            self._ktypes = _get_remote_ktypes()
         return self._ktypes
 
     @ktypes.setter
