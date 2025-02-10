@@ -64,7 +64,11 @@ def _perform_request(
         debug_text = response.text
     logger.debug("Received the follow response from route `%s`:", route)
     logger.debug(debug_text)
-    if response.status_code == 401 and dsms.config.reauthenticate and retry:
+    if (
+        response.status_code == 401
+        and dsms.config.enable_auto_reauth
+        and retry
+    ):
         if dsms.config.username and dsms.config.password:
             username = dsms.config.username.get_secret_value()
             passwd = dsms.config.password.get_secret_value()

@@ -74,7 +74,7 @@ class Configuration(BaseSettings):
         description="JWT bearer token for connecting to the DSMS instance",
     )
 
-    reauthenticate: bool = Field(
+    enable_auto_reauth: bool = Field(
         True,
         description="""Whether to reauthenticate with username and password
         when the token is expired.""",
@@ -84,14 +84,14 @@ class Configuration(BaseSettings):
         True, description="Check whether the host is a DSMS instance or not."
     )
 
-    ktypes_on_startup: bool = Field(
+    auto_fetch_ktypes: bool = Field(
         True,
         description="""Whether the KTypes of the DSMS should be fetched automatically
         when the session is started. They will be fetched if requested and cached
         in memory.""",
     )
 
-    refetch_ktypes: bool = Field(
+    always_refetch_ktypes: bool = Field(
         False,
         description="""Whether the KTypes of the DSMS should be refetched
         every time used in the SDK. This can be helpful if the SDK is integrated
