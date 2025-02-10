@@ -76,7 +76,7 @@ class Configuration(BaseSettings):
 
     enable_auto_reauth: bool = Field(
         True,
-        description="""Whether to reauthenticate with username and password
+        description="""Whether to automatically reauthenticate with username and password
         when the token is expired.""",
     )
 
