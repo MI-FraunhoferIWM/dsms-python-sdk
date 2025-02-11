@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional, Union
 from uuid import UUID
+from enum import Enum
 
 from pydantic import BaseModel, Field, model_serializer
 
@@ -19,6 +20,12 @@ logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.propagate = False
 
+class Format(Enum):
+    """Data formats"""
+    
+    JSON = "json"
+    YAML = "yaml"
+    HDF5 = "hdf5"
 
 class KType(BaseModel):
     """Knowledge type of the knowledge item."""
@@ -138,16 +145,18 @@ class KType(BaseModel):
             for key, value in self.__dict__.items()
         }
     
-    # def export(self, format: Format) -> Any:
-    #     """Export ktypes to different formats"""
+    def export(self, format: Format) -> Any:
+        """Export ktypes to different formats"""
 
-    #     if format == Format.HDF5:
-    #         return 
+        if format == Format.HDF5:
+            from dsms.knowledge.ktype_wrapper import to_hdf5
+            return to_hdf5(self)
+            
         
-    #     elif format == Format.JSON:
-    #         # need to implement
-    #         return
+        elif format == Format.JSON:
+            # need to implement
+            return
         
-    #     elif format == Format.YAML:
-    #         # need to implement
-    #         return
+        elif format == Format.YAML:
+            # need to implement
+            return

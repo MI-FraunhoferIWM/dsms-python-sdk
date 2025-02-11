@@ -139,22 +139,16 @@ def to_hdf5(kItem) -> io.BytesIO:
 
                     for j, entry in enumerate(section):
                         entry_group = entries_group.create_group(f'entry_{j}')
-
-                        for key, value in entry:
-                            if key == 'kitem':
+                        entry_keys = ['measurement_unit', 'relation_mapping']
+                        for entry_key, entry_value in entry:
+                            if entry_key == 'kitem':
                                 continue
-                            if key == 'measurement_unit':
-                                measurement_unit_group = entry_group.create_group('measurement_unit')
-                                for key_, value_ in value:
-                                    if key_ == 'kitem':
-                                        continue
-                                    measurement_unit_group.create_dataset(key_, data=str(value_))
-                            elif key == 'relation_mapping':
-                                relation_mapping_group = entry_group.create_group('relation_mapping')
-                                for key_, value_ in value:
-                                    if key_ == 'kitem':
-                                        continue 
-                                    relation_mapping_group.create_dataset(key_, data=str(value_))
+                            elif entry_key in entry_keys and entry_value is not None:
+                                    group = entry_group.create_group(entry_key)
+                                    for key_, value_ in entry_value:
+                                        if key_ == 'kitem':
+                                            continue
+                                        create_dataset(key_, value_, group)
                             else:
                                 create_dataset(key, value, entry_group)
 
