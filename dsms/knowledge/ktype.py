@@ -128,7 +128,7 @@ class KType(BaseModel):
         return {
             key: (
                 value.model_dump(  # pylint: disable=no-member
-                    exclude_none=False, by_alias=False
+                    exclude_none=False, by_alias=True
                 )
                 if key == "webform"
                 and value is not None
