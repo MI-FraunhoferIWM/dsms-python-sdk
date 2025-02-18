@@ -21,7 +21,7 @@ The schema contains complex types and references, indicating an advanced usage s
 | Avatar Exists     | Whether the KItem holds an avatar or not.                                                               | boolean                                              | `False`  | `avatar_exists`    | Automatically generated          |
 | Custom Properties | A set of custom properties related to the KItem.                                                        | Any                                               | `None`     | `custom_properties`| Optional          |
 | Summary           | A brief human-readable summary of the KItem                                                             | string                              | `None`   | `summary`          | Optional          |
-| KItem Apps        | A list of applications associated with the KItem                                                        | List[[App](#app-fields)]                                         | `[ ]`    | `kitem_apps`       | Optional          |
+| Apps        | A list of applications associated with the KItem                                                        | List[[App](#app-fields)]                                         | `[ ]`    | `apps`       | Optional          |
 | Annotations       | A list of annotations related to the KItem                                                              | List[[Annotation](#annotation-fields)]                                  | `[ ]`    | `annotations`      | Optional          |
 | Affiliations      | A list of affiliations associated with the KItem                                                        | List[[Affiliation](#affiliation-fields)]                                 | `[ ]`    | `affiliations`     | Optional          |
 | Contacts          | Contact information related to the KItem                                                                | List[[ContactInfo](#contactinfo-fields)]                                 | `[ ]`    | `contacts`         | Optional          |
@@ -40,7 +40,7 @@ item = KItem(
     ktype_id="Testing Machine",
     custom_properties={"location": "Room01", "max_force": "100Pa"},
     summary="This is a summary",
-    kitem_apps=[
+    apps=[
         {"executable": "my_analysis_file",
         "title": "Analysis",
         "description": "Analysis the tensile strength from machine data"}
@@ -68,7 +68,7 @@ item = KItem(
 
 | Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
 |:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
-| KItem App ID | ID of the KItem App               | integer    | `None`  | `kitem_app_id`     | Automatically generated |
+| App ID | ID of the App               | integer    | `None`  | `kitem_app_id`     | Automatically generated |
 | Executable        | Name of the executable            | string      | `None`  | `executable`       | Required          |
 | Title             | Title of the application          | string      | `None`  | `title`            | Required          |
 | Description       | Description of the application    | string      | `None`  | `description`     |Required          |
@@ -77,7 +77,7 @@ item = KItem(
 
 ### Example Usage
 ```python
-sample_kitem.kitem_apps = [{
+sample_kitem.apps = [{
     "executable": "my_application",
     "title": "My Application",
     "description": "My Application for analysis.",
@@ -93,7 +93,7 @@ sample_kitem.kitem_apps = [{
 
 ### Example Usage
 ```python
-item.kitem_apps = [
+item.apps = [
         {
             "executable": "my_yaml_file",
             "title": "Data2RDF",

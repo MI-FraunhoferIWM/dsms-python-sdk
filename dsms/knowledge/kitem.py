@@ -18,6 +18,7 @@ from pydantic import (  # isort:skip
     ValidationInfo,
     field_validator,
     model_validator,
+    AliasChoices,
 )
 
 from dsms.core.logging import handler  # isort:skip
@@ -108,7 +109,7 @@ class KItem(BaseModel):
             Time and date when the KItem was updated.
         external_links (List[ExternalLink]):
             External links related to the KItem.
-        kitem_apps (List[App]): Apps related to the KItem.
+        apps (List[App]): Apps related to the KItem.
         summary (Optional[Union[str, Summary]]):
             Human readable summary text of the KItem.
         user_groups (List[UserGroup]):
@@ -176,7 +177,11 @@ class KItem(BaseModel):
         [],
         description="External links related to the KItem",
     )
-    kitem_apps: List[App] = Field([], description="Apps related to the KItem.")
+    apps: List[App] = Field(
+        [],
+        description="Apps related to the KItem.",
+        alias=AliasChoices("apps", "kitem_apps"),
+    )
     summary: Optional[Union[str, Summary]] = Field(
         None, description="Human readable summary text of the KItem."
     )
@@ -327,7 +332,7 @@ class KItem(BaseModel):
         """Validate attachments Field"""
         return AttachmentsProperty(value)
 
-    @field_validator("kitem_apps", mode="after")
+    @field_validator("apps", mode="after")
     @classmethod
     def validate_apps(cls, value: List[App]) -> AppsProperty:
         """Validate apps Field"""

@@ -160,7 +160,7 @@ class AppConfig(BaseModel):
                     "name": "request_timeout",
                     "value": self.dsms.config.request_timeout,
                 },
-                {"name": "ping", "value": self.dsms.config.ping_dsms},
+                {"name": "ping", "value": self.dsms.config.ping_backend},
                 {"name": "host_url", "value": str(self.dsms.config.host_url)},
                 {"name": "ssl_verify", "value": self.dsms.config.ssl_verify},
                 {"name": "kitem_repo", "value": self.dsms.config.kitem_repo},

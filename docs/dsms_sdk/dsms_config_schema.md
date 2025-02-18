@@ -15,7 +15,7 @@ This section describes the configuration properties for the DSMS Python SDK.
 | Username         | User name for connecting to the DSMS instance                                                | Optional[SecretStr]  | `None`                 | `username`           | Optional          |
 | Password         | Password for connecting to the DSMS instance                                                 | Optional[SecretStr]  | `None`                 | `password`           | Optional          |
 | Token            | JWT bearer token for connecting to the DSMS instance                                         | Optional[SecretStr]  | `None`                 | `token`              | Optional          |
-| Ping DSMS        | Check whether the host is a DSMS instance or not.                                            | bool                 | `True`                 | `ping_dsms`          | Optional          |
+| Ping Backend        | Check whether the host is a DSMS instance or not.                                            | bool                 | `True`                 | `ping_backend`          | Optional          |
 | Encoding         | General encoding to be used for reading/writing serializations.                              | str                  | “utf-8”              | `encoding`           | Optional          |
 | Datetime format  | Datetime format used in the DSMS instance.                                                   | str                  | “%Y-%m-%dT%H:%M:%S.%f” | `datetime_format`    | Optional          |
 | KItem repository       | Repository of the triplestore for KItems in the DSMS                                         | str                  | `knowledge`            | `kitem_repo`         | Optional          |
@@ -40,7 +40,7 @@ config = DSMS(
     username="****",
     password="****",
     token=None,
-    ping_dsms=True,
+    ping_backend=True,
     individual_slugs=True,
     encoding="utf-8",
     datetime_format="%Y-%m-%dT%H:%M:%S.%f",

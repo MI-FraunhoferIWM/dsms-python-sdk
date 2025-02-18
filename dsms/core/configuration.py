@@ -80,8 +80,10 @@ class Configuration(BaseSettings):
         when the token is expired.""",
     )
 
-    ping_dsms: bool = Field(
-        True, description="Check whether the host is a DSMS instance or not."
+    ping_backend: bool = Field(
+        True,
+        description="Check whether the host is a DSMS instance or not.",
+        alias=AliasChoices("ping_dsms", "ping_backend", "ping"),
     )
 
     auto_fetch_ktypes: bool = Field(
