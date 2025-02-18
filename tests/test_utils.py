@@ -104,7 +104,7 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         ],
         linked_kitems=[linked_kitem3],
         user_groups=[user_group],
-        kitem_apps=[app],
+        apps=[app],
     )
 
     expected = {
