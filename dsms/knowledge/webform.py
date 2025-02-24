@@ -241,27 +241,6 @@ class BaseWebformModel(BaseModel):
         super().__setattr__(key, value)
 
 
-<<<<<<< Updated upstream
-=======
-class WebformSelectOption(BaseWebformModel):
-    """Choices in webform"""
-
-    key: Optional[str] = Field(None, description="Label of the option")
-    label: Optional[Any] = Field(None, description="Value of the option")
-    disabled: Optional[bool] = Field(False, description="Disabled option")
-    class_mapping: Optional[str] = Field(
-        None, description="Class mapping of the option"
-    )
-
-    def __str__(self) -> str:
-        """Pretty print the model fields"""
-        return print_model(self, "select option")
-
-    def __repr__(self) -> str:
-        """Pretty print the model fields"""
-        return str(self)
-
-
 class WebformSelectOptionEntry(WebformSelectOption):
     """Webform option for a filled selection"""
 
@@ -276,80 +255,6 @@ class WebformSelectOptionEntry(WebformSelectOption):
         return str(self)
 
 
-class WebformMeasurementUnit(BaseModel):
-    """Measurement unit"""
-
-    label: Optional[str] = Field(
-        None, description="Label of the measurement unit"
-    )
-    iri: Optional[Union[str, AnyUrl]] = Field(
-        None, description="IRI of the measurement unit"
-    )
-    symbol: Optional[str] = Field(
-        None, description="Symbol of the measurement unit"
-    )
-    namespace: Optional[Union[str, AnyUrl]] = Field(
-        None, description="Namespace of the measurement unit"
-    )
-
-    @model_validator(mode="after")
-    def check_measurement_unit(cls, self) -> "MeasurementUnit":
-        """
-        Validate and convert IRI and namespace fields to AnyUrl type.
-
-        This method is a model validator that runs after the model is initialized.
-        It ensures that the `iri` and `namespace` fields of the `MeasurementUnit`
-        are of type `AnyUrl`. If they are not, it attempts to convert them to
-        `AnyUrl`.
-
-        Returns:
-            MeasurementUnit: The validated and potentially modified instance.
-        """
-
-        if not isinstance(self.iri, AnyUrl):
-            self.iri = str(self.iri)
-        if not isinstance(self.namespace, AnyUrl):
-            self.namespace = str(self.namespace)
-        return self
-
-    def __str__(self) -> str:
-        """Pretty print the model fields"""
-        return print_model(self, "webform measurement unit")
-
-    def __repr__(self) -> str:
-        """Pretty print the model fields"""
-        return str(self)
-
-
-class WebformRangeOptions(BaseModel):
-    """Range options"""
-
-    min: Optional[Union[int, float]] = Field(0, description="Minimum value")
-    max: Optional[Union[int, float]] = Field(0, description="Maximum value")
-    step: Optional[Union[int, float]] = Field(0, description="Step value")
-    range: Optional[bool] = Field(False, description="Range value")
-
-    def __str__(self) -> str:
-        """Pretty print the model fields"""
-        return print_model(self, "range options")
-
-    def __repr__(self) -> str:
-        """Pretty print the model fields"""
-        return str(self)
-
-
-class RelationMappingType(Enum):
-    """
-    Relation mapping type
-    """
-
-    OBJECT_PROPERY = "object_property"
-    DATA_PROPERTY = "data_property"
-    ANNOTATION_PROPERTY = "annotation_property"
-    PROPERTY = "property"
-
-
->>>>>>> Stashed changes
 class RelationMapping(BaseWebformModel):
     """Relation mapping"""
 
