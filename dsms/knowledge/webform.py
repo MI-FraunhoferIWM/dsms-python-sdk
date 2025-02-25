@@ -598,7 +598,9 @@ class Entry(BaseWebformModel):
         if dtype:
             logger.debug("Guessed data type: %s", dtype)
 
-        choices = [choice.label for choice in select_options] or None
+        choices = {
+            choice.label: choice.model_dump() for choice in select_options
+        } or None
         logger.debug("Entry choices: %s", choices)
 
         # if the widget not is guessed from the data type,
@@ -622,7 +624,7 @@ class Entry(BaseWebformModel):
             ):
                 if self.type == Widget.MULTI_SELECT.value:
                     is_list = True
-                dtype = (str, WebformSelectOption, dict)
+                dtype = WebformSelectOption
             elif self.type == Widget.KNOWLEDGE_ITEM.value:
                 dtype = (type(self.kitem), KnowledgeItemReference, dict)
                 is_list = True
@@ -642,11 +644,73 @@ class Entry(BaseWebformModel):
 
         # check whether strict validation is enabled
         if self.kitem.dsms.config.strict_validation:
+            # special case for webform select options
+            if (
+                self.type
+                in (
+                    Widget.SELECT.value,
+                    Widget.RADIO.value,
+                    Widget.MULTI_SELECT.value,
+                )
+                and self.value is not None
+            ):
+                error_message = (
+                    """Value `{}` is not a valid select option.
+                Valid options are: """
+                    + str(list(choices.keys()))
+                    + "\n"
+                )
+                if not select_options:
+                    raise ValueError(
+                        f"Widget of type `{self.type}` does not have select options."
+                    )
+                if isinstance(self.value, str):
+                    if self.value not in choices:
+                        raise ValueError(error_message.format(self.value))
+                    self.value = WebformSelectOptionEntry(
+                        **choices[self.value], value=self.value
+                    )
+                elif isinstance(self.value, dict):
+                    self.value = WebformSelectOptionEntry(**self.value)
+                    if self.value.label not in choices:
+                        raise ValueError(
+                            error_message.format(self.value.label)
+                        )
+
+                elif isinstance(self.value, list):
+                    chosen = []
+                    is_updated = False
+                    for val in self.value:
+                        if isinstance(val, str):
+                            if val not in choices:
+                                raise ValueError(error_message.format(val))
+                            val = WebformSelectOptionEntry(
+                                **choices[val], value=val
+                            )
+                            is_updated = True
+                        elif isinstance(val, dict):
+                            val = WebformSelectOptionEntry(**val)
+                            is_updated = True
+                            if val.label not in choices:
+                                raise ValueError(
+                                    error_message.format(val.label)
+                                )
+                        elif not isinstance(val, WebformSelectOptionEntry):
+                            raise ValueError(error_message.format(val))
+                        chosen.append(val)
+                    if is_updated:
+                        self.value = chosen
+                elif not isinstance(self.value, WebformSelectOptionEntry):
+                    raise ValueError(error_message.format(self.value))
+                logger.debug("Value is set to: %s", self.value)
+
             # check if value is of correct type
-            error_message = "Value of type {} is not of type {}."
+            error_message = "Value of type {} is invalid."
             if is_list is True:
-                error_message += f""" Widget of type ´{self.type}`
-                is requiring a value of type `List[{dtype}]`."""
+                error_message += f"""
+                Widget of type ´{self.type}` is requiring a value of type:
+                `List[{dtype}]`.
+                """
                 if not isinstance(self.value, list):
                     raise ValueError(
                         error_message.format(type(self.value), dtype)
@@ -657,8 +721,9 @@ class Entry(BaseWebformModel):
                             error_message.format(type(val), dtype)
                         )
             elif is_list is False:
-                error_message += f""" Widget of type ´{self.type}`
-                is requiring a value of type `{dtype}`."""
+                error_message += f"""
+                Widget of type ´{self.type}` is requiring a value of type:
+                `{dtype}`."""
                 if self.value is not None and not isinstance(
                     self.value, dtype
                 ):
@@ -670,26 +735,6 @@ class Entry(BaseWebformModel):
                     f"No webform was defined for entry `{self.label}`. "
                     "Cannot check if value is of correct type."
                 )
-
-            # check if value is a valid choice (if choices are set)
-            if self.value is not None and choices is not None:
-                logger.debug("Checking if value is a valid choice")
-                error_message = f"""Value {self.value} is not a valid choice for entry {self.label}.
-                Valid choices are: {choices}"""
-                # in case of multi-select
-                if is_list is True:
-                    for value in self.value:
-                        if value not in choices:
-                            raise ValueError(error_message)
-                # in case of single-select
-                elif is_list is False:
-                    if self.value not in choices:
-                        raise ValueError(error_message)
-                else:
-                    warnings.warn(
-                        f"No webform was defined for entry `{self.label}`. "
-                        "Cannot check if value is a valid choice."
-                    )
 
                 # check if value is required
                 logger.debug("Checking if value is required")
