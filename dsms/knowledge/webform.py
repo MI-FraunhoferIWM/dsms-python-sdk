@@ -711,15 +711,16 @@ class Entry(BaseWebformModel):
                 Widget of type ´{self.type}` is requiring a value of type:
                 `List[{dtype}]`.
                 """
-                if not isinstance(self.value, list):
-                    raise ValueError(
-                        error_message.format(type(self.value), dtype)
-                    )
-                for val in self.value:
-                    if not isinstance(val, dtype):
+                if self.value is not None:
+                    if not isinstance(self.value, list):
                         raise ValueError(
-                            error_message.format(type(val), dtype)
+                            error_message.format(type(self.value), dtype)
                         )
+                    for val in self.value:
+                        if not isinstance(val, dtype):
+                            raise ValueError(
+                                error_message.format(type(val), dtype)
+                            )
             elif is_list is False:
                 error_message += f"""
                 Widget of type ´{self.type}` is requiring a value of type:
@@ -736,16 +737,10 @@ class Entry(BaseWebformModel):
                     "Cannot check if value is of correct type."
                 )
 
-                # check if value is required
-                logger.debug("Checking if value is required")
-                if (
-                    self.value is None
-                    and default_value is None
-                    and self.required
-                ):
-                    raise ValueError(
-                        f"Value for entry {self.label} is required"
-                    )
+            # check if value is required
+            logger.debug("Checking if value is required")
+            if self.value is None and default_value is None and self.required:
+                raise ValueError(f"Value for entry {self.label} is required")
 
             # special case for knowledge item
             if (
