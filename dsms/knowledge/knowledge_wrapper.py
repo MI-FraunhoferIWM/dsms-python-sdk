@@ -55,7 +55,7 @@ def data_to_dict(data) -> Any:
         elif key == "content":
             content = data.download().encode("utf-8")
             bytes_io = io.BytesIO(content) if content else None
-            result =  base64.b64encode(bytes_io.getvalue()).decode("utf-8") 
+            result = base64.b64encode(bytes_io.getvalue()).decode("utf-8")
 
         # Process the value for other cases (lists, dicts, models, etc.)
         if result is None:
