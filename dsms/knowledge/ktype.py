@@ -145,7 +145,10 @@ class KType(BaseModel):
         """Export ktypes to different formats"""
 
         if data_format == DataFormat.HDF5:
-            from dsms.knowledge.knowledge_wrapper import data_to_dict, dict_to_hdf5
+            from dsms.knowledge.knowledge_wrapper import (  # isort:skip
+                data_to_dict,
+                dict_to_hdf5,
+            )
 
             return dict_to_hdf5(data_to_dict(self))
 
