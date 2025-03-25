@@ -122,92 +122,69 @@ def dict_to_hdf5(dict_data):
                 else:
                     group.create_dataset(key, data="")
 
-        # Start adding data to the root group
+        # Add data to the root group
         add_to_hdf5(dict_data, f)
 
     # Get the bytes data from the memory buffer
     byte_data.seek(0)
     return byte_data.read()
 
-
 def hdf5_to_dict(hdf5_file: io.BytesIO) -> dict:
-    """Convert an HDF5 file back into a Python dictionary."""
+    """Convert an HDF5 file into a Python dictionary."""
 
     def decode_if_bytes(value):
         """Decode bytes to string if needed."""
-
         if isinstance(value, bytes):
             return value.decode("utf-8")
-        if isinstance(value, np.ndarray) and value.dtype.type is np.bytes_:
+        elif isinstance(value, np.ndarray) and value.dtype.type is np.bytes_:
             return [elem.decode("utf-8") for elem in value.tolist()]
         return value
 
     def convert_numpy(obj):
-        """Recursively convert numpy data types in dictionaries or lists to native Python types."""
-
+        """Convert numpy data types to native Python types."""
         if isinstance(obj, np.generic):
             return obj.item()
-        if isinstance(obj, dict):
+        elif isinstance(obj, dict):
             return {key: convert_numpy(value) for key, value in obj.items()}
-        if isinstance(obj, list):
+        elif isinstance(obj, list):
             return [convert_numpy(item) for item in obj]
-        if isinstance(obj, tuple):
-            return tuple(convert_numpy(item) for item in obj)
-        if isinstance(obj, set):
-            return {convert_numpy(item) for item in obj}
         return obj
 
     def read_group(group):
-        """Recursively read HDF5 groups into a dictionary."""
-
+        """Recursively read HDF5 groups, grouping 'item_X' keys into lists efficiently."""
         data_dict = {}
-        grouped_items = {}
+        grouped_items = []
 
-        # Read attributes
         for key, value in group.attrs.items():
             data_dict[key] = decode_if_bytes(value)
 
-        # Read datasets
         for key, dataset in group.items():
             if isinstance(dataset, h5py.Dataset):
                 data = dataset[()]
-
-                # Convert binary data back to original format if needed
                 if isinstance(data, np.ndarray) and data.dtype == np.uint8:
                     try:
-                        value = (
-                            data.tobytes().decode()
-                        )  # Convert binary to string
+                        value = data.tobytes().decode()
                     except UnicodeDecodeError:
-                        value = data.tobytes()  # Keep as raw bytes
-
+                        value = data.tobytes()
                 elif isinstance(data, np.ndarray):
-                    value = decode_if_bytes(
-                        data.tolist()
-                    )  # Convert numpy arrays to lists
-
+                    value = decode_if_bytes(data.tolist())
                 else:
                     value = decode_if_bytes(data)
 
             elif isinstance(dataset, h5py.Group):
-                value = read_group(dataset)  # Recursively read subgroups
+                value = read_group(dataset)
 
-            # If key matches 'item_X', group into a list
-            if re.match(r"item_\d+", key):
-                parent_key = dataset.parent.name.split("/")[
-                    -1
-                ]  # Get the parent key
-                if parent_key not in grouped_items:
-                    grouped_items[parent_key] = []
-                grouped_items[parent_key].append(value)
+            if key.startswith("item_") and key[5:].isdigit():
+                grouped_items.append(value)
             else:
                 data_dict[key] = value
 
-        # Merge grouped items back into the main dictionary
-        data_dict.update(grouped_items)
+        # If there are grouped items, store them correctly
+        if grouped_items:
+            return grouped_items
 
         return convert_numpy(data_dict)
 
-    # Open the HDF5 file and start reading
-    with h5py.File(hdf5_file, "r") as hdf:
+    with h5py.File(hdf5_file, 'r') as hdf:
         return read_group(hdf)
+
