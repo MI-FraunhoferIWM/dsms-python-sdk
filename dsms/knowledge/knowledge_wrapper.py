@@ -2,7 +2,6 @@
 
 import base64
 import io
-import re
 from typing import Any
 
 import h5py
@@ -129,6 +128,7 @@ def dict_to_hdf5(dict_data):
     byte_data.seek(0)
     return byte_data.read()
 
+
 def hdf5_to_dict(hdf5_file: io.BytesIO) -> dict:
     """Convert an HDF5 file into a Python dictionary."""
 
@@ -136,7 +136,7 @@ def hdf5_to_dict(hdf5_file: io.BytesIO) -> dict:
         """Decode bytes to string if needed."""
         if isinstance(value, bytes):
             return value.decode("utf-8")
-        elif isinstance(value, np.ndarray) and value.dtype.type is np.bytes_:
+        if isinstance(value, np.ndarray) and value.dtype.type is np.bytes_:
             return [elem.decode("utf-8") for elem in value.tolist()]
         return value
 
@@ -144,9 +144,9 @@ def hdf5_to_dict(hdf5_file: io.BytesIO) -> dict:
         """Convert numpy data types to native Python types."""
         if isinstance(obj, np.generic):
             return obj.item()
-        elif isinstance(obj, dict):
+        if isinstance(obj, dict):
             return {key: convert_numpy(value) for key, value in obj.items()}
-        elif isinstance(obj, list):
+        if isinstance(obj, list):
             return [convert_numpy(item) for item in obj]
         return obj
 
@@ -185,6 +185,5 @@ def hdf5_to_dict(hdf5_file: io.BytesIO) -> dict:
 
         return convert_numpy(data_dict)
 
-    with h5py.File(hdf5_file, 'r') as hdf:
+    with h5py.File(hdf5_file, "r") as hdf:
         return read_group(hdf)
-
