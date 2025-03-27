@@ -323,19 +323,15 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "id",
             "kitem_apps",
             "created_at",
-            "external_links",
             "dataframe",
             "access_url",
         },
         exclude_none=True,
     )
     payload.update(
-        external_links={
-            link.label: str(link.url) for link in new_kitem.external_links
-        },
         **differences,
     )
-    if new_kitem.custom_properties:
+    if new_kitem.custom_properties is not None:
         custom_properties = new_kitem.custom_properties.model_dump(
             by_alias=True
         )

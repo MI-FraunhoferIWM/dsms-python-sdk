@@ -304,7 +304,9 @@ class Input(BaseWebformModel):
     multiple_selection: Optional[bool] = Field(
         False, description="Multiple selection"
     )
-    knowledge_type: Optional[str] = Field(None, description="Knowledge type")
+    knowledge_type: Optional[Union[str, List[str], List[None]]] = Field(
+        None, description="Knowledge type"
+    )
     range_options: Optional[WebformRangeOptions] = Field(
         None, description="Range options"
     )
@@ -544,7 +546,7 @@ class Entry(BaseWebformModel):
     @model_validator(mode="after")
     @classmethod
     def _validate_inputs(cls, self: "Entry") -> "Entry":
-        spec = cls._get_input_spec(self)
+        spec: List[Input] = cls._get_input_spec(self)
 
         logger.debug("Entry label: %s", self.label)
         logger.debug("Entry value: %s", self.value)
@@ -566,6 +568,7 @@ class Entry(BaseWebformModel):
             default_value = spec.value
             select_options = spec.select_options
             range_options = spec.range_options
+            knowledge_type = spec.knowledge_type
             if range_options:
                 is_list = range_options.range
             else:
@@ -581,6 +584,7 @@ class Entry(BaseWebformModel):
             logger.debug("Using user-provided widget type: %s", self.type)
             default_value = None
             select_options = []
+            knowledge_type = None
             is_list = None
             dtype = None
         # in this case we assume that a webform was not defined
@@ -592,6 +596,7 @@ class Entry(BaseWebformModel):
             self.type, is_list, dtype = _map_data_type_to_widget(self.value)
             logger.debug("Guessed widget type: %s", self.type)
             default_value = None
+            knowledge_type = None
             select_options = []
 
         logger.debug("Entry is_list: %s", is_list)
@@ -767,6 +772,13 @@ class Entry(BaseWebformModel):
                             slug=val.slug,
                         )
                         is_updated = True
+                    if (
+                        knowledge_type is not None
+                        and val.ktype_id not in knowledge_type
+                    ):
+                        raise ValueError(
+                            f"Knowledge item `{val.name}` is not of type {knowledge_type}."
+                        )
                     kitems.append(val)
                 if is_updated:
                     self.value = kitems
@@ -782,7 +794,7 @@ class Entry(BaseWebformModel):
         return self
 
     @classmethod
-    def _get_input_spec(cls, self: "Entry"):
+    def _get_input_spec(cls, self: "Entry") -> List[Input]:
         spec = []
         if self.webform:
             for section in self.webform.sections:
