@@ -18,6 +18,7 @@ from pydantic import (  # isort:skip
     ValidationInfo,
     field_validator,
     model_validator,
+    field_serializer,
 )
 
 from dsms.core.logging import handler  # isort:skip
@@ -589,6 +590,18 @@ class KItem(BaseModel):
                 f"{type(self.custom_properties)}: {self.custom_properties}"
             )
         return self
+
+    @field_serializer("custom_properties")
+    def _serialize_custom_properties(
+        self, custom_properties: Optional[Any]
+    ) -> Dict[str, Any]:
+        if custom_properties is not None:
+            serialized = {
+                "content": custom_properties.model_dump(by_alias=True)
+            }
+        else:
+            serialized = None
+        return serialized
 
     def _set_kitem_for_properties(self) -> None:
         """Set kitem for CustomProperties and KProperties in order to

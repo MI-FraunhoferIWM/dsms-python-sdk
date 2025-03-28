@@ -311,7 +311,6 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "authors",
             "avatar",
             "annotations",
-            "custom_properties",
             "linked_kitems",
             "updated_at",
             "rdf_exists",
@@ -326,16 +325,11 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "dataframe",
             "access_url",
         },
-        exclude_none=True,
+        exclude_defaults=True,
     )
     payload.update(
         **differences,
     )
-    if new_kitem.custom_properties is not None:
-        custom_properties = new_kitem.custom_properties.model_dump(
-            by_alias=True
-        )
-        payload.update(custom_properties={"content": custom_properties})
     logger.debug(
         "Update KItem for `%s` with payload: %s", new_kitem.id, payload
     )
