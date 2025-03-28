@@ -22,7 +22,7 @@ Introduction to DSMS
 
  Overview of the DSMS-SDK
 
-```{link-button} dsms_sdk.html
+```{link-button} dsms_sdk/dsms_sdk.html
 :text: Basics of DSMS-SDK
 :classes: btn-outline-primary stretched-link
 
