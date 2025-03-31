@@ -1,5 +1,6 @@
 """Knowledge Item implementation of the DSMS"""
 
+import json
 import logging
 import warnings
 from datetime import datetime
@@ -9,6 +10,7 @@ from urllib.parse import urljoin
 from uuid import UUID, uuid4
 
 import pandas as pd
+import yaml
 from rdflib import Graph
 
 from pydantic import (  # isort:skip
@@ -48,6 +50,8 @@ from dsms.knowledge.properties import (  # isort:skip
     UserGroup,
     UserGroupsProperty,
 )
+
+from dsms.knowledge.data_format import DataFormat  # isort:skip
 
 from dsms.knowledge.ktype import KType  # isort:skip
 
@@ -668,3 +672,41 @@ class KItem(BaseModel):
     def refresh(self) -> None:
         """Refresh the KItem"""
         _refresh_kitem(self)
+
+    def export(self, data_format: DataFormat) -> Any:
+        """Export kitems to different formats"""
+
+        if data_format == DataFormat.HDF5:
+            from dsms.knowledge.knowledge_wrapper import (  # isort:skip
+                data_to_dict,
+                dict_to_hdf5,
+            )
+
+            return dict_to_hdf5(data_to_dict(self))
+
+        if data_format == DataFormat.JSON:
+            from dsms.knowledge.knowledge_wrapper import data_to_dict
+
+            return json.dumps(data_to_dict(self))
+
+        if data_format == DataFormat.YAML:
+            from dsms.knowledge.knowledge_wrapper import data_to_dict
+
+            return yaml.dump(data_to_dict(self), default_flow_style=False)
+
+        raise ValueError(f"Unsupported data format: {data_format}")
+
+    def import_kitem(data, data_format: DataFormat) -> Any:
+        """Import objects in different formats to KItem"""
+
+        if data_format == DataFormat.HDF5:
+            from dsms.knowledge.knowledge_wrapper import hdf5_to_dict
+
+            return hdf5_to_dict(data)
+
+        if data_format == DataFormat.JSON:
+            return json.load(data)
+        if data_format == DataFormat.YAML:
+            return yaml.safe_load(data)
+
+        raise ValueError(f"Unsupported data format: {data_format}")
