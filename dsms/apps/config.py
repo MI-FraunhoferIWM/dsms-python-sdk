@@ -13,10 +13,6 @@ from pydantic import (  # isort:skip
     model_validator,
 )
 
-from dsms.apps.utils import (  # isort:skip
-    _app_spec_exists,
-    _get_app_specification,
-)
 
 from dsms.knowledge.utils import print_model  # isort:skip
 
@@ -63,44 +59,16 @@ class AppConfig(BaseModel):
 
     def __init__(self, **kwargs: "Any") -> None:
         """Initialize the KItem"""
-        from dsms import DSMS
-
-        logger.debug("Initialize KItem with model data: %s", kwargs)
-
         # set dsms instance if not already done
         if not self.dsms:
-            self.dsms = DSMS()
+            raise ValueError(
+                "DSMS instance not set. Please call DSMS() before initializing a KItem."
+            )
 
         # initialize the app config
         super().__init__(**kwargs)
 
-        # add app config to buffer
-        if (
-            not self.in_backend
-            and self.name not in self.session.buffers.created
-        ):
-            logger.debug(
-                """Marking AppConfig with name `%s` as created
-                and updated during AppConfig initialization.""",
-                self.name,
-            )
-            self.session.buffers.created.update({self.name: self})
-            self.session.buffers.updated.update({self.name: self})
-
         logger.debug("AppConfig initialization successful.")
-
-    def __setattr__(self, name, value) -> None:
-        """Add app to updated-buffer if an attribute is set"""
-        super().__setattr__(name, value)
-        logger.debug(
-            "Setting property with key `%s` on KItem level: %s.", name, value
-        )
-        if self.name not in self.session.buffers.updated:
-            logger.debug(
-                "Setting AppConfig with name `%s` as updated during AppConfig.__setattr__",
-                self.name,
-            )
-            self.session.buffers.updated.update({self.name: self})
 
     def __str__(self) -> str:
         """Pretty print the kitem Fields"""
@@ -123,11 +91,12 @@ class AppConfig(BaseModel):
     @classmethod
     def validate_specification(cls, self: "AppConfig") -> str:
         """Check specification to be uploaded"""
+        config = self.dsms.config
 
         if isinstance(self.specification, str):
             try:
                 with open(
-                    self.specification, encoding=self.dsms.config.encoding
+                    self.specification, encoding=config.encoding
                 ) as file:
                     content = file.read()
             except Exception as error:
@@ -140,38 +109,20 @@ class AppConfig(BaseModel):
                 raise RuntimeError(
                     f"Invalid yaml specification path: `{error.args[0]}`"
                 ) from error
-            self.session.buffers.updated.update({self.name: self})
-        elif isinstance(self.specification, dict) and self.in_backend:
-            spec = _get_app_specification(self.name)
-            if (
-                not yaml.safe_load(spec) == self.specification
-                and self.name not in self.session.buffers.updated
-            ):
-                self.session.buffers.updated.update({self.name: self})
-        elif (
-            isinstance(self.specification, dict)
-            and not self.in_backend
-            and self.name not in self.session.buffers.updated
-        ):
-            self.session.buffers.updated.update({self.name: self})
+
         if self.expose_sdk_config:
             self.specification["spec"]["arguments"]["parameters"] += [
                 {
                     "name": "request_timeout",
-                    "value": self.dsms.config.request_timeout,
+                    "value": config.request_timeout,
                 },
-                {"name": "ping", "value": self.dsms.config.ping_dsms},
-                {"name": "host_url", "value": str(self.dsms.config.host_url)},
-                {"name": "ssl_verify", "value": self.dsms.config.ssl_verify},
-                {"name": "kitem_repo", "value": self.dsms.config.kitem_repo},
-                {"name": "encoding", "value": self.dsms.config.encoding},
+                {"name": "ping", "value": config.ping_dsms},
+                {"name": "host_url", "value": str(config.host_url)},
+                {"name": "ssl_verify", "value": config.ssl_verify},
+                {"name": "kitem_repo", "value": config.kitem_repo},
+                {"name": "encoding", "value": config.encoding},
             ]
         return self
-
-    @property
-    def in_backend(self) -> bool:
-        """Checks whether the app config already exists."""
-        return _app_spec_exists(self.name)
 
     @property
     def session(self) -> "Session":

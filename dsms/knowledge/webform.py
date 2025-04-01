@@ -173,7 +173,7 @@ class BaseWebformModel(BaseModel):
         Returns:
             KType: KType instance
         """
-        return self.kitem.ktype
+        return self.kitem.ktype  # pylint: disable=no-member
 
     @property
     def webform(self) -> "Webform":
@@ -196,7 +196,7 @@ class BaseWebformModel(BaseModel):
         Returns:
             DSMS: The DSMS instance associated with the kitem.
         """
-        return self.kitem.dsms
+        return self.kitem.dsms  # pylint: disable=no-member
 
     def __str__(self) -> str:
         """Pretty print the model fields"""
@@ -205,40 +205,6 @@ class BaseWebformModel(BaseModel):
     def __repr__(self) -> str:
         """Pretty print the model fields"""
         return str(self)
-
-    def __setattr__(self, key, value) -> None:
-        """
-        Set an attribute of the model.
-
-        This method sets an attribute of the model and logs the operation.
-        If the attribute being set is `kitem`, it directly assigns the value.
-        For other attributes, it marks the associated `kitem` as updated in the
-        session buffers if it exists.
-
-        Args:
-            key (str): The name of the attribute to set.
-            value (Any): The value to set for the attribute.
-        """
-        logger.debug(
-            "Setting property for model attribute with key `%s` with value `%s`.",
-            key,
-            value,
-        )
-
-        # Set kitem as updated
-        if key != "kitem" and self.kitem:
-            logger.debug(
-                "Setting related kitem with id `%s` as updated",
-                self.kitem.id,
-            )
-            self.kitem.session.buffers.updated.update(
-                {self.kitem.id: self.kitem}
-            )
-
-        elif key == "kitem":
-            self.kitem = value
-
-        super().__setattr__(key, value)
 
 
 class WebformSelectOptionEntry(WebformSelectOption):
@@ -423,8 +389,6 @@ class KnowledgeItemReference(BaseModel):
     ktype_id: str = Field(..., description="ID of the knowledge type")
     slug: str = Field(..., description="Slug of the knowledge item")
 
-    model_config = ConfigDict(validate_assignment=True)
-
     @field_validator("id")
     @classmethod
     def _validate_uuid(cls, value: Union[str, UUID]) -> str:
@@ -470,15 +434,6 @@ class Entry(BaseWebformModel):
             key (str): The name of the attribute to set.
             value (Any): The value to set for the attribute.
         """
-        if key == "kitem":
-            if self.measurement_unit:
-                self.measurement_unit.kitem = (  # pylint: disable=assigning-non-slot
-                    value
-                )
-            if self.relation_mapping:
-                self.relation_mapping.kitem = (  # pylint: disable=assigning-non-slot
-                    value
-                )
 
         super().__setattr__(key, value)
 
@@ -825,12 +780,8 @@ class CustomPropertiesSection(BaseWebformModel):
             key: The key of the attribute to be set.
             value: The value of the attribute to be set.
         """
-        if key == "kitem":
-            for entry in self.entries:  # pylint: disable=not-an-iterable
-                entry.kitem = value  # pylint: disable=assigning-non-slot
-
         # Set value
-        if key not in self.model_dump() and key != "kitem":
+        if key not in self.model_dump():
             to_be_updated = []
             for entry in self.entries:  # pylint: disable=not-an-iterable
                 if entry.label == key:
@@ -870,7 +821,7 @@ class CustomPropertiesSection(BaseWebformModel):
             AttributeError: If no entry or multiple entries with the given label are found.
         """
         target = []
-        if not key in self.model_dump() and key != "kitem":
+        if not key in self.model_dump():
             for entry in self.entries:  # pylint: disable=not-an-iterable
                 if entry.label == key:
                     target.append(entry)
@@ -923,25 +874,6 @@ class CustomPropertiesSection(BaseWebformModel):
         """
         return len(self.entries)
 
-    @model_validator(mode="before")
-    @classmethod
-    def set_kitem(cls, self: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Set kitem for all entries of the section.
-
-        This validator is called before the model is validated. It sets the kitem
-        for all entries of the section if the kitem is set.
-
-        Args:
-            self (CustomPropertiesSection): The section to set the kitem for.
-        """
-        kitem = self.get("kitem")
-        if kitem:
-            for entry in self.get("entries"):
-                if not "kitem" in entry:
-                    entry["kitem"] = kitem
-        return self
-
     def __str__(self) -> str:
         """Pretty print the model fields"""
         return print_model(self, "section")
@@ -981,7 +913,7 @@ class KItemCustomPropertiesModel(BaseWebformModel):
         """
         target = []
 
-        if not key in self.model_dump() and key != "kitem":
+        if not key in self.model_dump():
             for section in self.sections:  # pylint: disable=not-an-iterable
                 if section.name == key:
                     target.append(section)
@@ -1019,9 +951,6 @@ class KItemCustomPropertiesModel(BaseWebformModel):
         Raises:
             AttributeError: If no entry or multiple entries with the given label are found.
         """
-
-        if key == "kitem":
-            self.sections.kitem = value  # pylint: disable=assigning-non-slot
 
         # Set value in model
         if key not in self.model_dump().keys():
@@ -1076,25 +1005,6 @@ class KItemCustomPropertiesModel(BaseWebformModel):
             CustomPropertiesSection: The section at the specified index.
         """
         return self.sections[key]  # pylint: disable=unsubscriptable-object
-
-    @model_validator(mode="before")
-    @classmethod
-    def set_kitem(cls, self: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Set kitem for all sections of the custom properties model.
-
-        This validator is called before the model is validated. It sets the kitem
-        for all sections of the custom properties model if the kitem is set.
-
-        Args:
-            self (KItemCustomPropertiesModel): The custom properties model to set the kitem for.
-        """
-        kitem = self.get("kitem")
-        if kitem:
-            for section in self.get("sections"):
-                if not "kitem" in section:
-                    section["kitem"] = kitem
-        return self
 
     def __str__(self) -> str:
         """Pretty print the model fields"""

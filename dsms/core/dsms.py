@@ -99,11 +99,11 @@ class DSMS:
 
         self._sparql_interface = SparqlInterface(self)
         if self.config.auto_fetch_ktypes:
-            self.ktypes = _get_remote_ktypes()
+            _get_remote_ktypes(self)
 
     def __getitem__(self, key: str) -> "KItem":
         """Get KItem from remote DSMS instance."""
-        return _get_kitem(key)
+        return _get_kitem(self, key)
 
     def __delitem__(self, obj) -> None:
         """Stage an KItem, KType or AppConfig for the deletion.
@@ -113,13 +113,13 @@ class DSMS:
         from dsms import KItem, AppConfig, KType  # isort:skip
 
         if isinstance(obj, KItem):
-            self.context.buffers.deleted.update({obj.id: obj})
+            self.session.buffers.deleted.update({obj.id: obj})
         elif isinstance(obj, AppConfig):
-            self.context.buffers.deleted.update({obj.name: obj})
+            self.session.buffers.deleted.update({obj.name: obj})
         elif isinstance(obj, KType) or (
             isinstance(obj, Enum) and isinstance(obj.value, KType)
         ):
-            self.context.buffers.deleted.update({obj.name: obj})
+            self.session.buffers.deleted.update({obj.name: obj})
         else:
             raise TypeError(
                 f"Object must be of type {KItem}, {AppConfig} or {KType}, not {type(obj)}. "
@@ -142,7 +142,9 @@ class DSMS:
         allow_fuzzy: "Optional[bool]" = True,
     ) -> "List[SearchResult]":
         """Search for KItems in the remote backend."""
-        return _search(query, ktypes, annotations, limit, offset, allow_fuzzy)
+        return _search(
+            self, query, ktypes, annotations, limit, offset, allow_fuzzy
+        )
 
     @property
     def sparql_interface(self) -> SparqlInterface:
@@ -153,7 +155,7 @@ class DSMS:
     def ktypes(self) -> "Enum":
         """Getter for the Enum of the KTypes defined in the DSMS instance."""
         if self._ktypes is None or self.config.always_refetch_ktypes:
-            self._ktypes = _get_remote_ktypes()
+            _get_remote_ktypes(self)
         return self._ktypes
 
     @ktypes.setter
@@ -209,7 +211,7 @@ class DSMS:
         message = """`kitems`-property is deprecated and only returns the 10 first kitems.
         Please use the `get_kitems`-method instead."""
         warnings.warn(message, DeprecationWarning)
-        return _get_kitem_list()
+        return _get_kitem_list(self)
 
     def get_kitems(self, limit=10, offset=0) -> "KItemListModel":
         """
@@ -220,7 +222,7 @@ class DSMS:
             offset (int): The offset in the list of KItems. Defaults to 0.
 
         """
-        return _get_kitem_list(limit=limit, offset=offset)
+        return _get_kitem_list(self, limit=limit, offset=offset)
 
     @property
     def app_configs(self) -> "List[AppConfig]":
@@ -229,7 +231,7 @@ class DSMS:
 
         return [
             AppConfig(**app_config)
-            for app_config in _get_available_apps_specs()
+            for app_config in _get_available_apps_specs(self)
         ]
 
     @property
@@ -238,7 +240,7 @@ class DSMS:
         return self._session.buffers
 
     @property
-    def context(self) -> "Session":
+    def session(self) -> "Session":
         """Return DSMS session"""
         return self._session
 
@@ -257,7 +259,7 @@ def verify_connection(dsms: DSMS) -> None:
         )
     if dsms.config.ping_dsms:
         try:
-            response = _ping_dsms()
+            response = _ping_dsms(dsms)
             if not response.ok:
                 raise ConnectionError(
                     f"""Host with `{dsms.config.host_url}`

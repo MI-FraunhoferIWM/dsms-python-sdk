@@ -1,11 +1,11 @@
 """DataFrame property of a KItem"""
 import logging
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 import pandas as pd
-from pydantic import Field
+from pydantic import BaseModel, Field
 
-from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 from dsms.knowledge.utils import _get_dataframe_column, _is_number, print_model
 
 from dsms.knowledge.semantics.units import (  # isort:skip
@@ -16,17 +16,23 @@ from dsms.knowledge.semantics.units import (  # isort:skip
 logger = logging.Logger(__name__)
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional
+    from typing import Any, Dict, List, Optional
 
 
-class Column(KItemProperty):
+class Column(BaseModel):
     """
     Column of an DataFrame data frame.
 
     Attributes:
+        id (UUID): ID of the KItem
         column_id (int): Column ID in the data frame.
         name (str): Name of the column in the data series.
     """
+
+    id: UUID = Field(
+        ...,
+        description="ID of the KItem",
+    )
 
     column_id: int = Field(..., description="Column ID in the data frame")
 
@@ -92,18 +98,8 @@ class Column(KItemProperty):
         ]
 
 
-class DataFrameContainer(KItemPropertyList):
+class DataFrameContainer(list):
     """DataFrame container of a data frame related to a KItem"""
-
-    # OVERRIDE
-    @property
-    def k_property_item(self) -> "Callable":
-        return Column
-
-    # OVERRIDE
-    @property
-    def k_property_helper(self) -> None:
-        """Not defined for DataFrame"""
 
     def to_df(self) -> pd.DataFrame:
         """Return dataframe as pandas DataFrame"""

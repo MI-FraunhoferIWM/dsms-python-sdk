@@ -10,10 +10,15 @@ from dsms.core.utils import _kitem_id2uri, _perform_request
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, TextIO, Union
 
+    from dsms import DSMS
 
-def _sparql_query(query: str, repository: str) -> "Dict[str, Any]":
+
+def _sparql_query(
+    dsms: "DSMS", query: str, repository: str
+) -> "Dict[str, Any]":
     """Submit plain SPARQL-query to the DSMS instance."""
     response = _perform_request(
+        dsms,
         "api/knowledge/sparql",
         "post",
         data={"query": query},
@@ -33,12 +38,14 @@ def _sparql_query(query: str, repository: str) -> "Dict[str, Any]":
 
 
 def _sparql_update(
+    dsms: "DSMS",
     file_or_pathlike: "Union[str, TextIO]",
     encoding: str,
     repository: str,
 ) -> None:
     """Submit plain SPARQL-query to the DSMS instance."""
     response = _perform_request(
+        dsms,
         "api/knowledge/update-query",
         "post",
         files=_get_file_or_pathlike(file_or_pathlike, encoding),
@@ -68,6 +75,7 @@ def _get_file_or_pathlike(
 
 
 def _add_rdf(
+    dsms: "DSMS",
     file_or_pathlike: "Union[str, TextIO]",
     encoding: str,
     repository: str,
@@ -78,6 +86,7 @@ def _add_rdf(
     if context:
         params["context"] = context
     response = _perform_request(
+        dsms,
         "api/knowledge/add-rdf",
         "post",
         files=_get_file_or_pathlike(file_or_pathlike, encoding),
@@ -125,11 +134,11 @@ def _update_subgraph(graph: "Graph", encoding: str, repository: str) -> None:
 
 
 def _get_subgraph(
-    identifier: str, repository: str, is_kitem_id: bool = False
+    dsms: "DSMS", identifier: str, repository: str, is_kitem_id: bool = False
 ) -> "Graph":
     """Get subgraph related to a certain dataset id."""
     if is_kitem_id:
-        identifier = _kitem_id2uri(identifier)
+        identifier = _kitem_id2uri(dsms, identifier)
     query = f"""
     SELECT DISTINCT
         ?s ?p ?o
@@ -143,7 +152,7 @@ def _get_subgraph(
     }}"""
 
     graph = Graph(identifier=identifier)
-    data = _sparql_query(query, repository)
+    data = _sparql_query(dsms, query, repository)
     for row in JSONResult(data).bindings:
         graph.add(row.values())
 

@@ -1,15 +1,13 @@
 """App  property of a KItem"""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
+from uuid import UUID
 
 from pydantic import BaseModel, Field, model_serializer
 
-from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
+from dsms.core.session import Session
 from dsms.knowledge.utils import _perform_request, print_model
-
-if TYPE_CHECKING:
-    from typing import Callable
 
 
 class AdditionalProperties(BaseModel):
@@ -46,8 +44,10 @@ class JobStatus(BaseModel):
     )
 
 
-class App(KItemProperty):
+class App(BaseModel):
     """App of a KItem."""
+
+    id: UUID = Field(..., description="ID of the KItem")
 
     kitem_app_id: Optional[int] = Field(
         None, description="ID of the KItem App"
@@ -72,10 +72,9 @@ class App(KItemProperty):
         None, description="Additional properties related to the appilcation"
     )
 
-    # OVERRIDE
     @model_serializer
-    def serialize_author(self) -> Dict[str, Any]:
-        """Serialize author model"""
+    def serialize_app(self) -> Dict[str, Any]:
+        """Serialize app model"""
         return {
             key: value
             for key, value in self.__dict__.items()
@@ -111,9 +110,10 @@ class App(KItemProperty):
         if expose_sdk_config:
             kwargs[
                 "access_token"
-            ] = self.context.dsms.config.token.get_secret_value()
+            ] = self.session.dsms.config.token.get_secret_value()
 
         response = _perform_request(
+            Session.dsms,
             f"api/knowledge/apps/argo/job/{self.executable}",
             "post",
             json=kwargs,
@@ -124,8 +124,6 @@ class App(KItemProperty):
                 f"Submission was not successful: {response.text}"
             )
         submitted = response.json()
-        if wait:
-            self.kitem.refresh()
 
         return Job(name=submitted.get("name"), executable=self.executable)
 
@@ -133,14 +131,13 @@ class App(KItemProperty):
     def inputs(self) -> Dict[str, Any]:
         """Inputs defined for the app from the webform builder"""
         route = f"api/knowledge/apps/argo/{self.executable}/inputs"
-        response = _perform_request(route, "get")
+        response = _perform_request(Session.dsms, route, "get")
         if not response.ok:
             raise RuntimeError(
                 f"Could not fetch app input schema: {response.text}"
             )
         return response.json()
 
-    # OVERRIDE
     def __str__(self):
         return print_model(self, "app")
 
@@ -160,7 +157,7 @@ class Job(BaseModel):
 
         route = f"api/knowledge/apps/argo/job/{self.name}/status"
 
-        response = _perform_request(route, "get")
+        response = _perform_request(Session.dsms, route, "get")
         if not response.ok:
             raise RuntimeError(f"Could not fetch job status: {response.text}")
         return JobStatus(**response.json())
@@ -170,7 +167,7 @@ class Job(BaseModel):
         """Get the atrifcats of a finished job"""
 
         route = f"api/knowledge/apps/argo/job/{self.name}/artifacts"
-        response = _perform_request(route, "get")
+        response = _perform_request(Session.dsms, route, "get")
         if not response.ok:
             raise RuntimeError(
                 f"Could not fetch job artifacts: {response.text}"
@@ -181,24 +178,14 @@ class Job(BaseModel):
     def logs(self) -> str:
         """Get the logs of a job"""
         route = f"api/knowledge/apps/argo/job/{self.name}/logs"
-        response = _perform_request(route, "get")
+        response = _perform_request(Session.dsms, route, "get")
         if not response.ok:
             raise RuntimeError(f"Could not fetch job logs: {response.text}")
         return response.text
 
 
-class AppsProperty(KItemPropertyList):
+class AppList(list):
     """KItemPropertyList for apps"""
-
-    # OVERRIDE
-    @property
-    def k_property_item(self) -> "Callable":
-        """App data model"""
-        return App
-
-    @property
-    def k_property_helper(self) -> None:
-        """Not defined for Apps"""
 
     @property
     def by_title(self) -> Dict[str, App]:

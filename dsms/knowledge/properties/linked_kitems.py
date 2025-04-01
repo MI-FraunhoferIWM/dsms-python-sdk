@@ -8,17 +8,14 @@ from pydantic import (  # isort:skip
     BaseModel,
     ConfigDict,
     Field,
-    PrivateAttr,
     model_serializer,
     field_validator,
 )
 
+from dsms.core.session import Session  # isort:skip
 from dsms.core.utils import _name_to_camel  # isort:skip
-from dsms.knowledge.properties.base import (  # isort:skip
-    KItemProperty,
-    KItemPropertyList,
-)
 from dsms.knowledge.ktype import KType  # isort:skip
+from dsms.knowledge.properties.summary import Summary  # isort:skip
 from dsms.knowledge.properties.affiliations import Affiliation  # isort:skip
 from dsms.knowledge.properties.annotations import Annotation  # isort:skip
 from dsms.knowledge.properties.attachments import Attachment  # isort:skip
@@ -30,17 +27,7 @@ from dsms.knowledge.utils import _get_kitem, print_model  # isort:skip
 
 
 if TYPE_CHECKING:
-    from typing import Callable
-
     from dsms import KItem
-
-
-def _linked_kitem_helper(kitem: "KItem"):
-    from dsms import KItem
-
-    if not isinstance(kitem, KItem):
-        raise TypeError(f"{kitem} is not of type {KItem}")
-    return {"id": kitem.id}
 
 
 class LinkedLinkedKItem(BaseModel):
@@ -57,36 +44,27 @@ class LinkedLinkedKItem(BaseModel):
         return str(self)
 
 
-class LinkedKItemSummary(BaseModel):
-    """Summary of a linked KItem"""
-
-    id: str = Field(..., description="ID of the linked KItem")
-
-    text: str = Field(
-        ..., description="Text for the summary of the linked KItem"
-    )
-
-
-class LinkedKItem(KItemProperty):
+class LinkedKItem(BaseModel):
     """Data model of a linked KItem"""
 
-    # OVERRIDE
-    id: Optional[UUID] = Field(
-        None,
+    id: UUID = Field(
+        ...,
         description="ID of the KItem to be linked",
     )
 
-    name: str = Field(..., description="Name of the linked KItem")
+    name: Optional[str] = Field(None, description="Name of the linked KItem")
 
-    slug: str = Field(..., description="Slug of the linked KItem")
+    slug: Optional[str] = Field(None, description="Slug of the linked KItem")
 
-    ktype_id: str = Field(..., description="Ktype ID of the linked KItem")
+    ktype_id: Optional[str] = Field(
+        None, description="Ktype ID of the linked KItem"
+    )
 
-    summary: Optional[Union[str, LinkedKItemSummary]] = Field(
+    summary: Optional[Union[str, Summary]] = Field(
         None, description="Summary of the linked KItem."
     )
 
-    avatar_exists: bool = Field(
+    avatar_exists: Optional[bool] = Field(
         False, description="Wether the linked KItem has an avatar."
     )
 
@@ -133,9 +111,6 @@ class LinkedKItem(KItemProperty):
         None, description="Time and date when the KItem was updated."
     )
 
-    _kitem = PrivateAttr(default=None)
-
-    # OVERRIDE
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def fetch(self) -> "KItem":
@@ -156,18 +131,6 @@ class LinkedKItem(KItemProperty):
         """Pretty print the linked KItem"""
         return str(self)
 
-    # OVERRIDE
-    @property
-    def kitem(self) -> "KItem":
-        """KItem related to the linked KItem"""
-        return self._kitem
-
-    # OVERRIDE
-    @kitem.setter
-    def kitem(self, value: "KItem") -> None:
-        """Set KItem related to the linked KItem"""
-        self._kitem = value
-
     @field_validator("attachments", mode="before")
     @classmethod
     def validate_attachments_before(
@@ -183,11 +146,9 @@ class LinkedKItem(KItemProperty):
 
     @field_validator("summary", mode="after")
     @classmethod
-    def validate_summary_before(
-        cls, value: Union[str, LinkedKItemSummary]
-    ) -> str:
+    def validate_summary_before(cls, value: Union[str, Summary]) -> str:
         """Validate summary Field"""
-        if isinstance(value, LinkedKItemSummary):
+        if isinstance(value, Summary):
             value = value.text
         return value
 
@@ -215,19 +176,8 @@ class LinkedKItem(KItemProperty):
         return value
 
 
-class LinkedKItemsProperty(KItemPropertyList):
+class LinkedKItemsList(list):
     """KItemPropertyList for linked KItems"""
-
-    # OVERRIDE
-    @property
-    def k_property_item(self) -> "Callable":
-        return LinkedKItem
-
-    # OVERRIDE
-    @property
-    def k_property_helper(self) -> "Callable":
-        """Linked KItem helper function"""
-        return _linked_kitem_helper
 
     def get(self, kitem_id: "Union[str, UUID]") -> "KItem":
         """Get the kitem with a certain id which is linked to the source KItem."""
@@ -250,7 +200,6 @@ class LinkedKItemsProperty(KItemPropertyList):
     @property
     def by_ktype(self) -> "Dict[KType, List[KItem]]":
         """Get the kitems grouped by ktype"""
-        from dsms import Session
 
         grouped = {}
         for linked in self:

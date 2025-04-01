@@ -24,6 +24,7 @@ from dsms.core.utils import _name_to_camel, _perform_request  # isort:skip
 from dsms.knowledge.search import SearchResult, KItemListModel  # isort:skip
 
 if TYPE_CHECKING:
+    from dsms import DSMS
     from dsms.apps import AppConfig
     from dsms.core.session import Buffers
     from dsms.knowledge import KItem, KType
@@ -79,24 +80,28 @@ def print_ktype(self) -> str:
     return print_model(self, "ktype")
 
 
-def _get_remote_ktypes() -> Enum:
+def _get_remote_ktypes(dsms: "DSMS") -> Enum:
     """Get the KTypes from the remote backend"""
     from dsms import (  # isort:skip
-        Session,
         KType,
     )
 
-    response = _perform_request("api/knowledge-type/", "get")
+    response = _perform_request(dsms, "api/knowledge-type/", "get")
     if not response.ok:
         raise ConnectionError(
             f"Something went wrong fetching the remote ktypes: {response.text}"
         )
 
-    Session.ktypes = {ktype["id"]: KType(**ktype) for ktype in response.json()}
+    dsms.session.ktypes = {
+        ktype["id"]: KType(**ktype) for ktype in response.json()
+    }
 
     ktypes = Enum(
         "KTypes",
-        {_name_to_camel(key): value for key, value in Session.ktypes.items()},
+        {
+            _name_to_camel(key): value
+            for key, value in dsms.session.ktypes.items()
+        },
     )
 
     def custom_getattr(self, name) -> None:
@@ -140,10 +145,10 @@ def _get_remote_ktypes() -> Enum:
     setattr(ktypes, "__repr__", print_ktype)
 
     logger.debug("Got the following ktypes from backend: `%s`.", list(ktypes))
-    return ktypes
+    dsms.ktypes = ktypes
 
 
-def _ktype_exists(ktype: Union[Any, str, UUID]) -> bool:
+def _ktype_exists(dsms: "DSMS", ktype: Union[Any, str, UUID]) -> bool:
     """Check whether the KType exists in the remote backend"""
     from dsms.knowledge.ktype import (  # isort:skip
         KType,
@@ -153,29 +158,31 @@ def _ktype_exists(ktype: Union[Any, str, UUID]) -> bool:
         route = f"api/knowledge-type/{ktype.id}"
     else:
         route = f"api/knowledge-type/{ktype}"
-    response = _perform_request(route, "get")
+    response = _perform_request(dsms, route, "get")
     return response.ok
 
 
-def _create_new_ktype(ktype: "KType") -> None:
+def _create_new_ktype(dsms: "DSMS", ktype: "KType") -> None:
     """Create a new KType in the remote backend"""
     body = {
         "name": ktype.name,
         "id": str(ktype.id),
     }
     logger.debug("Create new KType with body: %s", body)
-    response = _perform_request("api/knowledge-type/", "post", json=body)
+    response = _perform_request(dsms, "api/knowledge-type/", "post", json=body)
     if not response.ok:
         raise ValueError(
             f"KType with id `{ktype.id}` could not be created in DSMS: {response.text}`"
         )
 
 
-def _get_ktype(ktype_id: str, as_json=False) -> "Union[KType, Dict[str, Any]]":
+def _get_ktype(
+    dsms: "DSMS", ktype_id: str, as_json=False
+) -> "Union[KType, Dict[str, Any]]":
     """Get the KType for an instance with a certain ID from remote backend"""
     from dsms import KType, Session
 
-    response = _perform_request(f"api/knowledge-type/{ktype_id}", "get")
+    response = _perform_request(dsms, f"api/knowledge-type/{ktype_id}", "get")
     if response.status_code == 404:
         raise ValueError(
             f"""KType with the id `{ktype_id}` does not exist in
@@ -194,7 +201,7 @@ def _get_ktype(ktype_id: str, as_json=False) -> "Union[KType, Dict[str, Any]]":
     return response
 
 
-def _update_ktype(ktype: "KType") -> Response:
+def _update_ktype(dsms: "DSMS", ktype: "KType") -> Response:
     """Update a KType in the remote backend."""
     payload = ktype.model_dump(
         exclude_none=True,
@@ -202,7 +209,7 @@ def _update_ktype(ktype: "KType") -> Response:
     )
     logger.debug("Update KType for `%s` with body: %s", ktype.id, payload)
     response = _perform_request(
-        f"api/knowledge-type/{ktype.id}", "put", json=payload
+        dsms, f"api/knowledge-type/{ktype.id}", "put", json=payload
     )
     if not response.ok:
         raise ValueError(
@@ -211,24 +218,26 @@ def _update_ktype(ktype: "KType") -> Response:
     return response
 
 
-def _delete_ktype(ktype: "KType") -> None:
+def _delete_ktype(dsms: "DSMS", ktype: "KType") -> None:
     """Delete a KType in the remote backend"""
-    from dsms import Session
 
     logger.debug("Delete KType with id: %s", ktype.id)
-    response = _perform_request(f"api/knowledge-type/{ktype.id}", "delete")
+    response = _perform_request(
+        dsms, f"api/knowledge-type/{ktype.id}", "delete"
+    )
     if not response.ok:
         raise ValueError(
             f"KItem with uuid `{ktype.id}` could not be deleted from DSMS: `{response.text}`"
         )
-    Session.dsms.ktypes = _get_remote_ktypes()
+    _get_remote_ktypes(dsms)
 
 
-def _get_kitem_list(limit=10, offset=0) -> "KItemListModel":
+def _get_kitem_list(dsms: "DSMS", limit=10, offset=0) -> "KItemListModel":
     """Get all available KItems from the remote backend."""
     from dsms.knowledge.kitem import KItem  # isort:skip
 
     response = _perform_request(
+        dsms,
         "api/knowledge/kitems",
         "get",
         params={
@@ -248,27 +257,23 @@ def _get_kitem_list(limit=10, offset=0) -> "KItemListModel":
     return KItemListModel(**kitems)
 
 
-def _kitem_exists(kitem: Union[Any, str, UUID]) -> bool:
+def _kitem_exists(dsms: "DSMS", kitem: Union[str, UUID, "KItem"]) -> bool:
     """Check whether the KItem exists in the remote backend"""
-    from dsms.knowledge.kitem import (  # isort:skip
-        KItem,
-    )
-
-    if isinstance(kitem, KItem):
+    if not isinstance(kitem, (str, UUID)):
         route = f"api/knowledge/kitems/{kitem.id}"
     else:
         route = f"api/knowledge/kitems/{kitem}"
-    response = _perform_request(route, "get")
+    response = _perform_request(dsms, route, "get")
     return response.ok
 
 
 def _get_kitem(
-    uuid: Union[str, UUID], as_json=False
+    dsms: "DSMS", uuid: Union[str, UUID], as_json=False
 ) -> "Union[KItem, Dict[str, Any]]":
     """Get the KItem for a instance with a certain ID from remote backend"""
     from dsms import KItem, Session
 
-    response = _perform_request(f"api/knowledge/kitems/{uuid}", "get")
+    response = _perform_request(dsms, f"api/knowledge/kitems/{uuid}", "get")
     if response.status_code == 404:
         raise ValueError(
             f"""KItem with uuid `{uuid}` does not exist in
@@ -296,14 +301,18 @@ def _create_new_kitem(kitem: "KItem") -> None:
         "ktype_id": kitem.ktype.id,
     }
     logger.debug("Create new KItem with payload: %s", payload)
-    response = _perform_request("api/knowledge/kitems", "post", json=payload)
+    response = _perform_request(
+        kitem.dsms, "api/knowledge/kitems", "post", json=payload
+    )
     if not response.ok:
         raise ValueError(
             f"KItem with uuid `{kitem.id}` could not be created in DSMS: {response.text}`"
         )
 
 
-def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
+def _update_kitem(
+    dsms: "DSMS", new_kitem: "KItem", old_kitem: "Dict[str, Any]"
+) -> Response:
     """Update a KItem in the remote backend."""
     differences = _get_kitems_diffs(old_kitem, new_kitem)
     payload = new_kitem.model_dump(
@@ -334,7 +343,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
         "Update KItem for `%s` with payload: %s", new_kitem.id, payload
     )
     response = _perform_request(
-        f"api/knowledge/kitems/{new_kitem.id}", "put", json=payload
+        dsms, f"api/knowledge/kitems/{new_kitem.id}", "put", json=payload
     )
     if not response.ok:
         raise ValueError(
@@ -343,10 +352,12 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
     return response
 
 
-def _delete_kitem(kitem: "KItem") -> None:
+def _delete_kitem(dsms: "DSMS", kitem: "KItem") -> None:
     """Delete a KItem in the remote backend"""
     logger.debug("Delete KItem with id: %s", kitem.id)
-    response = _perform_request(f"api/knowledge/kitems/{kitem.id}", "delete")
+    response = _perform_request(
+        dsms, f"api/knowledge/kitems/{kitem.id}", "delete"
+    )
     if not response.ok:
         raise ValueError(
             f"KItem with uuid `{kitem.id}` could not be deleted from DSMS: `{response.text}`"
@@ -380,6 +391,7 @@ def _upload_attachments(kitem: "KItem", attachment: "Attachment") -> None:
         with open(path, mode="rb") as file:
             upload_file = {"dataFile": file}
             response = _perform_request(
+                kitem.dsms,
                 f"api/knowledge/attachments/{kitem.id}",
                 "put",
                 files=upload_file,
@@ -401,6 +413,7 @@ def _upload_attachments(kitem: "KItem", attachment: "Attachment") -> None:
         file.name = attachment.name
         upload_file = {"dataFile": file}
         response = _perform_request(
+            kitem.dsms,
             f"api/knowledge/attachments/{kitem.id}",
             "put",
             files=upload_file,
@@ -419,7 +432,7 @@ def _upload_attachments(kitem: "KItem", attachment: "Attachment") -> None:
 def _delete_attachments(kitem: "KItem", file_name: str) -> None:
     """Delete attachment from KItem"""
     url = f"api/knowledge/attachments/{kitem.id}/{file_name}"
-    response = _perform_request(url, "delete")
+    response = _perform_request(kitem.dsms, url, "delete")
     if not response.ok:
         raise RuntimeError(
             f"Could not delete attachment `{file_name}`: {response.text}"
@@ -427,11 +440,11 @@ def _delete_attachments(kitem: "KItem", file_name: str) -> None:
 
 
 def _get_attachment(
-    kitem_id: "KItem", file_name: str, as_bytes: bool
+    dsms: "DSMS", kitem_id: "KItem", file_name: str, as_bytes: bool
 ) -> Union[str, bytes]:
     """Download attachment from KItem"""
     url = f"api/knowledge/attachments/{kitem_id}/{file_name}"
-    response = _perform_request(url, "get")
+    response = _perform_request(dsms, url, "get")
     if not response.ok:
         raise RuntimeError(
             f"Download for attachment `{file_name}` was not successful: {response.text}"
@@ -585,9 +598,9 @@ def _commit_updated(
             )
 
 
-def _commit_updated_kitem(new_kitem: "KItem") -> None:
+def _commit_updated_kitem(dsms: "DSMS", new_kitem: "KItem") -> None:
     """Commit the updated KItems"""
-    old_kitem = _get_kitem(new_kitem.id, as_json=True)
+    old_kitem = _get_kitem(dsms, new_kitem.id, as_json=True)
     logger.debug(
         "Fetched data from old KItem with id `%s`: %s",
         new_kitem.id,
@@ -599,10 +612,10 @@ def _commit_updated_kitem(new_kitem: "KItem") -> None:
                 "New KItem data has `pd.DataFrame`. Will push as dataframe."
             )
             _update_dataframe(new_kitem.id, new_kitem.dataframe)
-            new_kitem.dataframe = _inspect_dataframe(new_kitem.id)
+            new_kitem.dataframe = _inspect_dataframe(dsms, new_kitem.id)
         elif isinstance(
             new_kitem.dataframe, type(None)
-        ) and _inspect_dataframe(new_kitem.id):
+        ) and _inspect_dataframe(dsms, new_kitem.id):
             _delete_dataframe(new_kitem.id)
         _update_kitem(new_kitem, old_kitem)
         _update_attachments(new_kitem, old_kitem)
@@ -615,23 +628,21 @@ def _commit_updated_kitem(new_kitem: "KItem") -> None:
         new_kitem.refresh()
 
 
-def _commit_updated_ktype(new_ktype: "KType") -> None:
+def _commit_updated_ktype(dsms: "DSMS", new_ktype: "KType") -> None:
     """Commit the updated KTypes"""
-    from dsms import Session
 
-    old_ktype = _get_ktype(new_ktype.id, as_json=True)
+    old_ktype = _get_ktype(dsms, new_ktype.id, as_json=True)
     logger.debug(
         "Fetched data from old KType with id `%s`: %s",
         new_ktype.id,
         old_ktype,
     )
     if old_ktype:
-        _update_ktype(new_ktype)
+        _update_ktype(dsms, new_ktype)
         logger.debug(
             "Fetching updated KType from remote backend: %s", new_ktype.id
         )
         new_ktype.refresh()
-        Session.dsms.ktypes = _get_remote_ktypes()
 
 
 def _commit_deleted(
@@ -658,7 +669,7 @@ def _commit_deleted(
 
 def _refresh_kitem(kitem: "KItem") -> None:
     """Refresh the KItem"""
-    for key, value in _get_kitem(kitem.id, as_json=True).items():
+    for key, value in _get_kitem(kitem.dsms, kitem.id, as_json=True).items():
         logger.debug(
             "Set updated property `%s` for KItem with id `%s` after commiting: %s",
             key,
@@ -666,12 +677,12 @@ def _refresh_kitem(kitem: "KItem") -> None:
             value,
         )
         setattr(kitem, key, value)
-    kitem.dataframe = _inspect_dataframe(kitem.id)
+    kitem.dataframe = _inspect_dataframe(kitem.dsms, kitem.id)
 
 
 def _refresh_ktype(ktype: "KType") -> None:
     """Refresh the KItem"""
-    for key, value in _get_ktype(ktype.id, as_json=True).items():
+    for key, value in _get_ktype(ktype.dsms, ktype.id, as_json=True).items():
         logger.debug(
             "Set updated property `%s` for KType with id `%s` after commiting: %s",
             key,
@@ -695,6 +706,7 @@ def _make_annotation_schema(iri: str) -> Dict[str, Any]:
 
 
 def _search(
+    dsms: "DSMS",
     query: Optional[str] = None,
     ktypes: "Optional[List[Union[Enum, KType]]]" = [],
     annotations: "Optional[List[str]]" = [],
@@ -713,6 +725,7 @@ def _search(
         "offset": offset,
     }
     response = _perform_request(
+        dsms,
         "api/knowledge/kitems/search",
         "post",
         json=payload,
@@ -747,19 +760,21 @@ def _slugify(input_string: str, replacement: str = ""):
     return slug
 
 
-def _slug_is_available(ktype_id: str, value: str) -> bool:
+def _slug_is_available(dsms: "DSMS", ktype_id: str, value: str) -> bool:
     """Check whether the id of a KItem is available in the DSMS or not"""
     response = _perform_request(
-        f"api/knowledge/kitems/{ktype_id}/{value}", "head"
+        dsms, f"api/knowledge/kitems/{ktype_id}/{value}", "head"
     )
     return response.status_code == 404
 
 
-def _get_dataframe_column(kitem_id: str, column_id: int) -> List[Any]:
+def _get_dataframe_column(
+    dsms: "DSMS", kitem_id: str, column_id: int
+) -> List[Any]:
     """Download the column of a dataframe container of a certain kitem"""
 
     response = _perform_request(
-        f"api/knowledge/data/{kitem_id}/column-{column_id}", "get"
+        dsms, f"api/knowledge/data/{kitem_id}/column-{column_id}", "get"
     )
     if not response.ok:
         message = f"""Something went wrong fetch column id `{column_id}`
@@ -768,9 +783,11 @@ def _get_dataframe_column(kitem_id: str, column_id: int) -> List[Any]:
     return response.json().get("array")
 
 
-def _inspect_dataframe(kitem_id: str) -> Optional[List[Dict[str, Any]]]:
+def _inspect_dataframe(
+    dsms: "DSMS", kitem_id: str
+) -> Optional[List[Dict[str, Any]]]:
     """Get column info for the dataframe container of a certain kitem"""
-    response = _perform_request(f"api/knowledge/data/{kitem_id}", "get")
+    response = _perform_request(dsms, f"api/knowledge/data/{kitem_id}", "get")
     if not response.ok and response.status_code == 404:
         dataframe = None
     elif not response.ok and response.status_code != 404:
@@ -782,7 +799,7 @@ def _inspect_dataframe(kitem_id: str) -> Optional[List[Dict[str, Any]]]:
     return dataframe
 
 
-def _update_dataframe(kitem_id: str, data: pd.DataFrame):
+def _update_dataframe(dsms: "DSMS", kitem_id: str, data: pd.DataFrame):
     if data.empty:
         _delete_dataframe(kitem_id)
     else:
@@ -790,7 +807,10 @@ def _update_dataframe(kitem_id: str, data: pd.DataFrame):
         data.to_json(buffer, indent=2)
         buffer.seek(0)
         response = _perform_request(
-            f"api/knowledge/data/{kitem_id}", "put", files={"data": buffer}
+            dsms,
+            f"api/knowledge/data/{kitem_id}",
+            "put",
+            files={"data": buffer},
         )
         if not response.ok:
             raise RuntimeError(
@@ -806,7 +826,7 @@ def _delete_dataframe(kitem_id: str) -> Response:
 def _commit_avatar(kitem) -> None:
     if kitem.avatar_exists:
         response = _perform_request(
-            f"api/knowledge/avatar/{kitem.id}", "delete"
+            kitem.dsms, f"api/knowledge/avatar/{kitem.id}", "delete"
         )
         if not response.ok:
             message = (
@@ -822,6 +842,7 @@ def _commit_avatar(kitem) -> None:
         "utf-8"
     )
     response = _perform_request(
+        kitem.dsms,
         f"api/knowledge/avatar/{kitem.id}",
         "put",
         json={
@@ -837,12 +858,13 @@ def _commit_avatar(kitem) -> None:
 
 
 def _make_avatar(
-    kitem: "KItem", image: Optional[Union[str, Image.Image]], make_qr: bool
+    image: Optional[Union[str, Image.Image]] = None,
+    encode_qr: Optional[str] = None,
 ) -> Image.Image:
     avatar = None
-    if make_qr:
+    if encode_qr:
         # this should be moved to the backend sooner or later
-        qrcode = segno.make(kitem.url)
+        qrcode = segno.make(encode_qr)
         if image:
             out = io.BytesIO()
             if isinstance(image, Image.Image):
@@ -856,28 +878,33 @@ def _make_avatar(
             avatar = Image.open(out)
         else:
             avatar = qrcode.to_pil(scale=5, border=0)
-    if image and not make_qr:
+    if image and not encode_qr:
         if isinstance(image, str):
             avatar = Image.open(image)
         else:
             avatar = image
-    if not image and not make_qr:
+    if not image and not encode_qr:
         raise RuntimeError(
-            "Cannot generate avator. Neither `include_qr` or `file` are specified."
+            "Cannot generate avator. Neither `encode_qr` or `file` are specified."
         )
     return avatar
 
 
-def _get_avatar(kitem: "KItem") -> Image.Image:
-    response = _perform_request(f"api/knowledge/avatar/{kitem.id}", "get")
+def _get_avatar(dsms: "DSMS", kitem_id: UUID) -> Image.Image:
+    response = _perform_request(
+        dsms, f"api/knowledge/avatar/{kitem_id}", "get"
+    )
     buffer = io.BytesIO(response.content)
     return Image.open(buffer)
 
 
-def _create_or_update_app_spec(app: "AppConfig", overwrite=False) -> None:
+def _create_or_update_app_spec(
+    dsms: "DSMS", app: "AppConfig", overwrite=False
+) -> None:
     """Create app specfication"""
     upload_file = {"def_file": io.StringIO(yaml.safe_dump(app.specification))}
     response = _perform_request(
+        dsms,
         f"/api/knowledge/apps/argo/spec/{app.name}",
         "post",
         files=upload_file,
@@ -889,9 +916,10 @@ def _create_or_update_app_spec(app: "AppConfig", overwrite=False) -> None:
     return response.text
 
 
-def _delete_app_spec(name: str) -> None:
+def _delete_app_spec(dsms: "DSMS", name: str) -> None:
     """Delete app specfication"""
     response = _perform_request(
+        dsms,
         f"/api/knowledge/apps/argo/spec/{name}",
         "delete",
     )
@@ -901,7 +929,9 @@ def _delete_app_spec(name: str) -> None:
     return response.text
 
 
-def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
+def _transform_custom_properties_schema(
+    kitem: "KItem", custom_properties: Any, webform: Any
+):
     if webform:
         copy_properties = custom_properties.copy()
         transformed_sections = {}
@@ -920,6 +950,7 @@ def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
                         "value": copy_properties.pop(input_def.label),
                         "measurement_unit": measurement_unit,
                         "type": input_def.widget,
+                        "kitem": kitem,
                     }
                     section_name = section_def.name
                     if section_name not in transformed_sections:

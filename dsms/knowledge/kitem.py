@@ -23,37 +23,31 @@ from pydantic import (  # isort:skip
 
 from dsms.core.logging import handler  # isort:skip
 
+from dsms.core.session import Session  # isort:skip
+
 from dsms.knowledge.properties import (  # isort:skip
     Affiliation,
-    AffiliationsProperty,
     Annotation,
-    AnnotationsProperty,
+    AnnotationList,
     App,
-    AppsProperty,
+    AppList,
     Avatar,
     Attachment,
-    AttachmentsProperty,
+    AttachmentList,
     Author,
-    AuthorsProperty,
     ContactInfo,
-    ContactsProperty,
     ExternalLink,
-    ExternalLinksProperty,
-    KItemPropertyList,
     DataFrameContainer,
     Column,
     LinkedKItem,
-    LinkedKItemsProperty,
+    LinkedKItemsList,
     Summary,
     UserGroup,
-    UserGroupsProperty,
 )
 
 from dsms.knowledge.ktype import KType  # isort:skip
 
 from dsms.knowledge.utils import (  # isort:skip
-    _kitem_exists,
-    _get_kitem,
     _slug_is_available,
     _slugify,
     _inspect_dataframe,
@@ -61,6 +55,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _refresh_kitem,
     _transform_custom_properties_schema,
     print_model,
+    _kitem_exists,
 )
 
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
@@ -68,12 +63,13 @@ from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
 from dsms.knowledge.webform import KItemCustomPropertiesModel  # isort:skip
 
 if TYPE_CHECKING:
-    from dsms import Session
     from dsms.core.dsms import DSMS
 
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.propagate = False
+
+DATETIME_FRMT = "%Y-%m-%dT%H:%M:%S.%f"
 
 
 class KItem(BaseModel):
@@ -121,6 +117,7 @@ class KItem(BaseModel):
     """
 
     # public
+
     name: str = Field(
         ..., description="Human readable name of the KItem", max_length=300
     )
@@ -131,10 +128,6 @@ class KItem(BaseModel):
     ktype_id: Union[Enum, str] = Field(..., description="Type ID of the KItem")
     ktype: Optional[Union[Enum, KType]] = Field(
         None, description="KType of the KItem", exclude=True
-    )
-    in_backend: bool = Field(
-        False,
-        description="Whether the KItem was already created in the backend.",
     )
     slug: Optional[str] = Field(
         None,
@@ -197,7 +190,7 @@ class KItem(BaseModel):
         False, description="Whether the KItem holds an RDF Graph or not."
     )
 
-    avatar: Optional[Union[Avatar, Dict]] = Field(
+    avatar: Optional[Avatar] = Field(
         default_factory=Avatar, description="KItem avatar interface"
     )
 
@@ -210,47 +203,19 @@ class KItem(BaseModel):
 
     def __init__(self, **kwargs: "Any") -> None:
         """Initialize the KItem"""
-        from dsms import DSMS
 
         logger.debug("Initialize KItem with model data: %s", kwargs)
 
         # set dsms instance if not already done
         if not self.dsms:
-            self.dsms = DSMS()
+            raise ValueError(
+                "DSMS instance not set. Please call DSMS() before initializing a KItem."
+            )
 
         # initialize the kitem
         super().__init__(**kwargs)
 
-        # add kitem to buffer
-        if not self.in_backend and self.id not in self.session.buffers.created:
-            logger.debug(
-                "Marking KItem with ID `%s` as created and updated during KItem initialization.",
-                self.id,
-            )
-            self.session.buffers.created.update({self.id: self})
-            self.session.buffers.updated.update({self.id: self})
-
-        self._set_kitem_for_properties()
-
         logger.debug("KItem initialization successful.")
-
-    def __setattr__(self, name, value) -> None:
-        """Add kitem to updated-buffer if an attribute is set"""
-        super().__setattr__(name, value)
-        logger.debug(
-            "Setting property with key `%s` on KItem level: %s.", name, value
-        )
-        self._set_kitem_for_properties()
-
-        if (
-            self.id not in self.session.buffers.updated
-            and not name.startswith("_")
-        ):
-            logger.debug(
-                "Setting KItem with ID `%s` as updated during KItem.__setattr__",
-                self.id,
-            )
-            self.session.buffers.updated.update({self.id: self})
 
     def __str__(self) -> str:
         """Pretty print the kitem fields"""
@@ -264,27 +229,6 @@ class KItem(BaseModel):
 
     def __hash__(self) -> int:
         return hash(str(self))
-
-    @field_validator("affiliations", mode="before")
-    @classmethod
-    def validate_affiliations_before(
-        cls, value: List[Union[str, Affiliation]]
-    ) -> List[Affiliation]:
-        """Validate affiliations Field"""
-        return [
-            Affiliation(name=affiliation)
-            if isinstance(affiliation, str)
-            else affiliation
-            for affiliation in value
-        ]
-
-    @field_validator("affiliations", mode="after")
-    @classmethod
-    def validate_affiliation_after(
-        cls, value: List[Affiliation]
-    ) -> AffiliationsProperty:
-        """Validate affiliations Field"""
-        return AffiliationsProperty(value)
 
     @field_validator("annotations", mode="before")
     @classmethod
@@ -303,9 +247,9 @@ class KItem(BaseModel):
     @classmethod
     def validate_annotations_after(
         cls, value: List[Annotation]
-    ) -> AnnotationsProperty:
+    ) -> AnnotationList:
         """Validate annotations Field"""
-        return AnnotationsProperty(value)
+        return AnnotationList(value)
 
     @field_validator("attachments", mode="before")
     @classmethod
@@ -323,72 +267,37 @@ class KItem(BaseModel):
     @field_validator("attachments", mode="after")
     @classmethod
     def validate_attachments_after(
-        cls, value: List[Attachment]
-    ) -> AttachmentsProperty:
+        cls, value: List[Attachment], info: ValidationInfo
+    ) -> AttachmentList:
         """Validate attachments Field"""
-        return AttachmentsProperty(value)
+        kitem_id = info.data["id"]
+        if value:
+            for attachment in value:
+                attachment.id = kitem_id
+        return AttachmentList(value)
 
     @field_validator("kitem_apps", mode="after")
     @classmethod
-    def validate_apps(cls, value: List[App]) -> AppsProperty:
+    def validate_apps(cls, value: List[App], info: ValidationInfo) -> AppList:
         """Validate apps Field"""
-        return AppsProperty(value)
+        kitem_id = info.data["id"]
+        if value:
+            for app in value:
+                app.id = kitem_id
+        return AppList(value)
 
-    @field_validator("authors")
-    @classmethod
-    def validate_authors(cls, value: List[Author]) -> AuthorsProperty:
-        """Validate authors Field"""
-        return AuthorsProperty(
-            [
-                Author(user_id=author) if isinstance(author, str) else author
-                for author in value
-            ]
-        )
-
-    @field_validator("contacts", mode="after")
-    @classmethod
-    def validate_contacts(cls, value: List[ContactInfo]) -> ContactsProperty:
-        """Validate contacts Field"""
-        return ContactsProperty(value)
-
-    @field_validator("external_links", mode="after")
-    @classmethod
-    def validate_external_links(
-        cls, value: List[ExternalLink]
-    ) -> ExternalLinksProperty:
-        """Validate external links Field"""
-        return ExternalLinksProperty(value)
-
-    @field_validator("linked_kitems", mode="before")
+    @field_validator("linked_kitems")
     @classmethod
     def validate_linked_kitems_list(
-        cls, value: "List[Union[Dict, KItem, Any]]", info: ValidationInfo
+        cls,
+        value: "List[Union[Dict, KItem, Any]]",
     ) -> List[LinkedKItem]:
         """Validate each single kitem to be linked"""
-        src_id = info.data.get("id")
         linked_kitems = []
         for item in value:
-            if isinstance(item, dict):
-                dest_id = item.get("id")
-                if not dest_id:
-                    raise ValueError("Linked KItem is missing `id`")
-                linked_model = _get_kitem(dest_id, as_json=True)
-            elif isinstance(item, KItem):
-                dest_id = item.id
-                linked_model = item.model_dump()
-            else:
-                try:
-                    dest_id = getattr(item, "id")
-                    linked_model = _get_kitem(dest_id, as_json=True)
-                except AttributeError as error:
-                    raise AttributeError(
-                        f"Linked KItem `{item}` has no attribute `id`."
-                    ) from error
-            if str(src_id) == str(dest_id):
-                raise ValueError(
-                    f"Cannot link KItem with ID `{src_id}` to itself!"
-                )
-            linked_kitems.append(LinkedKItem(**linked_model))
+            if isinstance(item, KItem):
+                item = LinkedKItem(**item.model_dump())
+            linked_kitems.append(item)
         return linked_kitems
 
     @field_validator("linked_kitems", mode="after")
@@ -396,47 +305,32 @@ class KItem(BaseModel):
     def validate_linked_kitems(
         cls,
         value: List[LinkedKItem],
-    ) -> LinkedKItemsProperty:
+    ) -> LinkedKItemsList:
         """Validate the list out of linked KItems"""
-        return LinkedKItemsProperty(value)
-
-    @field_validator("user_groups", mode="after")
-    @classmethod
-    def validate_user_groups(
-        cls, value: List[UserGroup]
-    ) -> UserGroupsProperty:
-        """Validate user groups Field"""
-        return UserGroupsProperty(value)
+        return LinkedKItemsList(value)
 
     @field_validator("created_at")
     @classmethod
     def validate_created(cls, value: str) -> Any:
         """Convert the str for `created_at` in to a `datetime`-object"""
-        from dsms import Session
 
         if isinstance(value, str):
-            value = datetime.strptime(
-                value, Session.dsms.config.datetime_format
-            )
+            value = datetime.strptime(value, DATETIME_FRMT)
         return value
 
     @field_validator("updated_at")
     @classmethod
     def validate_updated(cls, value: str) -> Any:
         """Convert the str for `created_at` in to a `datetime`-object"""
-        from dsms import Session
 
         if isinstance(value, str):
-            value = datetime.strptime(
-                value, Session.dsms.config.datetime_format
-            )
+            value = datetime.strptime(value, DATETIME_FRMT)
         return value
 
     @field_validator("ktype_id")
     @classmethod
     def validate_ktype_id(cls, value: Union[str, Enum]) -> KType:
         """Validate the ktype id of the KItem"""
-        from dsms import Session
 
         if isinstance(value, str):
             ktype = Session.ktypes.get(value)
@@ -458,7 +352,6 @@ class KItem(BaseModel):
         cls, value: Optional[Union[KType, Enum]], info: ValidationInfo
     ) -> KType:
         """Validate the ktype of the KItem"""
-        from dsms import Session
 
         ktype_id = info.data.get("ktype_id")
 
@@ -481,27 +374,14 @@ class KItem(BaseModel):
 
         return value
 
-    @field_validator("in_backend")
-    @classmethod
-    def validate_in_backend(cls, value: bool, info: ValidationInfo) -> bool:
-        """Checks whether the kitem already exists"""
-        kitem_id = info.data["id"]
-        if not value:
-            value = _kitem_exists(kitem_id)
-        return value
-
     @field_validator("slug")
     @classmethod
     def validate_slug(cls, value: str, info: ValidationInfo) -> str:
         """Validate slug"""
-        from dsms import Session
 
         ktype_id = info.data["ktype_id"]
         kitem_id = info.data["id"]
         name = info.data["name"]
-        kitem_exists = info.data.get("in_backend")
-        if not isinstance(kitem_exists, bool):
-            kitem_exists = cls.in_backend
 
         if not value:
             value = _slugify(name)
@@ -511,7 +391,9 @@ class KItem(BaseModel):
                 )
             if Session.dsms.config.individual_slugs:
                 value += f"-{str(kitem_id).split('-', maxsplit=1)[0]}"
-        if not kitem_exists and not _slug_is_available(ktype_id, value):
+        if not _kitem_exists(
+            Session.dsms, kitem_id
+        ) and not _slug_is_available(Session.dsms, ktype_id, value):
             raise ValueError(f"Slug for `{value}` is already taken.")
         return value
 
@@ -520,15 +402,7 @@ class KItem(BaseModel):
     def validate_summary(cls, value: Union[str, Summary]) -> Summary:
         """Check whether the summary is a string or the dedicated model"""
         if isinstance(value, str):
-            value = Summary(kitem=cls, text=value)
-        return value
-
-    @field_validator("avatar", mode="before")
-    @classmethod
-    def validate_avatar(cls, value: "Union[Dict, Avatar]") -> Avatar:
-        """Validate avatar"""
-        if isinstance(value, dict):
-            value = Avatar(kitem=cls, **value)
+            value = Summary(text=value)
         return value
 
     @field_validator("dataframe")
@@ -548,7 +422,7 @@ class KItem(BaseModel):
             else:
                 dataframe = pd.DataFrame.from_dict(value)
         else:
-            columns = _inspect_dataframe(kitem_id)
+            columns = _inspect_dataframe(Session.dsms, kitem_id)
             if columns:
                 dataframe = DataFrameContainer(
                     [Column(**column) for column in columns]
@@ -566,21 +440,16 @@ class KItem(BaseModel):
             value = (
                 self.custom_properties.get("content") or self.custom_properties
             )
-
             if not value.get("sections"):
-                value = _transform_custom_properties_schema(
-                    value, self.ktype.webform
-                )
                 warnings.warn(
                     """A flat dictionary was provided for custom properties.
                     Will be transformed into `KItemCustomPropertiesModel`."""
                 )
-            was_in_buffer = self.id in self.session.buffers.updated
             self.custom_properties = KItemCustomPropertiesModel(
-                **value, kitem=self
+                **_transform_custom_properties_schema(
+                    self, value, self.ktype.webform
+                )
             )
-            if not was_in_buffer:
-                self.session.buffers.updated.pop(self.id)
         elif not isinstance(
             self.custom_properties, (KItemCustomPropertiesModel, type(None))
         ):
@@ -589,6 +458,10 @@ class KItem(BaseModel):
                 "KItemCustomPropertiesModel. Not a "
                 f"{type(self.custom_properties)}: {self.custom_properties}"
             )
+        if self.custom_properties:
+            for section in self.custom_properties.sections:
+                for entry in section.entries:
+                    entry.kitem = self
         return self
 
     @field_serializer("custom_properties")
@@ -602,30 +475,6 @@ class KItem(BaseModel):
         else:
             serialized = None
         return serialized
-
-    def _set_kitem_for_properties(self) -> None:
-        """Set kitem for CustomProperties and KProperties in order to
-        remain the session for the buffer if any of these properties is changed.
-        """
-        for prop in self.__dict__.values():
-            if (
-                isinstance(
-                    prop,
-                    (
-                        KItemPropertyList,
-                        Summary,
-                        Avatar,
-                        KItemCustomPropertiesModel,
-                    ),
-                )
-                and not prop.kitem
-            ):
-                logger.debug(
-                    "Setting kitem with ID `%s` for property `%s` on KItem level",
-                    self.id,
-                    type(prop),
-                )
-                prop.kitem = self
 
     @property
     def dsms(self) -> "DSMS":
@@ -647,10 +496,6 @@ class KItem(BaseModel):
     @property
     def session(self) -> "Session":
         """Getter for Session"""
-        from dsms import (  # isort:skip
-            Session,
-        )
-
         return Session
 
     @property

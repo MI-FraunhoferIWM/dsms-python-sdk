@@ -1,17 +1,11 @@
 """UserGroup property of a KItem"""
 
-from typing import TYPE_CHECKING
+from pydantic import BaseModel, Field
 
-from pydantic import Field
-
-from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 from dsms.knowledge.utils import print_model
 
-if TYPE_CHECKING:
-    from typing import Callable
 
-
-class UserGroup(KItemProperty):
+class UserGroup(BaseModel):
     """Users groups related to a KItem."""
 
     name: str = Field(
@@ -24,16 +18,3 @@ class UserGroup(KItemProperty):
     # OVERWRITE
     def __str__(self):
         return print_model(self, "user_group")
-
-
-class UserGroupsProperty(KItemPropertyList):
-    """KItemPropertyList for user_groups"""
-
-    @property
-    def k_property_item(self) -> "Callable":
-        """UserGroup data model"""
-        return UserGroup
-
-    @property
-    def k_property_helper(self) -> None:
-        """Not defined for User groups"""
