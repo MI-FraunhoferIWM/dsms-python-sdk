@@ -48,14 +48,12 @@ from dsms.knowledge.properties import (  # isort:skip
 from dsms.knowledge.ktype import KType  # isort:skip
 
 from dsms.knowledge.utils import (  # isort:skip
-    _slug_is_available,
     _slugify,
     _inspect_dataframe,
     _make_annotation_schema,
     _refresh_kitem,
     _transform_custom_properties_schema,
     print_model,
-    _kitem_exists,
     _map_data_type_to_widget,
 )
 
@@ -395,7 +393,6 @@ class KItem(BaseModel):
     def validate_slug(cls, value: str, info: ValidationInfo) -> str:
         """Validate slug"""
 
-        ktype_id = info.data["ktype_id"]
         kitem_id = info.data["id"]
         name = info.data["name"]
 
@@ -407,10 +404,6 @@ class KItem(BaseModel):
                 )
             if Session.dsms.config.individual_slugs:
                 value += f"-{str(kitem_id).split('-', maxsplit=1)[0]}"
-        if not _kitem_exists(
-            Session.dsms, kitem_id
-        ) and not _slug_is_available(Session.dsms, ktype_id, value):
-            raise ValueError(f"Slug for `{value}` is already taken.")
         return value
 
     @field_validator("summary")

@@ -568,6 +568,10 @@ def _commit_created(
 
     for obj in buffer.values():
         if isinstance(obj, KItem):
+            if not _kitem_exists(obj.dsms, obj.id) and not _slug_is_available(
+                obj.dsms, obj.ktype_id, obj.slug
+            ):
+                raise ValueError(f"Slug for `{obj.slug}` is already taken.")
             _create_new_kitem(obj)
         elif isinstance(obj, AppConfig):
             _create_or_update_app_spec(obj)
