@@ -56,11 +56,20 @@ from dsms.knowledge.utils import (  # isort:skip
     _transform_custom_properties_schema,
     print_model,
     _kitem_exists,
+    _map_data_type_to_widget,
 )
 
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
 
-from dsms.knowledge.webform import KItemCustomPropertiesModel  # isort:skip
+from dsms.knowledge.webform import (  # isort:skip
+    Entry,
+    Input,
+    KItemCustomPropertiesModel,
+    KnowledgeItemReference,
+    WebformSelectOption,
+    WebformSelectOptionEntry,
+    Widget,
+)
 
 if TYPE_CHECKING:
     from dsms.core.dsms import DSMS
@@ -286,17 +295,24 @@ class KItem(BaseModel):
                 app.id = kitem_id
         return AppList(value)
 
-    @field_validator("linked_kitems")
+    @field_validator("linked_kitems", mode="before")
     @classmethod
     def validate_linked_kitems_list(
         cls,
-        value: "List[Union[Dict, KItem, Any]]",
+        value: "List[Union[LinkedKItem, KItem]]",
     ) -> List[LinkedKItem]:
         """Validate each single kitem to be linked"""
         linked_kitems = []
+        logger.debug("Found KItem to link: %s", value)
         for item in value:
-            if isinstance(item, KItem):
+            if isinstance(item, dict):
+                item = LinkedKItem(**item)
+            elif isinstance(item, BaseModel):
                 item = LinkedKItem(**item.model_dump())
+            else:
+                raise TypeError(
+                    "Expected either a LinkedKItem or a KItem to be linked."
+                )
             linked_kitems.append(item)
         return linked_kitems
 
@@ -461,8 +477,286 @@ class KItem(BaseModel):
         if self.custom_properties:
             for section in self.custom_properties.sections:
                 for entry in section.entries:
-                    entry.kitem = self
+                    self.validate_custom_property_entries(entry)
         return self
+
+    def validate_custom_property_entries(self, entry: "Entry") -> "Entry":
+        """
+        Validate the custom property entries within a KItem.
+
+        This method checks if the entry's configuration aligns with the defined
+        webform specification for the corresponding knowledge type. It validates
+        the entry type, default values, select options, and ensures the value
+        conforms to the specified data type and constraints. Warnings or errors
+        are raised if discrepancies are found, such as missing input specifications,
+        invalid data types, or required values not being set.
+
+        Args:
+            entry (Entry): The custom property entry to validate.
+
+        Returns:
+            Entry: The validated entry with updated type and value information.
+
+        Raises:
+            ValueError: If the entry's configuration does not match the webform
+                        specification or if the entry's value is invalid.
+        """
+
+        spec: "List[Input]" = []
+        if self.ktype.webform:
+            for section in self.ktype.webform.sections:
+                for inp in section.inputs:
+                    if inp.id == entry.id:
+                        spec.append(inp)
+
+        logger.debug("Entry label: %s", entry.label)
+        logger.debug("Entry value: %s", entry.value)
+
+        # in this case we assume that a webform was defined for
+        # the knowledge type for this specific entry
+        if spec:
+            logger.debug("Found input spec for entry: %s", entry.label)
+            if len(spec) == 0:
+                raise ValueError(
+                    f"Could not find input spec for entry {entry.label}"
+                )
+            if len(spec) > 1:
+                raise ValueError(
+                    f"Found multiple input specs for entry {entry.label}"
+                )
+            spec = spec.pop()
+            entry.type = spec.widget
+            default_value = spec.value
+            select_options = spec.select_options
+            range_options = spec.range_options
+            knowledge_type = spec.knowledge_type
+            if range_options:
+                is_list = range_options.range
+            else:
+                is_list = False
+            dtype = None
+            logger.debug("Widget type from spec: %s", entry.type)
+        # in this case we assume that a webform was not defined
+        # but the user explicitly set the widget type
+        # this might be e.g. the case when a kitem without a webform
+        # is pulled from the remote backend
+        elif entry.type and not spec:
+            logger.debug("Did not find input spec for entry: %s", entry.label)
+            logger.debug("Using user-provided widget type: %s", entry.type)
+            default_value = None
+            select_options = []
+            knowledge_type = None
+            is_list = None
+            dtype = None
+        # in this case we assume that a webform was not defined
+        # and the user did not explicitly set the widget type
+        # this might be e.g. the case when a new kitem is instanciated
+        # in the session by a flat dict (e.g. {"foo": "bar"})
+        else:
+            logger.debug("Did not find input spec for entry: %s", entry.label)
+            entry.type, is_list, dtype = _map_data_type_to_widget(entry.value)
+            logger.debug("Guessed widget type: %s", entry.type)
+            default_value = None
+            knowledge_type = None
+            select_options = []
+
+        logger.debug("Entry is_list: %s", is_list)
+        if dtype:
+            logger.debug("Guessed data type: %s", dtype)
+
+        choices = {
+            choice.label: choice.model_dump() for choice in select_options
+        } or None
+        logger.debug("Entry choices: %s", choices)
+
+        # if the widget not is guessed from the data type,
+        # check if widget is mapped to the correct data type
+        if not dtype:
+            logger.debug("Guessing data type from widget type")
+            if entry.type in (
+                Widget.TEXT.value,
+                Widget.FILE.value,
+                Widget.TEXTAREA.value,
+            ):
+                dtype = str
+            elif entry.type in (Widget.NUMBER.value, Widget.SLIDER.value):
+                dtype = (int, float)
+            elif entry.type == Widget.CHECKBOX.value:
+                dtype = bool
+            elif entry.type in (
+                Widget.SELECT.value,
+                Widget.RADIO.value,
+                Widget.MULTI_SELECT.value,
+            ):
+                if entry.type == Widget.MULTI_SELECT.value:
+                    is_list = True
+                dtype = WebformSelectOption
+            elif entry.type == Widget.KNOWLEDGE_ITEM.value:
+                dtype = (type(entry.kitem), KnowledgeItemReference, dict)
+                is_list = True
+            else:
+                raise ValueError(
+                    f"Widget type is not mapped to a data type: {entry.type}"
+                )
+
+            logger.debug("Guessed data type: %s", dtype)
+
+        # check if value is set
+        if entry.value is None and default_value is not None:
+            logger.debug(
+                "Value is not set, setting default value: %s", default_value
+            )
+            entry.value = default_value
+
+        # check whether strict validation is enabled
+        if self.dsms.config.strict_validation:
+            # special case for webform select options
+            if (
+                entry.type
+                in (
+                    Widget.SELECT.value,
+                    Widget.RADIO.value,
+                    Widget.MULTI_SELECT.value,
+                )
+                and entry.value is not None
+            ):
+                error_message = (
+                    """Value `{}` is not a valid select option.
+                Valid options are: """
+                    + str(list(choices.keys()))
+                    + "\n"
+                )
+                if not select_options:
+                    raise ValueError(
+                        f"Widget of type `{entry.type}` does not have select options."
+                    )
+                if isinstance(entry.value, str):
+                    if entry.value not in choices:
+                        raise ValueError(error_message.format(entry.value))
+                    entry.value = WebformSelectOptionEntry(
+                        **choices[entry.value], value=entry.value
+                    )
+                elif isinstance(entry.value, dict):
+                    entry.value = WebformSelectOptionEntry(**entry.value)
+                    if entry.value.label not in choices:
+                        raise ValueError(
+                            error_message.format(entry.value.label)
+                        )
+
+                elif isinstance(entry.value, list):
+                    chosen = []
+                    is_updated = False
+                    for val in entry.value:
+                        if isinstance(val, str):
+                            if val not in choices:
+                                raise ValueError(error_message.format(val))
+                            val = WebformSelectOptionEntry(
+                                **choices[val], value=val
+                            )
+                            is_updated = True
+                        elif isinstance(val, dict):
+                            val = WebformSelectOptionEntry(**val)
+                            is_updated = True
+                            if val.label not in choices:
+                                raise ValueError(
+                                    error_message.format(val.label)
+                                )
+                        elif not isinstance(val, WebformSelectOptionEntry):
+                            raise ValueError(error_message.format(val))
+                        chosen.append(val)
+                    if is_updated:
+                        entry.value = chosen
+                elif not isinstance(entry.value, WebformSelectOptionEntry):
+                    raise ValueError(error_message.format(entry.value))
+                logger.debug("Value is set to: %s", entry.value)
+
+            # check if value is of correct type
+            error_message = "Value of type {} is invalid."
+            if is_list is True:
+                error_message += f"""
+                Widget of type ´{entry.type}` is requiring a value of type:
+                `List[{dtype}]`.
+                """
+                if entry.value is not None:
+                    if not isinstance(entry.value, list):
+                        raise ValueError(
+                            error_message.format(type(entry.value), dtype)
+                        )
+                    for val in entry.value:
+                        if not isinstance(val, dtype):
+                            raise ValueError(
+                                error_message.format(type(val), dtype)
+                            )
+            elif is_list is False:
+                error_message += f"""
+                Widget of type ´{entry.type}` is requiring a value of type:
+                `{dtype}`."""
+                if entry.value is not None and not isinstance(
+                    entry.value, dtype
+                ):
+                    raise ValueError(
+                        error_message.format(type(entry.value), dtype)
+                    )
+            else:
+                warnings.warn(
+                    f"No webform was defined for entry `{entry.label}`. "
+                    "Cannot check if value is of correct type."
+                )
+
+            # check if value is required
+            logger.debug("Checking if value is required")
+            if (
+                entry.value is None
+                and default_value is None
+                and entry.required
+            ):
+                raise ValueError(f"Value for entry {entry.label} is required")
+
+            # special case for knowledge item
+            if (
+                entry.value is not None
+                and entry.type == Widget.KNOWLEDGE_ITEM.value
+            ):
+                logger.debug("Checking if value is a valid knowledge item")
+                kitems = []
+                is_updated = False
+                if not isinstance(entry.value, list):
+                    raise ValueError(
+                        f"""Value for entry `{entry.label}` for widget of type `knowledge item`
+                        is not a list. Got {type(entry.value)}."""
+                    )
+                for val in entry.value:
+                    if isinstance(val, dict):
+                        val = KnowledgeItemReference(**val)
+                        is_updated = True
+                    if not isinstance(val, KnowledgeItemReference):
+                        val = KnowledgeItemReference(
+                            id=val.id,
+                            name=val.name,
+                            ktype_id=val.ktype_id,
+                            slug=val.slug,
+                        )
+                        is_updated = True
+                    if (
+                        knowledge_type is not None
+                        and val.ktype_id not in knowledge_type
+                    ):
+                        raise ValueError(
+                            f"Knowledge item `{val.name}` is not of type {knowledge_type}."
+                        )
+                    kitems.append(val)
+                if is_updated:
+                    entry.value = kitems
+        else:
+            warnings.warn(
+                """
+                Strict validation is disabled.
+                Will not strictly type check the custom properties.
+                This also will take place when values are re-assigned.
+                """
+            )
+
+        return entry
 
     @field_serializer("custom_properties")
     def _serialize_custom_properties(

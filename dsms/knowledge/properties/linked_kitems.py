@@ -6,7 +6,6 @@ from uuid import UUID
 
 from pydantic import (  # isort:skip
     BaseModel,
-    ConfigDict,
     Field,
     model_serializer,
     field_validator,
@@ -16,6 +15,7 @@ from dsms.core.session import Session  # isort:skip
 from dsms.core.utils import _name_to_camel  # isort:skip
 from dsms.knowledge.ktype import KType  # isort:skip
 from dsms.knowledge.properties.summary import Summary  # isort:skip
+from dsms.knowledge.properties.apps import App  # isort:skip
 from dsms.knowledge.properties.affiliations import Affiliation  # isort:skip
 from dsms.knowledge.properties.annotations import Annotation  # isort:skip
 from dsms.knowledge.properties.attachments import Attachment  # isort:skip
@@ -24,6 +24,7 @@ from dsms.knowledge.properties.contacts import ContactInfo  # isort:skip
 from dsms.knowledge.properties.external_links import ExternalLink  # isort:skip
 from dsms.knowledge.properties.user_groups import UserGroup  # isort:skip
 from dsms.knowledge.utils import _get_kitem, print_model  # isort:skip
+from dsms.knowledge.webform import KItemCustomPropertiesModel  # isort:skip
 
 
 if TYPE_CHECKING:
@@ -52,15 +53,13 @@ class LinkedKItem(BaseModel):
         description="ID of the KItem to be linked",
     )
 
-    name: Optional[str] = Field(None, description="Name of the linked KItem")
+    name: str = Field(..., description="Name of the linked KItem")
 
-    slug: Optional[str] = Field(None, description="Slug of the linked KItem")
+    slug: str = Field(..., description="Slug of the linked KItem")
 
-    ktype_id: Optional[str] = Field(
-        None, description="Ktype ID of the linked KItem"
-    )
+    ktype_id: str = Field(..., description="Ktype ID of the linked KItem")
 
-    summary: Optional[Union[str, Summary]] = Field(
+    summary: Optional[Summary] = Field(
         None, description="Summary of the linked KItem."
     )
 
@@ -68,41 +67,43 @@ class LinkedKItem(BaseModel):
         False, description="Wether the linked KItem has an avatar."
     )
 
-    annotations: List[Optional[Annotation]] = Field(
+    annotations: List[Annotation] = Field(
         [], description="Annotations of the linked KItem"
     )
 
-    linked_kitems: List[Optional[LinkedLinkedKItem]] = Field(
+    linked_kitems: List[LinkedLinkedKItem] = Field(
         [], description="Linked KItems of the linked KItem"
     )
 
-    external_links: List[Optional[ExternalLink]] = Field(
+    external_links: List[ExternalLink] = Field(
         [], description="External links of the linked KItem"
     )
 
-    contacts: List[Optional[ContactInfo]] = Field(
+    contacts: List[ContactInfo] = Field(
         [], description="Contact info of the linked KItem"
     )
 
-    authors: List[Optional[Author]] = Field(
+    authors: List[Author] = Field(
         [], description="Authors of the linked KItem"
     )
 
-    linked_affiliations: List[Optional[Affiliation]] = Field(
+    affiliations: List[Affiliation] = Field(
         [], description="Linked affiliations of the linked KItem"
     )
 
-    attachments: List[Union[str, Optional[Attachment]]] = Field(
+    attachments: List[Attachment] = Field(
         [], description="Attachment of the linked KItem"
     )
 
-    user_groups: List[Optional[UserGroup]] = Field(
+    user_groups: List[UserGroup] = Field(
         [], description="User groups of the linked KItem"
     )
 
-    custom_properties: Optional[Any] = Field(
+    custom_properties: Optional[KItemCustomPropertiesModel] = Field(
         None, description="Custom properies of the linked KItem"
     )
+
+    kitem_apps: List[App] = Field([], description="Apps of the linked KItem")
 
     created_at: Optional[Union[str, datetime]] = Field(
         None, description="Time and date when the KItem was created."
@@ -111,7 +112,9 @@ class LinkedKItem(BaseModel):
         None, description="Time and date when the KItem was updated."
     )
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    rdf_exists: Optional[bool] = Field(
+        False, description="Wether the linked KItem has an RDF subgraph."
+    )
 
     def fetch(self) -> "KItem":
         """Fetch the linked KItem"""
