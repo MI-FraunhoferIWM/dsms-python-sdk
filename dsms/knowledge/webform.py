@@ -338,7 +338,7 @@ class MeasurementUnit(BaseWebformModel):
         return self
 
 
-class KnowledgeItemReference(BaseWebformModel):
+class KnowledgeItemReference(BaseModel):
     """Reference to a knowledge item if linked in the custom properties"""
 
     id: Union[str, UUID] = Field(..., description="ID of the knowledge item")

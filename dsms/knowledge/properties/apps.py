@@ -47,7 +47,7 @@ class JobStatus(BaseModel):
 class App(BaseModel):
     """App of a KItem."""
 
-    id: UUID = Field(..., description="ID of the KItem")
+    id: Optional[UUID] = Field(None, description="ID of the KItem")
 
     kitem_app_id: Optional[int] = Field(
         None, description="ID of the KItem App"

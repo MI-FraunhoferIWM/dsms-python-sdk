@@ -187,9 +187,9 @@ class KItem(BaseModel):
         [],
         description="User groups able to access the KItem.",
     )
-    custom_properties: Optional[Any] = Field(
-        None, description="Custom properties associated to the KItem"
-    )
+    custom_properties: Optional[
+        Union[KItemCustomPropertiesModel, Dict[str, Any]]
+    ] = Field(None, description="Custom properties associated to the KItem")
 
     dataframe: Optional[
         Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]
@@ -441,7 +441,7 @@ class KItem(BaseModel):
             columns = _inspect_dataframe(Session.dsms, kitem_id)
             if columns:
                 dataframe = DataFrameContainer(
-                    [Column(**column) for column in columns]
+                    [Column(id=kitem_id, **column) for column in columns]
                 )
             else:
                 dataframe = None
@@ -453,6 +453,9 @@ class KItem(BaseModel):
         """Validate custom properties"""
 
         if isinstance(self.custom_properties, dict):
+            logger.debug(
+                "Converting custom properties to KItemCustomPropertiesModel"
+            )
             value = (
                 self.custom_properties.get("content") or self.custom_properties
             )
@@ -477,10 +480,10 @@ class KItem(BaseModel):
         if self.custom_properties:
             for section in self.custom_properties.sections:
                 for entry in section.entries:
-                    self.validate_custom_property_entries(entry)
+                    self.validate_custom_property_entry(entry)
         return self
 
-    def validate_custom_property_entries(self, entry: "Entry") -> "Entry":
+    def validate_custom_property_entry(self, entry: "Entry") -> "Entry":
         """
         Validate the custom property entries within a KItem.
 
@@ -503,8 +506,10 @@ class KItem(BaseModel):
         """
 
         spec: "List[Input]" = []
-        if self.ktype.webform:
-            for section in self.ktype.webform.sections:
+        if self.ktype.webform:  # pylint: disable=no-member
+            for (
+                section
+            ) in self.ktype.webform.sections:  # pylint: disable=no-member
                 for inp in section.inputs:
                     if inp.id == entry.id:
                         spec.append(inp)
