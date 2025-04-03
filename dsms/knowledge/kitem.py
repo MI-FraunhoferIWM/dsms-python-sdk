@@ -53,7 +53,6 @@ from dsms.knowledge.ktype import KType  # isort:skip
 
 from dsms.knowledge.utils import (  # isort:skip
     _kitem_exists,
-    _get_kitem,
     _slug_is_available,
     _slugify,
     _inspect_dataframe,
@@ -362,33 +361,22 @@ class KItem(BaseModel):
     @field_validator("linked_kitems", mode="before")
     @classmethod
     def validate_linked_kitems_list(
-        cls, value: "List[Union[Dict, KItem, Any]]", info: ValidationInfo
+        cls,
+        value: "List[Union[LinkedKItem, KItem]]",
     ) -> List[LinkedKItem]:
         """Validate each single kitem to be linked"""
-        src_id = info.data.get("id")
         linked_kitems = []
+        logger.debug("Found KItem to link: %s", value)
         for item in value:
             if isinstance(item, dict):
-                dest_id = item.get("id")
-                if not dest_id:
-                    raise ValueError("Linked KItem is missing `id`")
-                linked_model = _get_kitem(dest_id, as_json=True)
-            elif isinstance(item, KItem):
-                dest_id = item.id
-                linked_model = item.model_dump()
+                item = LinkedKItem(**item)
+            elif isinstance(item, BaseModel):
+                item = LinkedKItem(**item.model_dump())
             else:
-                try:
-                    dest_id = getattr(item, "id")
-                    linked_model = _get_kitem(dest_id, as_json=True)
-                except AttributeError as error:
-                    raise AttributeError(
-                        f"Linked KItem `{item}` has no attribute `id`."
-                    ) from error
-            if str(src_id) == str(dest_id):
-                raise ValueError(
-                    f"Cannot link KItem with ID `{src_id}` to itself!"
+                raise TypeError(
+                    "Expected either a LinkedKItem or a KItem to be linked."
                 )
-            linked_kitems.append(LinkedKItem(**linked_model))
+            linked_kitems.append(item)
         return linked_kitems
 
     @field_validator("linked_kitems", mode="after")
