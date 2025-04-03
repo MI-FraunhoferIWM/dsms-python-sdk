@@ -270,27 +270,28 @@ def _kitem_exists(dsms: "DSMS", kitem: Union[str, UUID, "KItem"]) -> bool:
 
 
 def _get_kitem(
-    dsms: "DSMS", uuid: Union[str, UUID], as_json=False
+    dsms: "DSMS", uuid: Union[str, UUID], as_json=False, raise_error=True
 ) -> "Union[KItem, Dict[str, Any]]":
     """Get the KItem for a instance with a certain ID from remote backend"""
     from dsms import KItem
 
     response = _perform_request(dsms, f"api/knowledge/kitems/{uuid}", "get")
-    if response.status_code == 404:
+    if response.status_code == 404 and raise_error:
         raise ValueError(
             f"""KItem with uuid `{uuid}` does not exist in
             DSMS-instance `{dsms.config.host_url}`"""
         )
-    if not response.ok:
+    if not response.ok and raise_error:
         raise ValueError(
             f"""An error occured fetching the KItem with uuid `{uuid}`:
             `{response.text}`"""
         )
-    payload = response.json()
-    if as_json:
-        response = payload
-    else:
-        response = KItem(**payload)
+    if response.ok:
+        payload = response.json()
+        if as_json:
+            response = payload
+        else:
+            response = KItem(**payload)
     return response
 
 
@@ -571,7 +572,11 @@ def _commit_created(
 
     for obj in buffer.values():
         if isinstance(obj, KItem):
-            if not _kitem_exists(obj.dsms, obj.id) and not _slug_is_available(
+            old_kitem = _get_kitem(
+                obj.dsms, obj.id, as_json=True, raise_error=False
+            )
+
+            if not old_kitem.ok and not _slug_is_available(
                 obj.dsms, obj.ktype_id, obj.slug
             ):
                 raise ValueError(f"Slug for `{obj.slug}` is already taken.")
@@ -935,9 +940,7 @@ def _delete_app_spec(obj: "AppConfig") -> None:
     return response.text
 
 
-def _transform_custom_properties_schema(
-    kitem: "KItem", custom_properties: Any, webform: Any
-):
+def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
     if webform:
         copy_properties = custom_properties.copy()
         transformed_sections = {}
@@ -956,7 +959,6 @@ def _transform_custom_properties_schema(
                         "value": copy_properties.pop(input_def.label),
                         "measurement_unit": measurement_unit,
                         "type": input_def.widget,
-                        "kitem": kitem,
                     }
                     section_name = section_def.name
                     if section_name not in transformed_sections:

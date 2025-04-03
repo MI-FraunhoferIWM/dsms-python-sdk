@@ -17,7 +17,6 @@ from pydantic import (  # isort:skip
     Field,
     ValidationInfo,
     field_validator,
-    model_validator,
     field_serializer,
 )
 
@@ -185,9 +184,9 @@ class KItem(BaseModel):
         [],
         description="User groups able to access the KItem.",
     )
-    custom_properties: Optional[
-        Union[KItemCustomPropertiesModel, Dict[str, Any]]
-    ] = Field(None, description="Custom properties associated to the KItem")
+    custom_properties: Optional[Union[KItemCustomPropertiesModel]] = Field(
+        None, description="Custom properties associated to the KItem"
+    )
 
     dataframe: Optional[
         Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]
@@ -440,43 +439,55 @@ class KItem(BaseModel):
                 dataframe = None
         return dataframe
 
-    @model_validator(mode="after")
+    @field_validator("custom_properties", mode="before")
     @classmethod
-    def validate_custom_properties(cls, self: "KItem") -> "KItem":
+    def validate_custom_properties(
+        cls,
+        value: Optional[Union[KItemCustomPropertiesModel, Dict[str, Any]]],
+        info: ValidationInfo,
+    ) -> "Optional[KItemCustomPropertiesModel]":
         """Validate custom properties"""
 
-        if isinstance(self.custom_properties, dict):
+        ktype = info.data["ktype"]
+
+        logger.debug("Received custom properties: %s", value)
+
+        if isinstance(value, dict):
             logger.debug(
                 "Converting custom properties to KItemCustomPropertiesModel"
             )
-            value = (
-                self.custom_properties.get("content") or self.custom_properties
-            )
+            value = value.get("content") or value
+            if not isinstance(value, dict):
+                raise TypeError(
+                    "Custom properties must be either a dictionary or a "
+                    "KItemCustomPropertiesModel. Not a "
+                    f"{type(value)}: {value}"
+                )
             if not value.get("sections"):
                 warnings.warn(
                     """A flat dictionary was provided for custom properties.
                     Will be transformed into `KItemCustomPropertiesModel`."""
                 )
-            self.custom_properties = KItemCustomPropertiesModel(
-                **_transform_custom_properties_schema(
-                    self, value, self.ktype.webform
+                value = _transform_custom_properties_schema(
+                    value, ktype.webform
                 )
-            )
-        elif not isinstance(
-            self.custom_properties, (KItemCustomPropertiesModel, type(None))
-        ):
+            value = KItemCustomPropertiesModel(**value)
+        elif not isinstance(value, (KItemCustomPropertiesModel, type(None))):
             raise TypeError(
                 "Custom properties must be either a dictionary or a "
                 "KItemCustomPropertiesModel. Not a "
-                f"{type(self.custom_properties)}: {self.custom_properties}"
+                f"{type(value)}: {value}"
             )
-        if self.custom_properties:
-            for section in self.custom_properties.sections:
+        if value:
+            for section in value.sections:
                 for entry in section.entries:
-                    self.validate_custom_property_entry(entry)
-        return self
+                    cls.validate_custom_property_entry(entry, ktype)
+        return value
 
-    def validate_custom_property_entry(self, entry: "Entry") -> "Entry":
+    @classmethod
+    def validate_custom_property_entry(
+        cls, entry: "Entry", ktype: "KType"
+    ) -> "Entry":
         """
         Validate the custom property entries within a KItem.
 
@@ -499,10 +510,8 @@ class KItem(BaseModel):
         """
 
         spec: "List[Input]" = []
-        if self.ktype.webform:  # pylint: disable=no-member
-            for (
-                section
-            ) in self.ktype.webform.sections:  # pylint: disable=no-member
+        if ktype.webform:  # pylint: disable=no-member
+            for section in ktype.webform.sections:  # pylint: disable=no-member
                 for inp in section.inputs:
                     if inp.id == entry.id:
                         spec.append(inp)
@@ -607,7 +616,7 @@ class KItem(BaseModel):
             entry.value = default_value
 
         # check whether strict validation is enabled
-        if self.dsms.config.strict_validation:
+        if Session.dsms.config.strict_validation:
             # special case for webform select options
             if (
                 entry.type
