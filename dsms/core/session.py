@@ -13,17 +13,14 @@ if TYPE_CHECKING:
 class Buffers:
     """Buffers of KItems for synchronization with the DSMS backend"""
 
-    created: "Dict[UUID, KItem]" = {}
-
-    updated: "Dict[UUID, KItem]" = {}
+    added: "Dict[UUID, KItem]" = {}
 
     deleted: "Dict[UUID, KItem]" = {}
 
     @classmethod
     def clear(cls):
         """Clear all buffers of KItems for synchronization with the DSMS backend"""
-        cls.created = {}
-        cls.updated = {}
+        cls.added = {}
         cls.deleted = {}
 
 

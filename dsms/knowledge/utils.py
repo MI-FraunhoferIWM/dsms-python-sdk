@@ -271,7 +271,7 @@ def _kitem_exists(dsms: "DSMS", kitem: Union[str, UUID, "KItem"]) -> bool:
 
 def _get_kitem(
     dsms: "DSMS", uuid: Union[str, UUID], as_json=False, raise_error=True
-) -> "Union[KItem, Dict[str, Any]]":
+) -> "Union[KItem, Dict[str, Any], Response]":
     """Get the KItem for a instance with a certain ID from remote backend"""
     from dsms import KItem
 
@@ -295,7 +295,7 @@ def _get_kitem(
     return response
 
 
-def _create_new_kitem(kitem: "KItem") -> None:
+def _create_new_kitem(kitem: "KItem") -> Response:
     """Create a new KItem in the remote backend"""
     payload = {
         "name": kitem.name,
@@ -311,6 +311,7 @@ def _create_new_kitem(kitem: "KItem") -> None:
         raise ValueError(
             f"KItem with uuid `{kitem.id}` could not be created in DSMS: {response.text}`"
         )
+    return response
 
 
 def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
@@ -554,10 +555,33 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
 def _commit(buffers: "Buffers") -> None:
     """Commit the buffers for the
     created, updated and deleted buffers"""
+    from dsms import AppConfig, KItem, KType
+
     logger.debug("Committing KItems in buffers. Current buffers:")
-    logger.debug("Current Created-buffer: %s", buffers.created)
-    logger.debug("Current Updated-buffer: %s", buffers.updated)
+    logger.debug("Current Addded-buffer: %s", buffers.added)
     logger.debug("Current Deleted-buffer: %s", buffers.deleted)
+    for kitem in buffers.added.values():
+        if isinstance(kitem, KItem):
+            old_kitem = _get_kitem(
+                kitem.dsms, kitem.id, as_json=True, raise_error=False
+            )
+
+            if not old_kitem.ok and not _slug_is_available(
+                kitem.dsms, kitem.ktype_id, kitem.slug
+            ):
+                raise ValueError(f"Slug for `{kitem.slug}` is already taken.")
+            if not old_kitem.ok:
+                old_kitem = _create_new_kitem(kitem)
+            _update_kitem(kitem, old_kitem.json())
+        elif isinstance(kitem, KType):
+            _create_new_ktype(kitem)
+        elif isinstance(kitem, AppConfig):
+            _create_or_update_app_spec(kitem)
+        else:
+            raise TypeError(
+                f"Object `{kitem}` of type {type(kitem)} cannot be committed."
+            )
+
     _commit_created(buffers.created)
     _commit_updated(buffers.updated)
     _commit_deleted(buffers.deleted)

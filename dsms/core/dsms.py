@@ -143,42 +143,15 @@ class DSMS:
 
         # Check if KItem
         if isinstance(obj, KItem):
-            # Check if KItem already exists
-            if (
-                not _kitem_exists(self, obj.id)
-                and obj.id not in self.buffers.created
-            ):
-                self.buffers.created.update({obj.id: obj})
-            # Check if KItem not already in updated buffer
-            if obj.id not in self.buffers.updated:
-                self.buffers.updated.update({obj.id: obj})
-
+            self.buffers.added.update({obj.id: obj})
         # Check if AppConfig
         elif isinstance(obj, AppConfig):
-            # Check if AppConfig already exists
-            if (
-                not _app_spec_exists(AppConfig)
-                and obj.name not in self.buffers.created
-            ):
-                self.buffers.created.update({obj.name: obj})
-            # Check if AppConfig not already in updated buffer
-            if obj.name not in self.buffers.updated:
-                self.buffers.updated.update({obj.name: obj})
-
+            self.buffers.added.update({obj.name: obj})
         # Check if KType
         elif isinstance(obj, KType) or (
             isinstance(obj, Enum) and isinstance(obj.value, KType)
         ):
-            # Check if KType already exists
-            if (
-                not _ktype_exists(self, obj.name)
-                and obj.name not in self.buffers.created
-            ):
-                self.buffers.created.update({obj.name: obj})
-            # Check if KType not already in updated buffer
-            if obj.name not in self.buffers.updated:
-                self.buffers.updated.update({obj.name: obj})
-
+            self.buffers.added.update({obj.name: obj})
         # otherwise raise error
         else:
             raise TypeError(
@@ -187,11 +160,7 @@ class DSMS:
 
     def commit(self) -> None:
         """Commit and empty the buffers of the KItems to the DSMS backend."""
-        if (
-            len(self.buffers.created) == 0
-            and len(self.buffers.updated) == 0
-            and len(self.buffers.deleted) == 0
-        ):
+        if len(self.buffers.added) == 0 and len(self.buffers.deleted) == 0:
             warnings.warn(
                 "Nothing to commit. No changes have been made to the DSMS instance."
                 "If you would like to add&/delete KItems, KTypes or AppConfigs,"
