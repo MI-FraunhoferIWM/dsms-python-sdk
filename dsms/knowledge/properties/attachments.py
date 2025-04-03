@@ -35,7 +35,7 @@ class Attachment(BaseModel):
     )
 
     def __str__(self) -> str:
-        return print_model(self, "attachment")
+        return print_model(self, "attachment", exclude_extra={"id"})
 
     def download(self, as_bytes: bool = False) -> "Union[str, bytes]":
         """Download attachment file"""

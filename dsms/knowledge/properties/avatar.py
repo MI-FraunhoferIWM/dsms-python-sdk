@@ -20,10 +20,10 @@ class Avatar(BaseModel):
         None,
         description="The file path to the image when setting a new avatar is set",
     )
-    encode_qr: Optional[bool] = Field(
+    encode_qr: Optional[str] = Field(
         False,
-        description="""Whether the new avatar is supposed to include a qr.
-        This can be combined with an image file.""",
+        description="""String for e.g. a link with should be encoded
+        into an QR code. This can be combined with an image file.""",
     )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -38,4 +38,4 @@ class Avatar(BaseModel):
 
     # OVERRIDE
     def __str__(self):
-        return print_model(self, "avatar")
+        return print_model(self, "avatar", exclude_extra={"id"})

@@ -7,12 +7,15 @@ from typing import TYPE_CHECKING, Any, Dict, List
 
 from dotenv import load_dotenv
 
-from dsms.apps.utils import _get_available_apps_specs
+from dsms.apps.config import AppConfig
+from dsms.apps.utils import _app_spec_exists, _get_available_apps_specs
 from dsms.core.configuration import Configuration
 from dsms.core.session import Session
 from dsms.core.utils import _ping_dsms
+from dsms.knowledge.kitem import KItem
+from dsms.knowledge.ktype import KType
 from dsms.knowledge.sparql_interface import SparqlInterface
-from dsms.knowledge.utils import _search
+from dsms.knowledge.utils import _kitem_exists, _ktype_exists, _search
 
 from dsms.knowledge.utils import (  # isort:skip
     _commit,
@@ -24,10 +27,7 @@ from dsms.knowledge.utils import (  # isort:skip
 if TYPE_CHECKING:
     from typing import Optional, Union
 
-    from dsms.apps import AppConfig
     from dsms.core.session import Buffers
-    from dsms.knowledge.kitem import KItem
-    from dsms.knowledge.ktype import KType
     from dsms.knowledge.search import KItemListModel, SearchResult
 
 warnings.simplefilter("always", DeprecationWarning)
@@ -110,16 +110,76 @@ class DSMS:
         WARNING: Changes only will take place after executing the `commit`-method
         """
 
-        from dsms import KItem, AppConfig, KType  # isort:skip
-
         if isinstance(obj, KItem):
-            self.session.buffers.deleted.update({obj.id: obj})
+            self.buffers.deleted.update({obj.id: obj})
         elif isinstance(obj, AppConfig):
-            self.session.buffers.deleted.update({obj.name: obj})
+            self.buffers.deleted.update({obj.name: obj})
         elif isinstance(obj, KType) or (
             isinstance(obj, Enum) and isinstance(obj.value, KType)
         ):
-            self.session.buffers.deleted.update({obj.name: obj})
+            self.buffers.deleted.update({obj.name: obj})
+        else:
+            raise TypeError(
+                f"Object must be of type {KItem}, {AppConfig} or {KType}, not {type(obj)}. "
+            )
+
+    def delete(self, obj) -> None:
+        """Stage an KItem, KType or AppConfig for the deletion.
+        WARNING: Changes only will take place after executing the `commit`-method
+        """
+        del self[obj]
+
+    def add(self, obj) -> None:
+        """
+        Stage an KItem, KType or AppConfig for creation.
+        WARNING: Changes only will take place after executing the `commit`-method
+
+        Args:
+            obj (KItem | AppConfig | KType): The object to be added to the DSMS instance.
+
+        Raises:
+            TypeError: If the object is not of type KItem, AppConfig or KType.
+        """
+
+        # Check if KItem
+        if isinstance(obj, KItem):
+            # Check if KItem already exists
+            if (
+                not _kitem_exists(self, obj.id)
+                and obj.id not in self.buffers.created
+            ):
+                self.buffers.created.update({obj.id: obj})
+            # Check if KItem not already in updated buffer
+            if obj.id not in self.buffers.updated:
+                self.buffers.updated.update({obj.id: obj})
+
+        # Check if AppConfig
+        elif isinstance(obj, AppConfig):
+            # Check if AppConfig already exists
+            if (
+                not _app_spec_exists(AppConfig)
+                and obj.name not in self.buffers.created
+            ):
+                self.buffers.created.update({obj.name: obj})
+            # Check if AppConfig not already in updated buffer
+            if obj.name not in self.buffers.updated:
+                self.buffers.updated.update({obj.name: obj})
+
+        # Check if KType
+        elif isinstance(obj, KType) or (
+            isinstance(obj, Enum) and isinstance(obj.value, KType)
+        ):
+            # Check if KType already exists
+            if (
+                not _ktype_exists(self, obj.name)
+                and obj.name not in self.buffers.created
+            ):
+                self.buffers.created.update({obj.name: obj})
+            # Check if KType not already in updated buffer
+            if obj.name not in self.buffers.updated:
+                self.buffers.updated.update({obj.name: obj})
+
+        # otherwise raise error
         else:
             raise TypeError(
                 f"Object must be of type {KItem}, {AppConfig} or {KType}, not {type(obj)}. "
@@ -127,10 +187,19 @@ class DSMS:
 
     def commit(self) -> None:
         """Commit and empty the buffers of the KItems to the DSMS backend."""
+        if (
+            len(self.buffers.created) == 0
+            and len(self.buffers.updated) == 0
+            and len(self.buffers.deleted) == 0
+        ):
+            warnings.warn(
+                "Nothing to commit. No changes have been made to the DSMS instance."
+                "If you would like to add&/delete KItems, KTypes or AppConfigs,"
+                "please use: `dsms.add(my_object)` or dsms.delete(my_object)`"
+                "before running `dsms.commit()`."
+            )
         _commit(self.buffers)
-        self.buffers.created = {}
-        self.buffers.updated = {}
-        self.buffers.deleted = {}
+        self.buffers.clear()
 
     def search(
         self,
@@ -227,8 +296,6 @@ class DSMS:
     @property
     def app_configs(self) -> "List[AppConfig]":
         """Return available app configs in the DSMS"""
-        from dsms.apps import AppConfig
-
         return [
             AppConfig(**app_config)
             for app_config in _get_available_apps_specs(self)

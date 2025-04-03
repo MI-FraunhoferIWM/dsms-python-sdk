@@ -773,11 +773,6 @@ class KItem(BaseModel):
         """DSMS session getter"""
         return self.session.dsms
 
-    @dsms.setter
-    def dsms(self, value: "DSMS") -> None:
-        """DSMS session setter"""
-        self.session.dsms = value
-
     @property
     def subgraph(self) -> Optional[Graph]:
         """Getter for Subgraph"""

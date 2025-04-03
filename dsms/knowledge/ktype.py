@@ -2,14 +2,19 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_serializer
 
 from dsms.core.logging import handler
+from dsms.core.session import Session
 from dsms.knowledge.utils import _refresh_ktype, print_ktype
 from dsms.knowledge.webform import Webform
+
+if TYPE_CHECKING:
+    from dsms import DSMS
+
 
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
@@ -68,3 +73,13 @@ class KType(BaseModel):
             )
             for key, value in self.__dict__.items()
         }
+
+    @property
+    def dsms(self) -> "DSMS":
+        """DSMS session getter"""
+        return self.session.dsms
+
+    @property
+    def session(self) -> "Session":
+        """Getter for Session"""
+        return Session

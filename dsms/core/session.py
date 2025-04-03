@@ -19,6 +19,13 @@ class Buffers:
 
     deleted: "Dict[UUID, KItem]" = {}
 
+    @classmethod
+    def clear(cls):
+        """Clear all buffers of KItems for synchronization with the DSMS backend"""
+        cls.created = {}
+        cls.updated = {}
+        cls.deleted = {}
+
 
 class Session:
     """Object giving the current DSMS session."""

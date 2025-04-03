@@ -41,7 +41,7 @@ class Column(BaseModel):
     )
 
     def __str__(self) -> str:
-        return print_model(self, "column")
+        return print_model(self, "column", exclude_extra={"id"})
 
     def get(self) -> "List[Any]":
         """

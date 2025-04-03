@@ -139,7 +139,7 @@ class App(BaseModel):
         return response.json()
 
     def __str__(self):
-        return print_model(self, "app")
+        return print_model(self, "app", exclude_extra={"id"})
 
 
 class Job(BaseModel):

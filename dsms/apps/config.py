@@ -13,10 +13,11 @@ from pydantic import (  # isort:skip
     model_validator,
 )
 
-
 from dsms.knowledge.utils import print_model  # isort:skip
 
 from dsms.core.logging import handler  # isort:skip
+
+from dsms.core.session import Session  # isort:skip
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ logger.addHandler(handler)
 logger.propagate = False
 
 if TYPE_CHECKING:
-    from dsms import DSMS, Session
+    from dsms import DSMS
 
 
 class AppConfig(BaseModel):
@@ -127,18 +128,9 @@ class AppConfig(BaseModel):
     @property
     def session(self) -> "Session":
         """Getter for Session"""
-        from dsms import (  # isort:skip
-            Session,
-        )
-
         return Session
 
     @property
     def dsms(self) -> "DSMS":
         """DSMS session getter"""
         return self.session.dsms
-
-    @dsms.setter
-    def dsms(self, value: "DSMS") -> None:
-        """DSMS session setter"""
-        self.session.dsms = value

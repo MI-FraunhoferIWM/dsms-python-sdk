@@ -30,3 +30,9 @@ def _get_app_specification(appname: str, dsms: "DSMS") -> str:
         message = f"Something went wrong downloading app config `{appname}`: {response.text}"
         raise RuntimeError(message)
     return response.text
+
+
+def _app_spec_exists(name: str) -> bool:
+    """Check whether the specification of the app already exists."""
+    response = _perform_request(f"api/knowledge/apps/argo/spec/{name}", "head")
+    return response.ok
