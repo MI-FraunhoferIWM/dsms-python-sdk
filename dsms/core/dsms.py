@@ -8,14 +8,14 @@ from typing import TYPE_CHECKING, Any, Dict, List
 from dotenv import load_dotenv
 
 from dsms.apps.config import AppConfig
-from dsms.apps.utils import _app_spec_exists, _get_available_apps_specs
+from dsms.apps.utils import _get_available_apps_specs
 from dsms.core.configuration import Configuration
 from dsms.core.session import Session
 from dsms.core.utils import _ping_dsms
 from dsms.knowledge.kitem import KItem
 from dsms.knowledge.ktype import KType
 from dsms.knowledge.sparql_interface import SparqlInterface
-from dsms.knowledge.utils import _kitem_exists, _ktype_exists, _search
+from dsms.knowledge.utils import _search
 
 from dsms.knowledge.utils import (  # isort:skip
     _commit,
