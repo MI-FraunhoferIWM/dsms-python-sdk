@@ -3,7 +3,7 @@
 import os
 import warnings
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Union
 
 from dotenv import load_dotenv
 
@@ -25,7 +25,7 @@ from dsms.knowledge.utils import (  # isort:skip
 )
 
 if TYPE_CHECKING:
-    from typing import Optional, Union
+    from typing import Optional
 
     from dsms.core.session import Buffers
     from dsms.knowledge.search import KItemListModel, SearchResult
@@ -123,24 +123,44 @@ class DSMS:
                 f"Object must be of type {KItem}, {AppConfig} or {KType}, not {type(obj)}. "
             )
 
-    def delete(self, obj) -> None:
+    def delete(
+        self,
+        obj: Union[
+            KItem, KType, AppConfig, List[Union[KItem, KType, AppConfig]]
+        ],
+    ) -> None:
         """Stage an KItem, KType or AppConfig for the deletion.
         WARNING: Changes only will take place after executing the `commit`-method
         """
+        if isinstance(obj, list):
+            for o in obj:
+                self._del(o)
+        else:
+            self._del(obj)
+
+    def _del(self, obj: Union[KItem, KType, AppConfig]):
         del self[obj]
 
-    def add(self, obj) -> None:
-        """
-        Stage an KItem, KType or AppConfig for creation.
+    def add(
+        self,
+        obj: Union[
+            KItem, KType, AppConfig, List[Union[KItem, KType, AppConfig]]
+        ],
+    ) -> None:
+        """Stage an KItem, KType or AppConfig for the addition.
         WARNING: Changes only will take place after executing the `commit`-method
 
         Args:
-            obj (KItem | AppConfig | KType): The object to be added to the DSMS instance.
-
-        Raises:
-            TypeError: If the object is not of type KItem, AppConfig or KType.
+            obj (Union[KItem, KType, AppConfig, List[Union[KItem, KType, AppConfig]]]):
+                The object to be added.
         """
+        if isinstance(obj, list):
+            for o in obj:
+                self._add(o)
+        else:
+            self._add(obj)
 
+    def _add(self, obj: Union[KItem, KType, AppConfig]):
         # Check if KItem
         if isinstance(obj, KItem):
             self.buffers.added.update({obj.id: obj})

@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from dsms.core.session import Session
 from dsms.knowledge.utils import _get_attachment, print_model
 
 if TYPE_CHECKING:
@@ -16,8 +17,9 @@ class Attachment(BaseModel):
     """Attachment uploaded by a  certain user."""
 
     id: UUID = Field(
-        ...,
+        None,
         description="ID of the attachment",
+        exclude=True,
     )
 
     name: str = Field(
@@ -40,7 +42,9 @@ class Attachment(BaseModel):
     def download(self, as_bytes: bool = False) -> "Union[str, bytes]":
         """Download attachment file"""
         if not self.content:
-            content = _get_attachment(self.id, self.name, as_bytes)
+            content = _get_attachment(
+                Session.dsms, self.id, self.name, as_bytes
+            )
         else:
             content = self.content
         return content

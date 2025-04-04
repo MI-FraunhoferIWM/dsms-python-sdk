@@ -18,6 +18,8 @@ from pydantic import (  # isort:skip
     AliasChoices,
 )
 
+from dsms.core.session import Session  # isort:skip
+
 from dsms.knowledge.utils import (  # isort:skip
     generate_id,
     print_model,
@@ -378,10 +380,13 @@ class Entry(BaseWebformModel):
         description="Relation mapping of the entry",
     )
     required: Optional[bool] = Field(False, description="Required input")
+    kitem_id: Optional[str] = Field(
+        None, description="ID of the knowledge item", exclude=True
+    )
 
     def __str__(self) -> str:
         """Pretty print the model fields"""
-        return print_model(self, "entry")
+        return print_model(self, "entry", exclude_extra={"kitem_id"})
 
     def __repr__(self) -> str:
         """Pretty print the model fields"""
@@ -390,11 +395,11 @@ class Entry(BaseWebformModel):
     def get_unit(self) -> "Dict[str, Any]":
         """Get unit for the property"""
         return get_property_unit(
-            self.kitem.id,  # pylint: disable=no-member
+            self.kitem_id,  # pylint: disable=no-member
             self.label,
             self.measurement_unit,
             is_dataframe_column=True,
-            autocomplete_symbol=self.kitem.dsms.config.autocomplete_units,  # pylint: disable=no-member
+            autocomplete_symbol=Session.dsms.config.autocomplete_units,  # pylint: disable=no-member
         )
 
     def convert_to(

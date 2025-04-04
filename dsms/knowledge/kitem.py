@@ -448,6 +448,7 @@ class KItem(BaseModel):
     ) -> "Optional[KItemCustomPropertiesModel]":
         """Validate custom properties"""
 
+        kitem_id = info.data["id"]
         ktype = info.data["ktype"]
 
         logger.debug("Received custom properties: %s", value)
@@ -481,6 +482,7 @@ class KItem(BaseModel):
         if value:
             for section in value.sections:
                 for entry in section.entries:
+                    entry.kitem_id = kitem_id
                     cls.validate_custom_property_entry(entry, ktype)
         return value
 
@@ -599,7 +601,7 @@ class KItem(BaseModel):
                     is_list = True
                 dtype = WebformSelectOption
             elif entry.type == Widget.KNOWLEDGE_ITEM.value:
-                dtype = (type(entry.kitem), KnowledgeItemReference, dict)
+                dtype = (type(cls), KnowledgeItemReference, dict)
                 is_list = True
             else:
                 raise ValueError(

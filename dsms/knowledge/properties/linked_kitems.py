@@ -118,7 +118,7 @@ class LinkedKItem(BaseModel):
 
     def fetch(self) -> "KItem":
         """Fetch the linked KItem"""
-        return _get_kitem(self.id)
+        return _get_kitem(Session.dsms, self.id)
 
     def is_a(self, to_be_compared: KType) -> bool:
         """Check the KType of the KItem"""

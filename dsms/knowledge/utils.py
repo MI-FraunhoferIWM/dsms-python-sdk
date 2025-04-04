@@ -330,7 +330,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "dataframe",
             "access_url",
         },
-        exclude_defaults=True,
+        # exclude_defaults=True,
     )
     payload.update(
         **differences,
@@ -566,7 +566,20 @@ def _commit(buffers: "Buffers") -> None:
                 raise ValueError(f"Slug for `{obj.slug}` is already taken.")
             if not old_kitem:
                 old_kitem = _create_new_kitem(obj)
+            if isinstance(obj.dataframe, pd.DataFrame):
+                logger.debug(
+                    "New KItem data has `pd.DataFrame`. Will push as dataframe."
+                )
+                _update_dataframe(obj.id, obj.dataframe)
+                obj.dataframe = _inspect_dataframe(obj.dsms, obj.id)
+            elif isinstance(obj.dataframe, type(None)) and _inspect_dataframe(
+                obj.dsms, obj.id
+            ):
+                _delete_dataframe(obj.id)
             _update_kitem(obj, old_kitem)
+            _update_attachments(obj, old_kitem)
+            if obj.avatar.file or obj.avatar.encode_qr:
+                _commit_avatar(obj)
         elif isinstance(obj, KType):
             old_ktype = _get_ktype(obj.dsms, obj.id, as_json=True)
             if old_ktype:
@@ -595,36 +608,6 @@ def _commit(buffers: "Buffers") -> None:
             )
 
     logger.debug("Committing successful, clearing buffers.")
-
-
-def _commit_updated_kitem(new_kitem: "KItem") -> None:
-    """Commit the updated KItems"""
-    old_kitem = _get_kitem(new_kitem.dsms, new_kitem.id, as_json=True)
-    logger.debug(
-        "Fetched data from old KItem with id `%s`: %s",
-        new_kitem.id,
-        old_kitem,
-    )
-    if old_kitem:
-        if isinstance(new_kitem.dataframe, pd.DataFrame):
-            logger.debug(
-                "New KItem data has `pd.DataFrame`. Will push as dataframe."
-            )
-            _update_dataframe(new_kitem.id, new_kitem.dataframe)
-            new_kitem.dataframe = _inspect_dataframe(
-                new_kitem.dsms, new_kitem.id
-            )
-        elif isinstance(
-            new_kitem.dataframe, type(None)
-        ) and _inspect_dataframe(new_kitem.dsms, new_kitem.id):
-            _delete_dataframe(new_kitem.id)
-        _update_kitem(new_kitem, old_kitem)
-        _update_attachments(new_kitem, old_kitem)
-        if new_kitem.avatar.file or new_kitem.avatar.encode_qr:
-            _commit_avatar(new_kitem)
-        logger.debug(
-            "Fetching updated KItem from remote backend: %s", new_kitem.id
-        )
 
 
 def _refresh_kitem(kitem: "KItem") -> None:
