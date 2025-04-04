@@ -330,7 +330,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "dataframe",
             "access_url",
         },
-        # exclude_defaults=True,
+        exclude_defaults=True,
     )
     payload.update(
         **differences,
