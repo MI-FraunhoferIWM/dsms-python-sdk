@@ -581,8 +581,10 @@ def _commit(buffers: "Buffers") -> None:
             if obj.avatar.file or obj.avatar.encode_qr:
                 _commit_avatar(obj)
         elif isinstance(obj, KType):
-            old_ktype = _get_ktype(obj.dsms, obj.id, as_json=True)
-            if old_ktype:
+            old_ktype = _get_ktype(
+                obj.dsms, obj.id, as_json=True, raise_error=False
+            )
+            if not old_ktype:
                 _create_new_ktype(obj)
             _update_ktype(obj.dsms, obj)
 

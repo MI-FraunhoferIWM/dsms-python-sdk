@@ -216,6 +216,14 @@ class DSMS:
             _get_remote_ktypes(self)
         return self._ktypes
 
+    def refresh_ktypes(self) -> None:
+        """Refresh the KTypes from the remote backend.
+
+        This method should be called if the KTypes from the remote backend
+        have been modified outside of this DSMS instance. It will update the
+        local KType Enum with the new KTypes from the remote backend."""
+        _get_remote_ktypes(self)
+
     @ktypes.setter
     def ktypes(self, value: "Enum") -> None:
         """Setter for the ktypes property of the DSMS instance.
