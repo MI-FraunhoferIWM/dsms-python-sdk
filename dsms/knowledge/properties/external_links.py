@@ -1,17 +1,13 @@
 """ExternalLink property of a KItem"""
 
-from typing import TYPE_CHECKING, Union
+from typing import Union
 
-from pydantic import AnyUrl, Field, field_validator
+from pydantic import AnyUrl, BaseModel, Field, field_validator
 
-from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 from dsms.knowledge.utils import print_model
 
-if TYPE_CHECKING:
-    from typing import Callable
 
-
-class ExternalLink(KItemProperty):
+class ExternalLink(BaseModel):
     """External link of a KItem."""
 
     label: str = Field(
@@ -21,7 +17,6 @@ class ExternalLink(KItemProperty):
         ..., description="URL of the external link"
     )
 
-    # OVERRIDE
     def __str__(self):
         return print_model(self, "external_link")
 
@@ -44,17 +39,3 @@ class ExternalLink(KItemProperty):
         if isinstance(value, AnyUrl):
             value = str(value)
         return value
-
-
-class ExternalLinksProperty(KItemPropertyList):
-    """KItemPropertyList for external links"""
-
-    # OVERRIDE
-    @property
-    def k_property_item(self) -> "Callable":
-        return ExternalLink
-
-    # OVERRIDE
-    @property
-    def k_property_helper(self) -> None:
-        """Not defined for External links"""

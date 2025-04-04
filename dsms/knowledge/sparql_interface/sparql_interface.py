@@ -29,7 +29,7 @@ class SparqlInterface:
         self, query: str, repository: str = DEFAULT_REPO
     ) -> "Dict[str, Any]":
         """Perform Sparql Query"""
-        return _sparql_query(query, repository)
+        return _sparql_query(self._dsms, query, repository)
 
     def update(
         self,
@@ -38,7 +38,10 @@ class SparqlInterface:
     ) -> None:
         """Perform update query from local file"""
         _sparql_update(
-            file_or_pathlike, self._dsms.config.encoding, repository
+            self._dsms,
+            file_or_pathlike,
+            self._dsms.config.encoding,
+            repository,
         )
 
     def insert(
@@ -47,7 +50,12 @@ class SparqlInterface:
         repository: str = DEFAULT_REPO,
     ) -> None:
         """Upload RDF to triplestore from local file"""
-        _add_rdf(file_or_pathlike, self._dsms.config.encoding, repository)
+        _add_rdf(
+            self._dsms,
+            file_or_pathlike,
+            self._dsms.config.encoding,
+            repository,
+        )
 
     @property
     def subgraph(self) -> Subgraph:

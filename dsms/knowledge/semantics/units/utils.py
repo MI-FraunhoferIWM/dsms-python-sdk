@@ -3,6 +3,8 @@
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
+from dsms.core.session import Session
+
 from .base import BaseUnitSparqlQuery
 from .conversion import (
     _check_qudt_mapping,
@@ -95,7 +97,6 @@ def get_property_unit(
     Raises:
         ValueError: If no unit is found.
     """
-    from dsms import Session
 
     if not measurement_unit:
         units_sparql_object = Session.dsms.config.units_sparql_object

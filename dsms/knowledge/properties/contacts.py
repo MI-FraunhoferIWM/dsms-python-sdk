@@ -1,19 +1,15 @@
 """Contacts  property of a KItem"""
 
 
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import BaseModel, Field, field_serializer
 
-from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
 from dsms.knowledge.utils import print_model
 
-if TYPE_CHECKING:
-    from typing import Callable
 
-
-class ContactInfo(KItemProperty):
+class ContactInfo(BaseModel):
     """Contact info"""
 
     name: str = Field(..., description="Name of the contact person")
@@ -22,20 +18,19 @@ class ContactInfo(KItemProperty):
         None, description="User ID of the contact person"
     )
 
+    @field_serializer("user_id")
+    def serialize_user_id(self, value: UUID) -> str:
+        """
+        Serialize the user_id of the contact to a string.
+
+        Args:
+            value: the UUID of the user_id
+
+        Returns:
+            str: the serialized user_id
+        """
+        return str(value)
+
     # OVERRIDE
     def __str__(self) -> str:
         return print_model(self, "contact")
-
-
-class ContactsProperty(KItemPropertyList):
-    """KItemPropertyList for contacts"""
-
-    # OVERRIDE
-    @property
-    def k_property_item(self) -> "Callable":
-        return ContactInfo
-
-    # OVERRIDE
-    @property
-    def k_property_helper(self) -> None:
-        """Not defined for Contacts"""

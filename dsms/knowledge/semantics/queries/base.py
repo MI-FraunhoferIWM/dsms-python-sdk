@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 
 from rdflib.plugins.sparql.results.jsonresults import JSONResult
 
+from dsms.core.session import Session
+
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional
 
@@ -15,8 +17,6 @@ class BaseSparqlQuery(ABC):
     """Abstract class for DSMS Sparql Query"""
 
     def __init__(self, **kwargs: "Dict[str, Any]") -> None:
-        from dsms import Session
-
         self._kwargs = kwargs
         self._results: "Optional[Dict[str, Any]]" = None
         self._dsms: "DSMS" = Session.dsms

@@ -111,11 +111,6 @@ class Configuration(BaseSettings):
         description="General encoding to be used for reading/writing serializations.",
     )
 
-    datetime_format: str = Field(
-        "%Y-%m-%dT%H:%M:%S.%f",
-        description="Datetime format used in the DSMS instance.",
-    )
-
     display_units: bool = Field(
         False,
         description="""Whether the custom properties or the dataframe columns shall
