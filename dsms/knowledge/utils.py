@@ -627,10 +627,9 @@ def _refresh_kitem(kitem: "KItem") -> None:
             value,
         )
         setattr(kitem, key, value)
-    kitem.dataframe = [
-        {"id": kitem.id, **column}
-        for column in _inspect_dataframe(kitem.dsms, kitem.id)
-    ]
+    dataframe = _inspect_dataframe(kitem.dsms, kitem.id)
+    if dataframe:
+        kitem.dataframe = [{"id": kitem.id, **column} for column in dataframe]
 
 
 def _refresh_ktype(ktype: "KType") -> None:
