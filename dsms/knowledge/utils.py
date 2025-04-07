@@ -571,7 +571,10 @@ def _commit(buffers: "Buffers") -> None:
                     "New KItem data has `pd.DataFrame`. Will push as dataframe."
                 )
                 _update_dataframe(obj.dsms, obj.id, obj.dataframe)
-                obj.dataframe = _inspect_dataframe(obj.dsms, obj.id)
+                obj.dataframe = [
+                    {"id": obj.id, **column}
+                    for column in _inspect_dataframe(obj.dsms, obj.id)
+                ]
             elif isinstance(obj.dataframe, type(None)) and _inspect_dataframe(
                 obj.dsms, obj.id
             ):
@@ -624,7 +627,10 @@ def _refresh_kitem(kitem: "KItem") -> None:
             value,
         )
         setattr(kitem, key, value)
-    kitem.dataframe = _inspect_dataframe(kitem.dsms, kitem.id)
+    kitem.dataframe = [
+        {"id": kitem.id, **column}
+        for column in _inspect_dataframe(kitem.dsms, kitem.id)
+    ]
 
 
 def _refresh_ktype(ktype: "KType") -> None:

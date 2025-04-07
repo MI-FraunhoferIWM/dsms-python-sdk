@@ -40,6 +40,9 @@ class Column(BaseModel):
         ..., description="Name of the column in the data series."
     )
 
+    def __repr__(self) -> str:
+        return str(self)
+
     def __str__(self) -> str:
         return print_model(self, "column", exclude_extra={"id"})
 

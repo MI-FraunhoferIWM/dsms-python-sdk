@@ -431,6 +431,7 @@ class KItem(BaseModel):
                 dataframe = pd.DataFrame.from_dict(value)
         else:
             columns = _inspect_dataframe(Session.dsms, kitem_id)
+            logger.debug("Found columns: %s", columns)
             if columns:
                 dataframe = DataFrameContainer(
                     [Column(id=kitem_id, **column) for column in columns]
