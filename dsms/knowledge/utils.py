@@ -570,7 +570,7 @@ def _commit(buffers: "Buffers") -> None:
                 logger.debug(
                     "New KItem data has `pd.DataFrame`. Will push as dataframe."
                 )
-                _update_dataframe(obj.id, obj.dataframe)
+                _update_dataframe(obj.dsms, obj.id, obj.dataframe)
                 obj.dataframe = _inspect_dataframe(obj.dsms, obj.id)
             elif isinstance(obj.dataframe, type(None)) and _inspect_dataframe(
                 obj.dsms, obj.id
