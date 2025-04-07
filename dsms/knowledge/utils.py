@@ -580,7 +580,9 @@ def _commit(buffers: "Buffers") -> None:
             _update_attachments(obj, old_kitem)
             if obj.avatar.file or obj.avatar.encode_qr:
                 _commit_avatar(obj)
-        elif isinstance(obj, KType):
+        elif isinstance(obj, KType) or (
+            isinstance(obj, Enum) and isinstance(obj.value, KType)
+        ):
             old_ktype = _get_ktype(
                 obj.dsms, obj.id, as_json=True, raise_error=False
             )
