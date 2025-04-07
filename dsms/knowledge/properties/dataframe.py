@@ -6,6 +6,7 @@ from uuid import UUID
 import pandas as pd
 from pydantic import BaseModel, Field
 
+from dsms.core.session import Session
 from dsms.knowledge.utils import _get_dataframe_column, _is_number, print_model
 
 from dsms.knowledge.semantics.units import (  # isort:skip
@@ -66,7 +67,7 @@ class Column(BaseModel):
             self.id,
             self.name,
             is_dataframe_column=True,
-            autocomplete_symbol=self.kitem.dsms.config.autocomplete_units,
+            autocomplete_symbol=Session.dsms.config.autocomplete_units,
         )
 
     def convert_to(
