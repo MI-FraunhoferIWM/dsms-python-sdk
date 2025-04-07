@@ -98,7 +98,7 @@ def _add_rdf(
         )
 
 
-def _delete_subgraph(identifier: str, repository: str) -> None:
+def _delete_subgraph(dsms: "DSMS", identifier: str, repository: str) -> None:
     """Get subgraph related to a certain dataset id."""
     query = f"""
     DELETE {{
@@ -112,25 +112,33 @@ def _delete_subgraph(identifier: str, repository: str) -> None:
             GRAPH ?g {{ ?s ?p ?o . }}
         }}
     }}"""
-    response = _sparql_query(query, repository)
+    response = _sparql_query(dsms, query, repository)
     if not response.get("boolean"):
         raise RuntimeError(
             f"Deleteing subgraph was not successful: {response}"
         )
 
 
-def _create_subgraph(graph: "Graph", encoding: str, respository: str) -> None:
+def _create_subgraph(
+    dsms: "DSMS", graph: "Graph", encoding: str, respository: str
+) -> None:
     """Create the subgraph in the remote backend"""
     upload_file = io.BytesIO(graph.serialize(encoding=encoding))
     _add_rdf(
-        upload_file, encoding, respository, context=f"<{graph.identifier}>"
+        dsms,
+        upload_file,
+        encoding,
+        respository,
+        context=f"<{graph.identifier}>",
     )
 
 
-def _update_subgraph(graph: "Graph", encoding: str, repository: str) -> None:
+def _update_subgraph(
+    dsms: "DSMS", graph: "Graph", encoding: str, repository: str
+) -> None:
     """Update the subgraph in the remote backend"""
-    _delete_subgraph(graph.identifier, repository)
-    _create_subgraph(graph, encoding, repository)
+    _delete_subgraph(dsms, graph.identifier, repository)
+    _create_subgraph(dsms, graph, encoding, repository)
 
 
 def _get_subgraph(
