@@ -80,6 +80,12 @@ class Configuration(BaseSettings):
         when the token is expired.""",
     )
 
+    auto_refresh: bool = Field(
+        True,
+        description="""Whether to automatically refresh KItems,
+        KTypes and AppConfigs after commiting""",
+    )
+
     ping_dsms: bool = Field(
         True, description="Check whether the host is a DSMS instance or not."
     )

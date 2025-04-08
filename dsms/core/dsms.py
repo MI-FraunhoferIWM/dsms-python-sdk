@@ -103,21 +103,16 @@ class DSMS:
 
     def __getitem__(self, key: str) -> "KItem":
         """Get KItem from remote DSMS instance."""
-        return _get_kitem(self, key)
+        return self._session.kitems.get(key) or _get_kitem(self, key)
 
     def __delitem__(self, obj) -> None:
         """Stage an KItem, KType or AppConfig for the deletion.
         WARNING: Changes only will take place after executing the `commit`-method
         """
-
-        if isinstance(obj, KItem):
-            self.buffers.deleted.update({obj.id: obj})
-        elif isinstance(obj, AppConfig):
-            self.buffers.deleted.update({obj.name: obj})
-        elif isinstance(obj, KType) or (
+        if isinstance(obj, (KItem, AppConfig, KType)) or (
             isinstance(obj, Enum) and isinstance(obj.value, KType)
         ):
-            self.buffers.deleted.update({obj.name: obj})
+            self.buffers.deleted.update(obj)
         else:
             raise TypeError(
                 f"Object must be of type {KItem}, {AppConfig} or {KType}, not {type(obj)}. "
@@ -161,18 +156,10 @@ class DSMS:
             self._add(obj)
 
     def _add(self, obj: Union[KItem, KType, AppConfig]):
-        # Check if KItem
-        if isinstance(obj, KItem):
-            self.buffers.added.update({obj.id: obj})
-        # Check if AppConfig
-        elif isinstance(obj, AppConfig):
-            self.buffers.added.update({obj.name: obj})
-        # Check if KType
-        elif isinstance(obj, KType) or (
+        if isinstance(obj, (KItem, AppConfig, KType)) or (
             isinstance(obj, Enum) and isinstance(obj.value, KType)
         ):
-            self.buffers.added.update({obj.name: obj})
-        # otherwise raise error
+            self.buffers.added.update(obj)
         else:
             raise TypeError(
                 f"Object must be of type {KItem}, {AppConfig} or {KType}, not {type(obj)}. "

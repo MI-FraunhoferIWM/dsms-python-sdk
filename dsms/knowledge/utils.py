@@ -21,7 +21,9 @@ from dsms.core.logging import handler  # isort:skip
 
 from dsms.core.utils import _name_to_camel, _perform_request  # isort:skip
 
-from dsms.knowledge.search import SearchResult, KItemListModel  # isort:skip
+from dsms.knowledge.search import SearchResult, KItemListModel  # isort:skip^
+
+from dsms.core.session import Session  # isort:skip
 
 if TYPE_CHECKING:
     from dsms import DSMS
@@ -554,7 +556,7 @@ def _commit(buffers: "Buffers") -> None:
     logger.debug("Committing KItems in buffers. Current buffers:")
     logger.debug("Current Addded-buffer: %s", buffers.added)
     logger.debug("Current Deleted-buffer: %s", buffers.deleted)
-    for obj in buffers.added.values():
+    for obj in buffers.added:
         if isinstance(obj, KItem):
             old_kitem = _get_kitem(
                 obj.dsms, obj.id, as_json=True, raise_error=False
@@ -599,7 +601,9 @@ def _commit(buffers: "Buffers") -> None:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed."
             )
-    for obj in buffers.deleted.values():
+        if Session.dsms.config.auto_refresh:
+            obj.refresh()
+    for obj in buffers.deleted:
         if isinstance(obj, KItem):
             _delete_dataframe(obj)
             _delete_kitem(obj)

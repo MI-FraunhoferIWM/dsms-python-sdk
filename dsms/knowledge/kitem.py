@@ -221,6 +221,9 @@ class KItem(BaseModel):
         # initialize the kitem
         super().__init__(**kwargs)
 
+        if str(self.id) not in self.dsms.session.kitems:
+            self.dsms.session.kitems[str(self.id)] = self
+
         logger.debug("KItem initialization successful.")
 
     def __str__(self) -> str:

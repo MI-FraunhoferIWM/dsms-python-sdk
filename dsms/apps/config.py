@@ -1,6 +1,7 @@
 """DSMS app models"""
 import logging
 import urllib.parse
+import warnings
 from typing import TYPE_CHECKING, Any, Dict, Union
 
 import yaml
@@ -59,7 +60,7 @@ class AppConfig(BaseModel):
     )
 
     def __init__(self, **kwargs: "Any") -> None:
-        """Initialize the KItem"""
+        """Initialize the AppConfig"""
         # set dsms instance if not already done
         if not self.dsms:
             raise ValueError(
@@ -78,6 +79,15 @@ class AppConfig(BaseModel):
     def __repr__(self) -> str:
         """Pretty print the kitem Fields"""
         return str(self)
+
+    def refresh(self):
+        """Warn that AppConfig does not support refresh functionality."""
+
+        warnings.warn(
+            "AppConfigs do not have a refresh functionality since they are"
+            "already up to date after committing. "
+            "You can continue normally using the app config."
+        )
 
     @field_validator("name")
     @classmethod

@@ -1,5 +1,6 @@
 """App  property of a KItem"""
 
+import warnings
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
@@ -124,6 +125,14 @@ class App(BaseModel):
                 f"Submission was not successful: {response.text}"
             )
         submitted = response.json()
+        if wait and Session.dsms.config.auto_refresh:
+            item = Session.kitems.get(str(self.id))
+            if item:
+                item.refresh()
+            else:
+                warnings.warn(
+                    f"Could not refresh KItem with ID {self.id} automatically."
+                )
 
         return Job(name=submitted.get("name"), executable=self.executable)
 

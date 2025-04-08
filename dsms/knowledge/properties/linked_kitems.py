@@ -118,7 +118,9 @@ class LinkedKItem(BaseModel):
 
     def fetch(self) -> "KItem":
         """Fetch the linked KItem"""
-        return _get_kitem(Session.dsms, self.id)
+        return Session.kitems.get(str(self.id)) or _get_kitem(
+            Session.dsms, self.id
+        )
 
     def is_a(self, to_be_compared: KType) -> bool:
         """Check the KType of the KItem"""
@@ -186,7 +188,7 @@ class LinkedKItemsList(list):
         """Get the kitem with a certain id which is linked to the source KItem."""
         if not str(kitem_id) in [str(item.id) for item in self]:
             raise KeyError(f"A KItem with ID `{kitem_id} is not linked.")
-        return _get_kitem(kitem_id)
+        return Session.kitems.get(str(kitem_id)) or _get_kitem(kitem_id)
 
     @property
     def by_annotation(self) -> "Dict[str, List[KItem]]":
