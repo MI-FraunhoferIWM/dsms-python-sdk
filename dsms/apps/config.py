@@ -84,7 +84,7 @@ class AppConfig(BaseModel):
         """Warn that AppConfig does not support refresh functionality."""
 
         warnings.warn(
-            "AppConfigs do not have a refresh functionality since they are"
+            "AppConfigs do not have a refresh functionality since they are "
             "already up to date after committing. "
             "You can continue normally using the app config."
         )
