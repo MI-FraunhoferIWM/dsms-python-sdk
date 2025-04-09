@@ -25,15 +25,19 @@ class Subgraph:
 
     def update(self, graph: "Graph", repository: str = DEFAULT_REPO) -> None:
         """Update a subgraph in the DSMS"""
-        _update_subgraph(graph, self._dsms.config.encoding, repository)
+        _update_subgraph(
+            self._dsms, graph, self._dsms.config.encoding, repository
+        )
 
     def create(self, graph: "Graph", repository: str = DEFAULT_REPO) -> None:
         """Create a subgraph in the DSMS"""
-        _create_subgraph(graph, self._dsms.config.encoding, repository)
+        _create_subgraph(
+            self._dsms, graph, self._dsms.config.encoding, repository
+        )
 
     def delete(self, identifier: str, repository: str = DEFAULT_REPO) -> None:
         """Delete a subgraph in the DSMS"""
-        _delete_subgraph(identifier, repository)
+        _delete_subgraph(self._dsms, identifier, repository)
 
     def get(
         self,
@@ -42,4 +46,4 @@ class Subgraph:
         is_kitem_id: bool = False,
     ) -> "Graph":
         """Get a subgraph from the DSMS"""
-        return _get_subgraph(identifier, repository, is_kitem_id)
+        return _get_subgraph(self._dsms, identifier, repository, is_kitem_id)

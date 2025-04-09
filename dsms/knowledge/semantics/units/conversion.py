@@ -8,6 +8,8 @@ from urllib.parse import urlparse
 import requests
 from rdflib import Graph
 
+from dsms.core.session import Session
+
 
 def _is_valid_url(url: str) -> bool:
     try:
@@ -119,8 +121,6 @@ def _get_factor_from_uri(uri: str) -> int:
 
 @lru_cache
 def _get_qudt_graph(ontology_ref: str) -> Graph:
-    from dsms import Session
-
     url = getattr(Session.dsms.config, ontology_ref)
     encoding = Session.dsms.config.encoding
     graph = Graph()
