@@ -11,7 +11,7 @@ from dsms.apps.config import AppConfig
 from dsms.apps.utils import _get_available_apps_specs
 from dsms.core.configuration import Configuration
 from dsms.core.session import Session
-from dsms.core.utils import _ping_dsms
+from dsms.core.utils import _ping_backend
 from dsms.knowledge.kitem import KItem
 from dsms.knowledge.ktype import KType
 from dsms.knowledge.sparql_interface import SparqlInterface
@@ -312,9 +312,9 @@ def verify_connection(dsms: DSMS) -> None:
             f"""The passed object for the dsms-connection
                 is not of type {DSMS}."""
         )
-    if dsms.config.ping_dsms:
+    if dsms.config.ping_backend:
         try:
-            response = _ping_dsms(dsms)
+            response = _ping_backend(dsms)
             if not response.ok:
                 raise ConnectionError(
                     f"""Host with `{dsms.config.host_url}`

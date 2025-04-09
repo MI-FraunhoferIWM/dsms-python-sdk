@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import (  # isort:skip
     BaseModel,
+    AliasChoices,
     Field,
     model_serializer,
     field_validator,
@@ -103,7 +104,11 @@ class LinkedKItem(BaseModel):
         None, description="Custom properies of the linked KItem"
     )
 
-    kitem_apps: List[App] = Field([], description="Apps of the linked KItem")
+    apps: List[App] = Field(
+        [],
+        description="Apps of the linked KItem",
+        alias=AliasChoices("kitem_apps", "apps"),
+    )
 
     created_at: Optional[Union[str, datetime]] = Field(
         None, description="Time and date when the KItem was created."

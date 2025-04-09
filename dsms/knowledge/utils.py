@@ -328,7 +328,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "ktype_id",
             "attachments",
             "id",
-            "kitem_apps",
+            "apps",
             "created_at",
             "dataframe",
             "access_url",
@@ -468,7 +468,7 @@ def _get_apps_diff(
         {key: value for key, value in old.items() if key not in exclude}
         for old in old_kitem.get("kitem_apps")
     ]
-    new_apps = [new.model_dump() for new in new_kitem.kitem_apps]
+    new_apps = [new.model_dump() for new in new_kitem.apps]
     differences["kitem_apps_to_update"] = [
         attr for attr in new_apps if attr not in old_apps
     ]
@@ -543,9 +543,9 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     # kitems also might differ in their new properties in some cases.
     linked_kitems = _get_linked_diffs(kitem_old, kitem_new)
     # same holds for kitem apps
-    kitem_apps = _get_apps_diff(kitem_old, kitem_new)
+    apps = _get_apps_diff(kitem_old, kitem_new)
     # merge with previously found differences
-    differences.update(**linked_kitems, **kitem_apps)
+    differences.update(**linked_kitems, **apps)
     return differences
 
 
@@ -628,14 +628,7 @@ def _commit(buffers: "Buffers") -> None:
 
 def _refresh_kitem(kitem: "KItem") -> None:
     """Refresh the KItem"""
-    for key, value in _get_kitem(kitem.dsms, kitem.id, as_json=True).items():
-        logger.debug(
-            "Set updated property `%s` for KItem with id `%s` after commiting: %s",
-            key,
-            kitem.id,
-            value,
-        )
-        setattr(kitem, key, value)
+    kitem.model_validate(_get_kitem(kitem.dsms, kitem.id, as_json=True))
     dataframe = _inspect_dataframe(kitem.dsms, kitem.id)
     if dataframe:
         kitem.dataframe = [{"id": kitem.id, **column} for column in dataframe]

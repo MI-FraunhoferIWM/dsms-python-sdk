@@ -127,7 +127,7 @@ class AppConfig(BaseModel):
                     "name": "request_timeout",
                     "value": config.request_timeout,
                 },
-                {"name": "ping", "value": config.ping_dsms},
+                {"name": "ping", "value": config.ping_backend},
                 {"name": "host_url", "value": str(config.host_url)},
                 {"name": "ssl_verify", "value": config.ssl_verify},
                 {"name": "kitem_repo", "value": config.kitem_repo},
