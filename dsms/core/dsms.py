@@ -109,10 +109,12 @@ class DSMS:
         """Stage an KItem, KType or AppConfig for the deletion.
         WARNING: Changes only will take place after executing the `commit`-method
         """
-        if isinstance(obj, (KItem, AppConfig, KType)) or (
+        if isinstance(obj, (KItem, KType)) or (
             isinstance(obj, Enum) and isinstance(obj.value, KType)
         ):
-            self.buffers.deleted.update(obj)
+            self.buffers.deleted.update({str(obj.id): obj})
+        elif isinstance(obj, AppConfig):
+            self.buffers.deleted.update({str(obj.name): obj})
         else:
             raise TypeError(
                 f"Object must be of type {KItem}, {AppConfig} or {KType}, not {type(obj)}. "
@@ -156,10 +158,12 @@ class DSMS:
             self._add(obj)
 
     def _add(self, obj: Union[KItem, KType, AppConfig]):
-        if isinstance(obj, (KItem, AppConfig, KType)) or (
+        if isinstance(obj, (KItem, KType)) or (
             isinstance(obj, Enum) and isinstance(obj.value, KType)
         ):
-            self.buffers.added.update(obj)
+            self.buffers.added.update({str(obj.id): obj})
+        elif isinstance(obj, AppConfig):
+            self.buffers.added.update({str(obj.name): obj})
         else:
             raise TypeError(
                 f"Object must be of type {KItem}, {AppConfig} or {KType}, not {type(obj)}. "

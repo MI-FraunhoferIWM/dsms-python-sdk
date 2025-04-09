@@ -54,7 +54,7 @@ class Column(BaseModel):
         Returns:
             List[Any]: List of data for the column.
         """
-        return _get_dataframe_column(self.id, self.column_id)
+        return _get_dataframe_column(Session.dsms, self.id, self.column_id)
 
     def get_unit(self) -> "Dict[str, Any]":
         """

@@ -6,6 +6,7 @@ import random
 import re
 import string
 import time
+import warnings
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
@@ -556,7 +557,8 @@ def _commit(buffers: "Buffers") -> None:
     logger.debug("Committing KItems in buffers. Current buffers:")
     logger.debug("Current Addded-buffer: %s", buffers.added)
     logger.debug("Current Deleted-buffer: %s", buffers.deleted)
-    for obj in buffers.added:
+    had_ktypes = False
+    for obj in buffers.added.values():
         if isinstance(obj, KItem):
             old_kitem = _get_kitem(
                 obj.dsms, obj.id, as_json=True, raise_error=False
@@ -594,6 +596,7 @@ def _commit(buffers: "Buffers") -> None:
             if not old_ktype:
                 _create_new_ktype(obj)
             _update_ktype(obj.dsms, obj)
+            had_ktypes = True
 
         elif isinstance(obj, AppConfig):
             _create_or_update_app_spec(obj, overwrite=True)
@@ -603,7 +606,7 @@ def _commit(buffers: "Buffers") -> None:
             )
         if Session.dsms.config.auto_refresh:
             obj.refresh()
-    for obj in buffers.deleted:
+    for obj in buffers.deleted.values():
         if isinstance(obj, KItem):
             _delete_dataframe(obj)
             _delete_kitem(obj)
@@ -613,11 +616,13 @@ def _commit(buffers: "Buffers") -> None:
             isinstance(obj, Enum) and isinstance(obj.value, KType)
         ):
             _delete_ktype(obj)
+            had_ktypes = True
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed or deleted."
             )
-
+    if Session.dsms.config.auto_refresh and had_ktypes:
+        Session.dsms.refresh_ktypes()
     logger.debug("Committing successful, clearing buffers.")
 
 
@@ -974,8 +979,13 @@ def _map_data_type_to_widget(value):
                 f"More than one widget type detected from data ({value}): {types} "
             )
         if len(types) == 0:
-            raise ValueError(f"No widget type detected from data ({value}).")
-        widget = types.pop()
+            warnings.warn(
+                f"No widget type detected from data ({value}). Will set a default type: TEXT."
+            )
+            widget = Widget.TEXT.value
+            dtype = str
+        else:
+            widget = types.pop()
     else:
         dtype = type(value)
         if isinstance(value, str):

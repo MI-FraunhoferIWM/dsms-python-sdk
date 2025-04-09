@@ -484,6 +484,12 @@ class KItem(BaseModel):
                 f"{type(value)}: {value}"
             )
         if value:
+            if len(value.sections) == 0:
+                warnings.warn(
+                    "No sections were found in the custom properties. "
+                    "Will be set to None."
+                )
+                value = None
             for section in value.sections:
                 for entry in section.entries:
                     entry.kitem_id = kitem_id

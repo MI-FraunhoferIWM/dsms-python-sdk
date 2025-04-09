@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Set
+    from typing import Any, Dict, Optional
 
     from dsms.core.dsms import DSMS
     from dsms.knowledge.kitem import KItem
@@ -12,15 +12,15 @@ if TYPE_CHECKING:
 class Buffers:
     """Buffers of KItems for synchronization with the DSMS backend"""
 
-    added: "Set[KItem]" = set()
+    added: "Dict[str, KItem]" = {}
 
-    deleted: "Set[KItem]" = set()
+    deleted: "Dict[str, KItem]" = {}
 
     @classmethod
     def clear(cls):
         """Clear all buffers of KItems for synchronization with the DSMS backend"""
-        cls.added = set()
-        cls.deleted = set()
+        cls.added = {}
+        cls.deleted = {}
 
 
 class Session:

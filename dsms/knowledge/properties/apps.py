@@ -111,7 +111,7 @@ class App(BaseModel):
         if expose_sdk_config:
             kwargs[
                 "access_token"
-            ] = self.session.dsms.config.token.get_secret_value()
+            ] = Session.dsms.config.token.get_secret_value()
 
         response = _perform_request(
             Session.dsms,
