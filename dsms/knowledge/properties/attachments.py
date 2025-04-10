@@ -36,9 +36,11 @@ class Attachment(BaseModel):
         from_attributes=True,
     )
 
+    # OVERRIDE
     def __repr__(self) -> str:
         return str(self)
 
+    # OVERRIDE
     def __str__(self) -> str:
         return print_model(self, "attachment", exclude_extra={"id"})
 

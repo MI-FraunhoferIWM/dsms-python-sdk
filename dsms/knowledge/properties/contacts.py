@@ -34,3 +34,6 @@ class ContactInfo(BaseModel):
     # OVERRIDE
     def __str__(self) -> str:
         return print_model(self, "contact")
+
+    def __repr__(self) -> str:
+        return self.__str__()

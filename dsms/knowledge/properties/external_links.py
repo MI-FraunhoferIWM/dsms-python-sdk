@@ -17,8 +17,13 @@ class ExternalLink(BaseModel):
         ..., description="URL of the external link"
     )
 
+    # OVERRIDE
     def __str__(self):
         return print_model(self, "external_link")
+
+    # OVERRIDE
+    def __repr__(self) -> str:
+        return str(self)
 
     @field_validator("url")
     @classmethod

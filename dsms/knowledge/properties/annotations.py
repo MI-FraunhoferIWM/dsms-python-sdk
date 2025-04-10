@@ -25,6 +25,10 @@ class Annotation(BaseModel):
     def __str__(self) -> str:
         return print_model(self, "annotation")
 
+    # OVERRIDE
+    def __repr__(self) -> str:
+        return str(self)
+
 
 class AnnotationList(list):
     """KItemPropertyList for Annotations"""

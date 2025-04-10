@@ -14,6 +14,7 @@ class Summary(BaseModel):
     def __str__(self):
         return print_model(self, "summary")
 
+    # OVERIDE
     def __repr__(self) -> str:
         """Pretty print the custom properties"""
         return str(self)

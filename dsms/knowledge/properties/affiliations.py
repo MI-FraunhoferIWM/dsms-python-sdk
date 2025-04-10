@@ -15,3 +15,7 @@ class Affiliation(BaseModel):
     # OVERRIDE
     def __str__(self) -> str:
         return print_model(self, "affiliation")
+
+    # OVERRIDE
+    def __repr__(self) -> str:
+        return str(self)
