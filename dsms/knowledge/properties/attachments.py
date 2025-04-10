@@ -2,19 +2,25 @@
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
+from uuid import UUID
 
-from pydantic import ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
-from dsms.knowledge.properties.utils import _str_to_dict
+from dsms.core.session import Session
 from dsms.knowledge.utils import _get_attachment, print_model
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Iterable, List
+    from typing import List
 
 
-class Attachment(KItemProperty):
+class Attachment(BaseModel):
     """Attachment uploaded by a  certain user."""
+
+    id: UUID = Field(
+        None,
+        description="ID of the attachment",
+        exclude=True,
+    )
 
     name: str = Field(
         ..., description="File name of the attachment", max_length=100
@@ -24,7 +30,6 @@ class Attachment(KItemProperty):
         None, description="Content of the file", exclude=True
     )
 
-    # OVERRIDE
     model_config = ConfigDict(
         exclude={"id", "content"},
         populate_by_name=True,
@@ -32,70 +37,26 @@ class Attachment(KItemProperty):
     )
 
     # OVERRIDE
+    def __repr__(self) -> str:
+        return str(self)
+
+    # OVERRIDE
     def __str__(self) -> str:
-        return print_model(self, "attachment")
+        return print_model(self, "attachment", exclude_extra={"id"})
 
     def download(self, as_bytes: bool = False) -> "Union[str, bytes]":
         """Download attachment file"""
         if not self.content:
-            content = _get_attachment(self.id, self.name, as_bytes)
+            content = _get_attachment(
+                Session.dsms, self.id, self.name, as_bytes
+            )
         else:
             content = self.content
         return content
 
 
-class AttachmentsProperty(KItemPropertyList):
+class AttachmentList(list):
     """KItemPropertyList for managing attachments."""
-
-    # OVERRIDE
-    @property
-    def k_property_item(self) -> "Callable":
-        return Attachment
-
-    # OVERRIDE
-    @property
-    def k_property_helper(self) -> "Callable":
-        """Helper for constructing attachment property"""
-        return _str_to_dict
-
-    def extend(self, iterable: "Iterable") -> None:
-        """Extend KItemPropertyList with list of KItemProperty"""
-        from dsms import KItem
-
-        to_extend = []
-        for item in iterable:
-            if isinstance(item, (list, tuple)):
-                for subitem in item:
-                    item = self._check_item(subitem)
-                    if not Path(item.name).stem in self.by_name:
-                        to_extend.append(item)
-            elif isinstance(item, (dict, KItemProperty, KItem)):
-                item = self._check_item(item)
-                if not Path(item.name).stem in self.by_name:
-                    to_extend.append(item)
-            else:
-                if not Path(item.name).stem in self.by_name:
-                    to_extend.append(item)
-        if to_extend:
-            self._mark_as_updated()
-            super().extend(to_extend)
-
-    def append(self, item: "Union[Dict, Any]") -> None:
-        """Append KItemProperty to KItemPropertyList"""
-
-        item = self._check_item(item)
-
-        if not Path(item.name).stem in self.by_name:
-            self._mark_as_updated()
-            super().append(item)
-
-    def insert(self, index: int, item: "Union[Dict, Any]") -> None:
-        """Insert KItemProperty at KItemPropertyList at certain index"""
-
-        item = self._check_item(item)
-        if not Path(item.name).stem in self.by_name:
-            self._mark_as_updated()
-            super().insert(index, item)
 
     @property
     def by_name(self) -> "List[str]":

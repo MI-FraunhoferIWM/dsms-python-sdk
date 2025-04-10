@@ -1,18 +1,11 @@
 """Affiliation property of a KItem"""
 
-from typing import TYPE_CHECKING
+from pydantic import BaseModel, Field
 
-from pydantic import Field
-
-from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
-from dsms.knowledge.properties.utils import _str_to_dict
 from dsms.knowledge.utils import print_model
 
-if TYPE_CHECKING:
-    from typing import Callable
 
-
-class Affiliation(KItemProperty):
+class Affiliation(BaseModel):
     """Affiliation of a KItem."""
 
     name: str = Field(
@@ -23,16 +16,6 @@ class Affiliation(KItemProperty):
     def __str__(self) -> str:
         return print_model(self, "affiliation")
 
-
-class AffiliationsProperty(KItemPropertyList):
-    """Affiliations property"""
-
     # OVERRIDE
-    @property
-    def k_property_item(self) -> "Callable":
-        return Affiliation
-
-    @property
-    def k_property_helper(self) -> "Callable":
-        """Affiliation property helper"""
-        return _str_to_dict
+    def __repr__(self) -> str:
+        return str(self)

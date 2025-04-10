@@ -80,8 +80,16 @@ class Configuration(BaseSettings):
         when the token is expired.""",
     )
 
-    ping_dsms: bool = Field(
-        True, description="Check whether the host is a DSMS instance or not."
+    auto_refresh: bool = Field(
+        True,
+        description="""Whether to automatically refresh KItems,
+        KTypes and AppConfigs after commiting""",
+    )
+
+    ping_backend: bool = Field(
+        True,
+        description="Check whether the host is a DSMS instance or not.",
+        alias=AliasChoices("ping_dsms", "ping_backend", "ping"),
     )
 
     auto_fetch_ktypes: bool = Field(
@@ -109,11 +117,6 @@ class Configuration(BaseSettings):
     encoding: str = Field(
         "utf-8",
         description="General encoding to be used for reading/writing serializations.",
-    )
-
-    datetime_format: str = Field(
-        "%Y-%m-%dT%H:%M:%S.%f",
-        description="Datetime format used in the DSMS instance.",
     )
 
     display_units: bool = Field(

@@ -19,9 +19,9 @@ The schema contains complex types and references, indicating an advanced usage s
 | Updated At        | Timestamp of when the KItem was updated.                                                                | Union[string, datetime]                              | `None`   | `updated_at`       | Automatically generated          |
 | Avatar | The avatar of the KItem. | Union[[Avatar](#avatar-fields), Dict[str, Any]] | `None`   | `avatar`           | Optional          |
 | Avatar Exists     | Whether the KItem holds an avatar or not.                                                               | boolean                                              | `False`  | `avatar_exists`    | Automatically generated          |
-| Custom Properties | A set of custom properties related to the KItem.                                                        | Any                                               | `None`     | `custom_properties`| Optional          |
+| KItemCustomPropertiesModel(#kitemcustompropertiesmodel) | A set of custom properties related to the KItem.                                                        | Any                                               | `None`     | `custom_properties`| Optional          |
 | Summary           | A brief human-readable summary of the KItem                                                             | string                              | `None`   | `summary`          | Optional          |
-| KItem Apps        | A list of applications associated with the KItem                                                        | List[[App](#app-fields)]                                         | `[ ]`    | `kitem_apps`       | Optional          |
+| Apps        | A list of applications associated with the KItem                                                        | List[[App](#app-fields)]                                         | `[ ]`    | `apps`       | Optional          |
 | Annotations       | A list of annotations related to the KItem                                                              | List[[Annotation](#annotation-fields)]                                  | `[ ]`    | `annotations`      | Optional          |
 | Affiliations      | A list of affiliations associated with the KItem                                                        | List[[Affiliation](#affiliation-fields)]                                 | `[ ]`    | `affiliations`     | Optional          |
 | Contacts          | Contact information related to the KItem                                                                | List[[ContactInfo](#contactinfo-fields)]                                 | `[ ]`    | `contacts`         | Optional          |
@@ -40,7 +40,7 @@ item = KItem(
     ktype_id="Testing Machine",
     custom_properties={"location": "Room01", "max_force": "100Pa"},
     summary="This is a summary",
-    kitem_apps=[
+    apps=[
         {"executable": "my_analysis_file",
         "title": "Analysis",
         "description": "Analysis the tensile strength from machine data"}
@@ -77,7 +77,7 @@ item = KItem(
 
 ### Example Usage
 ```python
-sample_kitem.kitem_apps = [{
+sample_kitem.apps = [{
     "executable": "my_application",
     "title": "My Application",
     "description": "My Application for analysis.",
@@ -93,7 +93,7 @@ sample_kitem.kitem_apps = [{
 
 ### Example Usage
 ```python
-item.kitem_apps = [
+item.apps = [
         {
             "executable": "my_yaml_file",
             "title": "Data2RDF",
@@ -270,3 +270,73 @@ sample_kitem.user_groups = [
     }
 ]
 ```
+
+## KItemCustomPropertiesModel
+
+| Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
+|:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
+| Sections          | Sections of custom properties     | List of [CustomPropertiesSection](#custompropertiessection-fields) | `[]`  | `sections`         | Optional           |
+
+
+
+## CustomPropertiesSection Fields
+
+| Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
+|:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
+| Id                | Id of the section                 | string or null | `None` | `id`               | Optional           |
+| Name              | Name of the section               | string    | `None`  | `name`             | Required           |
+| Entries           | Entries of the section            | List of [Entry](#entry-fields) | `[]`  | `entries`          | Optional           |
+
+## Entry Fields
+
+| Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
+|:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
+| Id                | Id of the entry                   | string    | `None`  | `id`               | Optional          |
+| Type              | Type of the entry                 | [Widget](#widget-fields) or null | `None`  | `type`             | Optional          |
+| Label             | Label of the entry                | string    | `None`  | `label`            | Required          |
+| Value             | Value of the entry                | any or null | `None`  | `value`            | Optional          |
+| Measurement Unit  | Measurement unit of the entry     | [MeasurementUnit](#measurementunit-fields) or null | `None`  | `measurementUnit`  | Optional          |
+| Relation Mapping  | Relation mapping of the entry     | [RelationMapping](#relationmapping-fields) or null | `None`  | `relationMapping`  | Optional          |
+| Required          | Required input                    | boolean or null | `False` | `required`         | Optional          |
+| KItem ID          | ID of the knowledge item          | string or null | `None`  | `kitemId`          | Optional          |
+
+## MeasurementUnit Fields
+
+| Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
+|:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
+| IRI               | IRI of the measurement unit       | string or null | `None`  | `iri`              | Optional          |
+| Label             | Label of the measurement unit     | string or null | `None`  | `label`            | Optional          |
+| Symbol            | Symbol of the measurement unit    | string or null | `None`  | `symbol`           | Optional          |
+| Namespace         | Namespace of the measurement unit | string or null | `None`  | `namespace`        | Optional          |
+
+## RelationMapping Fields
+
+| Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
+|:-----------------:|:---------------------------------:|:--------:|:-------:|:------------------:|:-----------------:|
+| IRI               | IRI of the annotation             | string or null | `None`  | `iri`              | Optional          |
+| Type              | Type of the annotation            | [RelationMappingType](#relationmappingtype-fields) or null | `None`  | `type`             | Optional          |
+| Class IRI         | Class IRI for object properties   | string or null | `None`  | `classIri`         | Optional          |
+
+## RelationMappingType Fields
+
+| Value                | Description            |
+|:--------------------:|:----------------------:|
+| `object_property`    | Object property type   |
+| `data_property`      | Data property type     |
+| `annotation_property`| Annotation property type|
+| `property`           | General property type  |
+
+## Widget Fields
+
+| Value           | Description                      |
+|:---------------:|:--------------------------------:|
+| `Text`          | Text input widget                |
+| `File`          | File input widget                |
+| `Textarea`      | Multiline text input widget      |
+| `Number`        | Numeric input widget             |
+| `Slider`        | Slider input widget              |
+| `Checkbox`      | Checkbox input widget            |
+| `Select`        | Dropdown select widget           |
+| `Radio`         | Radio button widget              |
+| `Knowledge item`| Knowledge item selector widget   |
+| `Multi-select`  | Multi-select widget              |

@@ -13,67 +13,70 @@ from rdflib import Graph
 
 from pydantic import (  # isort:skip
     BaseModel,
+    AliasChoices,
     ConfigDict,
     Field,
     ValidationInfo,
     field_validator,
-    model_validator,
     field_serializer,
 )
 
 from dsms.core.logging import handler  # isort:skip
 
+from dsms.core.session import Session  # isort:skip
+
 from dsms.knowledge.properties import (  # isort:skip
     Affiliation,
-    AffiliationsProperty,
     Annotation,
-    AnnotationsProperty,
+    AnnotationList,
     App,
-    AppsProperty,
+    AppList,
     Avatar,
     Attachment,
-    AttachmentsProperty,
+    AttachmentList,
     Author,
-    AuthorsProperty,
     ContactInfo,
-    ContactsProperty,
     ExternalLink,
-    ExternalLinksProperty,
-    KItemPropertyList,
     DataFrameContainer,
     Column,
     LinkedKItem,
-    LinkedKItemsProperty,
+    LinkedKItemsList,
     Summary,
     UserGroup,
-    UserGroupsProperty,
 )
 
 from dsms.knowledge.ktype import KType  # isort:skip
 
 from dsms.knowledge.utils import (  # isort:skip
-    _kitem_exists,
-    _get_kitem,
-    _slug_is_available,
     _slugify,
     _inspect_dataframe,
     _make_annotation_schema,
     _refresh_kitem,
     _transform_custom_properties_schema,
     print_model,
+    _map_data_type_to_widget,
 )
 
 from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
 
-from dsms.knowledge.webform import KItemCustomPropertiesModel  # isort:skip
+from dsms.knowledge.webform import (  # isort:skip
+    Entry,
+    Input,
+    KItemCustomPropertiesModel,
+    KnowledgeItemReference,
+    WebformSelectOption,
+    WebformSelectOptionEntry,
+    Widget,
+)
 
 if TYPE_CHECKING:
-    from dsms import Session
     from dsms.core.dsms import DSMS
 
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.propagate = False
+
+DATETIME_FRMT = "%Y-%m-%dT%H:%M:%S.%f"
 
 
 class KItem(BaseModel):
@@ -109,7 +112,7 @@ class KItem(BaseModel):
             Time and date when the KItem was updated.
         external_links (List[ExternalLink]):
             External links related to the KItem.
-        kitem_apps (List[App]): Apps related to the KItem.
+        apps (List[App]): Apps related to the KItem.
         summary (Optional[Union[str, Summary]]):
             Human readable summary text of the KItem.
         user_groups (List[UserGroup]):
@@ -121,6 +124,7 @@ class KItem(BaseModel):
     """
 
     # public
+
     name: str = Field(
         ..., description="Human readable name of the KItem", max_length=300
     )
@@ -131,10 +135,6 @@ class KItem(BaseModel):
     ktype_id: Union[Enum, str] = Field(..., description="Type ID of the KItem")
     ktype: Optional[Union[Enum, KType]] = Field(
         None, description="KType of the KItem", exclude=True
-    )
-    in_backend: bool = Field(
-        False,
-        description="Whether the KItem was already created in the backend.",
     )
     slug: Optional[str] = Field(
         None,
@@ -177,7 +177,11 @@ class KItem(BaseModel):
         [],
         description="External links related to the KItem",
     )
-    kitem_apps: List[App] = Field([], description="Apps related to the KItem.")
+    apps: List[App] = Field(
+        [],
+        description="Apps related to the KItem.",
+        alias=AliasChoices("kitem_apps", "apps"),
+    )
     summary: Optional[Union[str, Summary]] = Field(
         None, description="Human readable summary text of the KItem."
     )
@@ -185,7 +189,7 @@ class KItem(BaseModel):
         [],
         description="User groups able to access the KItem.",
     )
-    custom_properties: Optional[Any] = Field(
+    custom_properties: Optional[Union[KItemCustomPropertiesModel]] = Field(
         None, description="Custom properties associated to the KItem"
     )
 
@@ -197,7 +201,7 @@ class KItem(BaseModel):
         False, description="Whether the KItem holds an RDF Graph or not."
     )
 
-    avatar: Optional[Union[Avatar, Dict]] = Field(
+    avatar: Optional[Avatar] = Field(
         default_factory=Avatar, description="KItem avatar interface"
     )
 
@@ -210,47 +214,22 @@ class KItem(BaseModel):
 
     def __init__(self, **kwargs: "Any") -> None:
         """Initialize the KItem"""
-        from dsms import DSMS
 
         logger.debug("Initialize KItem with model data: %s", kwargs)
 
         # set dsms instance if not already done
         if not self.dsms:
-            self.dsms = DSMS()
+            raise ValueError(
+                "DSMS instance not set. Please call DSMS() before initializing a KItem."
+            )
 
         # initialize the kitem
         super().__init__(**kwargs)
 
-        # add kitem to buffer
-        if not self.in_backend and self.id not in self.session.buffers.created:
-            logger.debug(
-                "Marking KItem with ID `%s` as created and updated during KItem initialization.",
-                self.id,
-            )
-            self.session.buffers.created.update({self.id: self})
-            self.session.buffers.updated.update({self.id: self})
-
-        self._set_kitem_for_properties()
+        if str(self.id) not in self.dsms.session.kitems:
+            self.dsms.session.kitems[str(self.id)] = self
 
         logger.debug("KItem initialization successful.")
-
-    def __setattr__(self, name, value) -> None:
-        """Add kitem to updated-buffer if an attribute is set"""
-        super().__setattr__(name, value)
-        logger.debug(
-            "Setting property with key `%s` on KItem level: %s.", name, value
-        )
-        self._set_kitem_for_properties()
-
-        if (
-            self.id not in self.session.buffers.updated
-            and not name.startswith("_")
-        ):
-            logger.debug(
-                "Setting KItem with ID `%s` as updated during KItem.__setattr__",
-                self.id,
-            )
-            self.session.buffers.updated.update({self.id: self})
 
     def __str__(self) -> str:
         """Pretty print the kitem fields"""
@@ -264,27 +243,6 @@ class KItem(BaseModel):
 
     def __hash__(self) -> int:
         return hash(str(self))
-
-    @field_validator("affiliations", mode="before")
-    @classmethod
-    def validate_affiliations_before(
-        cls, value: List[Union[str, Affiliation]]
-    ) -> List[Affiliation]:
-        """Validate affiliations Field"""
-        return [
-            Affiliation(name=affiliation)
-            if isinstance(affiliation, str)
-            else affiliation
-            for affiliation in value
-        ]
-
-    @field_validator("affiliations", mode="after")
-    @classmethod
-    def validate_affiliation_after(
-        cls, value: List[Affiliation]
-    ) -> AffiliationsProperty:
-        """Validate affiliations Field"""
-        return AffiliationsProperty(value)
 
     @field_validator("annotations", mode="before")
     @classmethod
@@ -303,9 +261,9 @@ class KItem(BaseModel):
     @classmethod
     def validate_annotations_after(
         cls, value: List[Annotation]
-    ) -> AnnotationsProperty:
+    ) -> AnnotationList:
         """Validate annotations Field"""
-        return AnnotationsProperty(value)
+        return AnnotationList(value)
 
     @field_validator("attachments", mode="before")
     @classmethod
@@ -323,72 +281,44 @@ class KItem(BaseModel):
     @field_validator("attachments", mode="after")
     @classmethod
     def validate_attachments_after(
-        cls, value: List[Attachment]
-    ) -> AttachmentsProperty:
+        cls, value: List[Attachment], info: ValidationInfo
+    ) -> AttachmentList:
         """Validate attachments Field"""
-        return AttachmentsProperty(value)
+        kitem_id = info.data["id"]
+        if value:
+            for attachment in value:
+                attachment.id = kitem_id
+        return AttachmentList(value)
 
-    @field_validator("kitem_apps", mode="after")
+    @field_validator("apps", mode="after")
     @classmethod
-    def validate_apps(cls, value: List[App]) -> AppsProperty:
+    def validate_apps(cls, value: List[App], info: ValidationInfo) -> AppList:
         """Validate apps Field"""
-        return AppsProperty(value)
-
-    @field_validator("authors")
-    @classmethod
-    def validate_authors(cls, value: List[Author]) -> AuthorsProperty:
-        """Validate authors Field"""
-        return AuthorsProperty(
-            [
-                Author(user_id=author) if isinstance(author, str) else author
-                for author in value
-            ]
-        )
-
-    @field_validator("contacts", mode="after")
-    @classmethod
-    def validate_contacts(cls, value: List[ContactInfo]) -> ContactsProperty:
-        """Validate contacts Field"""
-        return ContactsProperty(value)
-
-    @field_validator("external_links", mode="after")
-    @classmethod
-    def validate_external_links(
-        cls, value: List[ExternalLink]
-    ) -> ExternalLinksProperty:
-        """Validate external links Field"""
-        return ExternalLinksProperty(value)
+        kitem_id = info.data["id"]
+        if value:
+            for app in value:
+                app.id = kitem_id
+        return AppList(value)
 
     @field_validator("linked_kitems", mode="before")
     @classmethod
     def validate_linked_kitems_list(
-        cls, value: "List[Union[Dict, KItem, Any]]", info: ValidationInfo
+        cls,
+        value: "List[Union[LinkedKItem, KItem]]",
     ) -> List[LinkedKItem]:
         """Validate each single kitem to be linked"""
-        src_id = info.data.get("id")
         linked_kitems = []
+        logger.debug("Found KItem to link: %s", value)
         for item in value:
             if isinstance(item, dict):
-                dest_id = item.get("id")
-                if not dest_id:
-                    raise ValueError("Linked KItem is missing `id`")
-                linked_model = _get_kitem(dest_id, as_json=True)
-            elif isinstance(item, KItem):
-                dest_id = item.id
-                linked_model = item.model_dump()
+                item = LinkedKItem(**item)
+            elif isinstance(item, BaseModel):
+                item = LinkedKItem(**item.model_dump())
             else:
-                try:
-                    dest_id = getattr(item, "id")
-                    linked_model = _get_kitem(dest_id, as_json=True)
-                except AttributeError as error:
-                    raise AttributeError(
-                        f"Linked KItem `{item}` has no attribute `id`."
-                    ) from error
-            if str(src_id) == str(dest_id):
-                raise ValueError(
-                    f"Cannot link KItem with ID `{src_id}` to itself!"
+                raise TypeError(
+                    "Expected either a LinkedKItem or a KItem to be linked."
                 )
-            linked_kitems.append(LinkedKItem(**linked_model))
+            linked_kitems.append(item)
         return linked_kitems
 
     @field_validator("linked_kitems", mode="after")
@@ -396,47 +326,32 @@ class KItem(BaseModel):
     def validate_linked_kitems(
         cls,
         value: List[LinkedKItem],
-    ) -> LinkedKItemsProperty:
+    ) -> LinkedKItemsList:
         """Validate the list out of linked KItems"""
-        return LinkedKItemsProperty(value)
-
-    @field_validator("user_groups", mode="after")
-    @classmethod
-    def validate_user_groups(
-        cls, value: List[UserGroup]
-    ) -> UserGroupsProperty:
-        """Validate user groups Field"""
-        return UserGroupsProperty(value)
+        return LinkedKItemsList(value)
 
     @field_validator("created_at")
     @classmethod
     def validate_created(cls, value: str) -> Any:
         """Convert the str for `created_at` in to a `datetime`-object"""
-        from dsms import Session
 
         if isinstance(value, str):
-            value = datetime.strptime(
-                value, Session.dsms.config.datetime_format
-            )
+            value = datetime.strptime(value, DATETIME_FRMT)
         return value
 
     @field_validator("updated_at")
     @classmethod
     def validate_updated(cls, value: str) -> Any:
         """Convert the str for `created_at` in to a `datetime`-object"""
-        from dsms import Session
 
         if isinstance(value, str):
-            value = datetime.strptime(
-                value, Session.dsms.config.datetime_format
-            )
+            value = datetime.strptime(value, DATETIME_FRMT)
         return value
 
     @field_validator("ktype_id")
     @classmethod
     def validate_ktype_id(cls, value: Union[str, Enum]) -> KType:
         """Validate the ktype id of the KItem"""
-        from dsms import Session
 
         if isinstance(value, str):
             ktype = Session.ktypes.get(value)
@@ -458,7 +373,6 @@ class KItem(BaseModel):
         cls, value: Optional[Union[KType, Enum]], info: ValidationInfo
     ) -> KType:
         """Validate the ktype of the KItem"""
-        from dsms import Session
 
         ktype_id = info.data.get("ktype_id")
 
@@ -481,27 +395,13 @@ class KItem(BaseModel):
 
         return value
 
-    @field_validator("in_backend")
-    @classmethod
-    def validate_in_backend(cls, value: bool, info: ValidationInfo) -> bool:
-        """Checks whether the kitem already exists"""
-        kitem_id = info.data["id"]
-        if not value:
-            value = _kitem_exists(kitem_id)
-        return value
-
     @field_validator("slug")
     @classmethod
     def validate_slug(cls, value: str, info: ValidationInfo) -> str:
         """Validate slug"""
-        from dsms import Session
 
-        ktype_id = info.data["ktype_id"]
         kitem_id = info.data["id"]
         name = info.data["name"]
-        kitem_exists = info.data.get("in_backend")
-        if not isinstance(kitem_exists, bool):
-            kitem_exists = cls.in_backend
 
         if not value:
             value = _slugify(name)
@@ -511,8 +411,6 @@ class KItem(BaseModel):
                 )
             if Session.dsms.config.individual_slugs:
                 value += f"-{str(kitem_id).split('-', maxsplit=1)[0]}"
-        if not kitem_exists and not _slug_is_available(ktype_id, value):
-            raise ValueError(f"Slug for `{value}` is already taken.")
         return value
 
     @field_validator("summary")
@@ -520,15 +418,7 @@ class KItem(BaseModel):
     def validate_summary(cls, value: Union[str, Summary]) -> Summary:
         """Check whether the summary is a string or the dedicated model"""
         if isinstance(value, str):
-            value = Summary(kitem=cls, text=value)
-        return value
-
-    @field_validator("avatar", mode="before")
-    @classmethod
-    def validate_avatar(cls, value: "Union[Dict, Avatar]") -> Avatar:
-        """Validate avatar"""
-        if isinstance(value, dict):
-            value = Avatar(kitem=cls, **value)
+            value = Summary(text=value)
         return value
 
     @field_validator("dataframe")
@@ -548,48 +438,349 @@ class KItem(BaseModel):
             else:
                 dataframe = pd.DataFrame.from_dict(value)
         else:
-            columns = _inspect_dataframe(kitem_id)
+            columns = _inspect_dataframe(Session.dsms, kitem_id)
+            logger.debug("Found columns: %s", columns)
             if columns:
                 dataframe = DataFrameContainer(
-                    [Column(**column) for column in columns]
+                    [Column(id=kitem_id, **column) for column in columns]
                 )
             else:
                 dataframe = None
         return dataframe
 
-    @model_validator(mode="after")
+    @field_validator("custom_properties", mode="before")
     @classmethod
-    def validate_custom_properties(cls, self: "KItem") -> "KItem":
+    def validate_custom_properties(
+        cls,
+        value: Optional[Union[KItemCustomPropertiesModel, Dict[str, Any]]],
+        info: ValidationInfo,
+    ) -> "Optional[KItemCustomPropertiesModel]":
         """Validate custom properties"""
 
-        if isinstance(self.custom_properties, dict):
-            value = (
-                self.custom_properties.get("content") or self.custom_properties
-            )
+        kitem_id = info.data["id"]
+        ktype = info.data["ktype"]
 
-            if not value.get("sections"):
-                value = _transform_custom_properties_schema(
-                    value, self.ktype.webform
+        logger.debug("Received custom properties: %s", value)
+
+        if isinstance(value, dict):
+            logger.debug(
+                "Converting custom properties to KItemCustomPropertiesModel"
+            )
+            value = value.get("content") or value
+            if not isinstance(value, dict):
+                raise TypeError(
+                    "Custom properties must be either a dictionary or a "
+                    "KItemCustomPropertiesModel. Not a "
+                    f"{type(value)}: {value}"
                 )
+            if not value.get("sections"):
                 warnings.warn(
                     """A flat dictionary was provided for custom properties.
                     Will be transformed into `KItemCustomPropertiesModel`."""
                 )
-            was_in_buffer = self.id in self.session.buffers.updated
-            self.custom_properties = KItemCustomPropertiesModel(
-                **value, kitem=self
-            )
-            if not was_in_buffer:
-                self.session.buffers.updated.pop(self.id)
-        elif not isinstance(
-            self.custom_properties, (KItemCustomPropertiesModel, type(None))
-        ):
+                value = _transform_custom_properties_schema(
+                    value, ktype.webform
+                )
+            value = KItemCustomPropertiesModel(**value)
+        elif not isinstance(value, (KItemCustomPropertiesModel, type(None))):
             raise TypeError(
                 "Custom properties must be either a dictionary or a "
                 "KItemCustomPropertiesModel. Not a "
-                f"{type(self.custom_properties)}: {self.custom_properties}"
+                f"{type(value)}: {value}"
             )
-        return self
+        if value:
+            if len(value.sections) == 0:
+                warnings.warn(
+                    "No sections were found in the custom properties. "
+                    "Will be set to None."
+                )
+                value = None
+            for section in value.sections:
+                for entry in section.entries:
+                    entry.kitem_id = kitem_id
+                    cls.validate_custom_property_entry(entry, ktype)
+        return value
+
+    @classmethod
+    def validate_custom_property_entry(
+        cls, entry: "Entry", ktype: "KType"
+    ) -> "Entry":
+        """
+        Validate the custom property entries within a KItem.
+
+        This method checks if the entry's configuration aligns with the defined
+        webform specification for the corresponding knowledge type. It validates
+        the entry type, default values, select options, and ensures the value
+        conforms to the specified data type and constraints. Warnings or errors
+        are raised if discrepancies are found, such as missing input specifications,
+        invalid data types, or required values not being set.
+
+        Args:
+            entry (Entry): The custom property entry to validate.
+
+        Returns:
+            Entry: The validated entry with updated type and value information.
+
+        Raises:
+            ValueError: If the entry's configuration does not match the webform
+                        specification or if the entry's value is invalid.
+        """
+
+        spec: "List[Input]" = []
+        if ktype.webform:  # pylint: disable=no-member
+            for section in ktype.webform.sections:  # pylint: disable=no-member
+                for inp in section.inputs:
+                    if inp.id == entry.id:
+                        spec.append(inp)
+
+        logger.debug("Entry label: %s", entry.label)
+        logger.debug("Entry value: %s", entry.value)
+
+        # in this case we assume that a webform was defined for
+        # the knowledge type for this specific entry
+        if spec:
+            logger.debug("Found input spec for entry: %s", entry.label)
+            if len(spec) == 0:
+                raise ValueError(
+                    f"Could not find input spec for entry {entry.label}"
+                )
+            if len(spec) > 1:
+                raise ValueError(
+                    f"Found multiple input specs for entry {entry.label}"
+                )
+            spec = spec.pop()
+            entry.type = spec.widget
+            default_value = spec.value
+            select_options = spec.select_options
+            range_options = spec.range_options
+            knowledge_type = spec.knowledge_type
+            if range_options:
+                is_list = range_options.range
+            else:
+                is_list = False
+            dtype = None
+            logger.debug("Widget type from spec: %s", entry.type)
+        # in this case we assume that a webform was not defined
+        # but the user explicitly set the widget type
+        # this might be e.g. the case when a kitem without a webform
+        # is pulled from the remote backend
+        elif entry.type and not spec:
+            logger.debug("Did not find input spec for entry: %s", entry.label)
+            logger.debug("Using user-provided widget type: %s", entry.type)
+            default_value = None
+            select_options = []
+            knowledge_type = None
+            is_list = None
+            dtype = None
+        # in this case we assume that a webform was not defined
+        # and the user did not explicitly set the widget type
+        # this might be e.g. the case when a new kitem is instanciated
+        # in the session by a flat dict (e.g. {"foo": "bar"})
+        else:
+            logger.debug("Did not find input spec for entry: %s", entry.label)
+            entry.type, is_list, dtype = _map_data_type_to_widget(entry.value)
+            logger.debug("Guessed widget type: %s", entry.type)
+            default_value = None
+            knowledge_type = None
+            select_options = []
+
+        logger.debug("Entry is_list: %s", is_list)
+        if dtype:
+            logger.debug("Guessed data type: %s", dtype)
+
+        choices = {
+            choice.label: choice.model_dump() for choice in select_options
+        } or None
+        logger.debug("Entry choices: %s", choices)
+
+        # if the widget not is guessed from the data type,
+        # check if widget is mapped to the correct data type
+        if not dtype:
+            logger.debug("Guessing data type from widget type")
+            if entry.type in (
+                Widget.TEXT.value,
+                Widget.FILE.value,
+                Widget.TEXTAREA.value,
+            ):
+                dtype = str
+            elif entry.type in (Widget.NUMBER.value, Widget.SLIDER.value):
+                dtype = (int, float)
+            elif entry.type == Widget.CHECKBOX.value:
+                dtype = bool
+            elif entry.type in (
+                Widget.SELECT.value,
+                Widget.RADIO.value,
+                Widget.MULTI_SELECT.value,
+            ):
+                if entry.type == Widget.MULTI_SELECT.value:
+                    is_list = True
+                dtype = WebformSelectOption
+            elif entry.type == Widget.KNOWLEDGE_ITEM.value:
+                dtype = (type(cls), KnowledgeItemReference, dict)
+                is_list = True
+            else:
+                raise ValueError(
+                    f"Widget type is not mapped to a data type: {entry.type}"
+                )
+
+            logger.debug("Guessed data type: %s", dtype)
+
+        # check if value is set
+        if entry.value is None and default_value is not None:
+            logger.debug(
+                "Value is not set, setting default value: %s", default_value
+            )
+            entry.value = default_value
+
+        # check whether strict validation is enabled
+        if Session.dsms.config.strict_validation:
+            # special case for webform select options
+            if (
+                entry.type
+                in (
+                    Widget.SELECT.value,
+                    Widget.RADIO.value,
+                    Widget.MULTI_SELECT.value,
+                )
+                and entry.value is not None
+            ):
+                error_message = (
+                    """Value `{}` is not a valid select option.
+                Valid options are: """
+                    + str(list(choices.keys()))
+                    + "\n"
+                )
+                if not select_options:
+                    raise ValueError(
+                        f"Widget of type `{entry.type}` does not have select options."
+                    )
+                if isinstance(entry.value, str):
+                    if entry.value not in choices:
+                        raise ValueError(error_message.format(entry.value))
+                    entry.value = WebformSelectOptionEntry(
+                        **choices[entry.value], value=entry.value
+                    )
+                elif isinstance(entry.value, dict):
+                    entry.value = WebformSelectOptionEntry(**entry.value)
+                    if entry.value.label not in choices:
+                        raise ValueError(
+                            error_message.format(entry.value.label)
+                        )
+
+                elif isinstance(entry.value, list):
+                    chosen = []
+                    is_updated = False
+                    for val in entry.value:
+                        if isinstance(val, str):
+                            if val not in choices:
+                                raise ValueError(error_message.format(val))
+                            val = WebformSelectOptionEntry(
+                                **choices[val], value=val
+                            )
+                            is_updated = True
+                        elif isinstance(val, dict):
+                            val = WebformSelectOptionEntry(**val)
+                            is_updated = True
+                            if val.label not in choices:
+                                raise ValueError(
+                                    error_message.format(val.label)
+                                )
+                        elif not isinstance(val, WebformSelectOptionEntry):
+                            raise ValueError(error_message.format(val))
+                        chosen.append(val)
+                    if is_updated:
+                        entry.value = chosen
+                elif not isinstance(entry.value, WebformSelectOptionEntry):
+                    raise ValueError(error_message.format(entry.value))
+                logger.debug("Value is set to: %s", entry.value)
+
+            # check if value is of correct type
+            error_message = "Value of type {} is invalid."
+            if is_list is True:
+                error_message += f"""
+                Widget of type ´{entry.type}` is requiring a value of type:
+                `List[{dtype}]`.
+                """
+                if entry.value is not None:
+                    if not isinstance(entry.value, list):
+                        raise ValueError(
+                            error_message.format(type(entry.value), dtype)
+                        )
+                    for val in entry.value:
+                        if not isinstance(val, dtype):
+                            raise ValueError(
+                                error_message.format(type(val), dtype)
+                            )
+            elif is_list is False:
+                error_message += f"""
+                Widget of type ´{entry.type}` is requiring a value of type:
+                `{dtype}`."""
+                if entry.value is not None and not isinstance(
+                    entry.value, dtype
+                ):
+                    raise ValueError(
+                        error_message.format(type(entry.value), dtype)
+                    )
+            else:
+                warnings.warn(
+                    f"No webform was defined for entry `{entry.label}`. "
+                    "Cannot check if value is of correct type."
+                )
+
+            # check if value is required
+            logger.debug("Checking if value is required")
+            if (
+                entry.value is None
+                and default_value is None
+                and entry.required
+            ):
+                raise ValueError(f"Value for entry {entry.label} is required")
+
+            # special case for knowledge item
+            if (
+                entry.value is not None
+                and entry.type == Widget.KNOWLEDGE_ITEM.value
+            ):
+                logger.debug("Checking if value is a valid knowledge item")
+                kitems = []
+                is_updated = False
+                if not isinstance(entry.value, list):
+                    raise ValueError(
+                        f"""Value for entry `{entry.label}` for widget of type `knowledge item`
+                        is not a list. Got {type(entry.value)}."""
+                    )
+                for val in entry.value:
+                    if isinstance(val, dict):
+                        val = KnowledgeItemReference(**val)
+                        is_updated = True
+                    if not isinstance(val, KnowledgeItemReference):
+                        val = KnowledgeItemReference(
+                            id=val.id,
+                            name=val.name,
+                            ktype_id=val.ktype_id,
+                            slug=val.slug,
+                        )
+                        is_updated = True
+                    if (
+                        knowledge_type is not None
+                        and val.ktype_id not in knowledge_type
+                    ):
+                        raise ValueError(
+                            f"Knowledge item `{val.name}` is not of type {knowledge_type}."
+                        )
+                    kitems.append(val)
+                if is_updated:
+                    entry.value = kitems
+        else:
+            warnings.warn(
+                """
+                Strict validation is disabled.
+                Will not strictly type check the custom properties.
+                This also will take place when values are re-assigned.
+                """
+            )
+
+        return entry
 
     @field_serializer("custom_properties")
     def _serialize_custom_properties(
@@ -603,54 +794,21 @@ class KItem(BaseModel):
             serialized = None
         return serialized
 
-    def _set_kitem_for_properties(self) -> None:
-        """Set kitem for CustomProperties and KProperties in order to
-        remain the session for the buffer if any of these properties is changed.
-        """
-        for prop in self.__dict__.values():
-            if (
-                isinstance(
-                    prop,
-                    (
-                        KItemPropertyList,
-                        Summary,
-                        Avatar,
-                        KItemCustomPropertiesModel,
-                    ),
-                )
-                and not prop.kitem
-            ):
-                logger.debug(
-                    "Setting kitem with ID `%s` for property `%s` on KItem level",
-                    self.id,
-                    type(prop),
-                )
-                prop.kitem = self
-
     @property
     def dsms(self) -> "DSMS":
         """DSMS session getter"""
         return self.session.dsms
 
-    @dsms.setter
-    def dsms(self, value: "DSMS") -> None:
-        """DSMS session setter"""
-        self.session.dsms = value
-
     @property
     def subgraph(self) -> Optional[Graph]:
         """Getter for Subgraph"""
         return _get_subgraph(
-            self.id, self.dsms.config.kitem_repo, is_kitem_id=True
+            self.dsms, self.id, self.dsms.config.kitem_repo, is_kitem_id=True
         )
 
     @property
     def session(self) -> "Session":
         """Getter for Session"""
-        from dsms import (  # isort:skip
-            Session,
-        )
-
         return Session
 
     @property

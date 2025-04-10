@@ -16,39 +16,41 @@ from dsms.core.logging import handler  # isort:skip
 if TYPE_CHECKING:
     from typing import Any, Callable
 
+    from dsms import DSMS
+
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.propagate = False
 
 
-def _kitem_id2uri(kitem_id: UUID) -> str:
+def _kitem_id2uri(dsms: "DSMS", kitem_id: UUID) -> str:
     "Convert a kitem id in the DSMS to the full resolvable URI"
-    from dsms import Session
-
-    return urljoin(str(Session.dsms.config.host_url), str(kitem_id))
+    return urljoin(str(dsms.config.host_url), str(kitem_id))
 
 
-def _uri2kitem_idi(uri: str) -> str:
+def _uri2kitem_idi(dsms: "DSMS", uri: str) -> str:
     "Extract the kitem id from an URI of the DSMS"
-    from dsms import Session
 
-    return uri.replace(f"{Session.dsms.config.host_url}/", "").split("/")[0]
+    return uri.replace(f"{dsms.config.host_url}/", "").split("/")[0]
 
 
-def _ping_dsms():
+def _ping_backend(dsms: "DSMS") -> Response:
     """General check if the remote DSMS instance is up and running"""
-    return _perform_request("api/knowledge/docs", "get")
+    return _perform_request(dsms, "api/knowledge/docs", "get")
 
 
 def _perform_request(
-    route: str, method: str, retry=True, headers=None, **kwargs: "Any"
+    dsms: "DSMS",
+    route: str,
+    method: str,
+    retry=True,
+    headers=None,
+    **kwargs: "Any",
 ) -> Response:
     """Perform a general request for a certain route and with a certain method.
     Kwargs are general arguments which can be passed to the `requests.request`-function.
     """
-    from dsms import Session
 
-    dsms = Session.dsms
     response = requests.request(
         method,
         url=urljoin(str(dsms.config.host_url), route),
@@ -57,7 +59,7 @@ def _perform_request(
         verify=dsms.config.ssl_verify,
         **kwargs,
     )
-    response.encoding = Session.dsms.config.encoding
+    response.encoding = dsms.config.encoding
     try:
         debug_text = json.dumps(response.json(), indent=2)
     except Exception:
@@ -74,6 +76,7 @@ def _perform_request(
             passwd = dsms.config.password.get_secret_value()
             authorization = f"Basic {username}:{passwd}"
             reauth = _perform_request(
+                dsms,
                 "api/users/token",
                 "get",
                 retry=False,
@@ -88,7 +91,7 @@ def _perform_request(
             else:
                 dsms.config.token = SecretStr(token)
             response = _perform_request(
-                route, method, retry=False, headers=None, **kwargs
+                dsms, route, method, retry=False, headers=None, **kwargs
             )
         else:
             logger.debug("No credentials found for reauthentication.")
