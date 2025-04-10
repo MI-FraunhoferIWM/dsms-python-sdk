@@ -628,7 +628,28 @@ def _commit(buffers: "Buffers") -> None:
 
 def _refresh_kitem(kitem: "KItem") -> None:
     """Refresh the KItem"""
-    kitem.model_validate(_get_kitem(kitem.dsms, kitem.id, as_json=True))
+    # note: in order propperly refresh the same item, we need to fetch the data
+    # from the backend and then revalidate it. However, this leads to the fact
+    # that a new Python-variable would be created for the same KItem instance and the
+    # old variable becomes obsolete. This is somewhat unintuitive for the user.
+    # Hence, we just set the attributes of the validated new instance to the old instance
+    # which is already in our memory. This is somewhat hacky since you will need to
+    # validate twice. However, if the iterate over the `refreshed` instance directly,
+    # the pydantic `AliasChoises` are not taken into consideration. Which means that
+    # e.g. our field `apps` cannot be refreshed and we will receive an error, that
+    # `kitem_apps` (how the field in the backend is called) is not part of the instance,
+    # because the pydantic aliases are only regarded during the model instanciation, not
+    # during attribute-assignment.
+    refreshed = _get_kitem(kitem.dsms, kitem.id, as_json=True)
+    validated = kitem.model_validate(refreshed)
+    for key, value in validated:
+        logger.debug(
+            "Set updated property `%s` for KType with id `%s` after commiting: %s",
+            key,
+            kitem.id,
+            value,
+        )
+        setattr(kitem, key, value)
     dataframe = _inspect_dataframe(kitem.dsms, kitem.id)
     if dataframe:
         kitem.dataframe = [{"id": kitem.id, **column} for column in dataframe]
