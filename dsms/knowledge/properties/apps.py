@@ -163,8 +163,9 @@ class App(BaseModel):
             )
         return response.json()
 
+    # OVERRIDE
     def __str__(self):
-        return print_model(self, "app", exclude_extra={"id"})
+        return print_model(self, "app")
 
     # OVERRIDE
     def __repr__(self) -> str:
