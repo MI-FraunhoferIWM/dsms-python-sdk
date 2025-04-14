@@ -15,6 +15,10 @@ class UserGroup(BaseModel):
         ..., description="ID of the user group", max_length=100
     )
 
-    # OVERWRITE
+    # OVERRIDE
     def __str__(self):
         return print_model(self, "user_group")
+
+    # OVERRIDE
+    def __repr__(self) -> str:
+        return str(self)

@@ -13,6 +13,7 @@ from rdflib import Graph
 
 from pydantic import (  # isort:skip
     BaseModel,
+    AliasChoices,
     ConfigDict,
     Field,
     ValidationInfo,
@@ -111,7 +112,7 @@ class KItem(BaseModel):
             Time and date when the KItem was updated.
         external_links (List[ExternalLink]):
             External links related to the KItem.
-        kitem_apps (List[App]): Apps related to the KItem.
+        apps (List[App]): Apps related to the KItem.
         summary (Optional[Union[str, Summary]]):
             Human readable summary text of the KItem.
         user_groups (List[UserGroup]):
@@ -176,7 +177,11 @@ class KItem(BaseModel):
         [],
         description="External links related to the KItem",
     )
-    kitem_apps: List[App] = Field([], description="Apps related to the KItem.")
+    apps: List[App] = Field(
+        [],
+        description="Apps related to the KItem.",
+        alias=AliasChoices("kitem_apps", "apps"),
+    )
     summary: Optional[Union[str, Summary]] = Field(
         None, description="Human readable summary text of the KItem."
     )
@@ -285,7 +290,7 @@ class KItem(BaseModel):
                 attachment.id = kitem_id
         return AttachmentList(value)
 
-    @field_validator("kitem_apps", mode="after")
+    @field_validator("apps", mode="after")
     @classmethod
     def validate_apps(cls, value: List[App], info: ValidationInfo) -> AppList:
         """Validate apps Field"""

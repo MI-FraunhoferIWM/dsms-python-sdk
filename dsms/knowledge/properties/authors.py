@@ -29,5 +29,10 @@ class Author(BaseModel):
 
         return str(value)
 
+    # OVERRIDE
     def __str__(self):
         return print_model(self, "author")
+
+    # OVERRIDE
+    def __repr__(self) -> str:
+        return str(self)

@@ -39,3 +39,7 @@ class Avatar(BaseModel):
     # OVERRIDE
     def __str__(self):
         return print_model(self, "avatar", exclude_extra={"id"})
+
+    # OVERRIDE
+    def __repr__(self) -> str:
+        return str(self)

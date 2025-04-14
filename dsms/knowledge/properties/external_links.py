@@ -20,6 +20,10 @@ class ExternalLink(BaseModel):
     def __str__(self):
         return print_model(self, "external_link")
 
+    # OVERRIDE
+    def __repr__(self) -> str:
+        return str(self)
+
     @field_validator("url")
     @classmethod
     def validate_url(cls, value: Union[str, AnyUrl]) -> AnyUrl:

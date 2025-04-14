@@ -328,7 +328,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "ktype_id",
             "attachments",
             "id",
-            "kitem_apps",
+            "apps",
             "created_at",
             "dataframe",
             "access_url",
@@ -468,7 +468,7 @@ def _get_apps_diff(
         {key: value for key, value in old.items() if key not in exclude}
         for old in old_kitem.get("kitem_apps")
     ]
-    new_apps = [new.model_dump() for new in new_kitem.kitem_apps]
+    new_apps = [new.model_dump() for new in new_kitem.apps]
     differences["kitem_apps_to_update"] = [
         attr for attr in new_apps if attr not in old_apps
     ]
@@ -543,9 +543,9 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     # kitems also might differ in their new properties in some cases.
     linked_kitems = _get_linked_diffs(kitem_old, kitem_new)
     # same holds for kitem apps
-    kitem_apps = _get_apps_diff(kitem_old, kitem_new)
+    apps = _get_apps_diff(kitem_old, kitem_new)
     # merge with previously found differences
-    differences.update(**linked_kitems, **kitem_apps)
+    differences.update(**linked_kitems, **apps)
     return differences
 
 
@@ -628,9 +628,23 @@ def _commit(buffers: "Buffers") -> None:
 
 def _refresh_kitem(kitem: "KItem") -> None:
     """Refresh the KItem"""
-    for key, value in _get_kitem(kitem.dsms, kitem.id, as_json=True).items():
+    # note: in order propperly refresh the same item, we need to fetch the data
+    # from the backend and then revalidate it. However, this leads to the fact
+    # that a new Python-variable would be created for the same KItem instance and the
+    # old variable becomes obsolete. This is somewhat unintuitive for the user.
+    # Hence, we just set the attributes of the validated new instance to the old instance
+    # which is already in our memory. This is somewhat hacky since you will need to
+    # validate twice. However, if the iterate over the `refreshed` instance directly,
+    # the pydantic `AliasChoises` are not taken into consideration. Which means that
+    # e.g. our field `apps` cannot be refreshed and we will receive an error, that
+    # `kitem_apps` (how the field in the backend is called) is not part of the instance,
+    # because the pydantic aliases are only regarded during the model instanciation, not
+    # during attribute-assignment.
+    refreshed = _get_kitem(kitem.dsms, kitem.id, as_json=True)
+    validated = kitem.model_validate(refreshed)
+    for key, value in validated:
         logger.debug(
-            "Set updated property `%s` for KItem with id `%s` after commiting: %s",
+            "Set updated property `%s` for KType with id `%s` after commiting: %s",
             key,
             kitem.id,
             value,

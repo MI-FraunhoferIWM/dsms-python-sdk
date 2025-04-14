@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import (  # isort:skip
     BaseModel,
+    AliasChoices,
     Field,
     model_serializer,
     field_validator,
@@ -59,7 +60,7 @@ class LinkedKItem(BaseModel):
 
     ktype_id: str = Field(..., description="Ktype ID of the linked KItem")
 
-    summary: Optional[Summary] = Field(
+    summary: Optional[Union[str, Summary]] = Field(
         None, description="Summary of the linked KItem."
     )
 
@@ -103,7 +104,11 @@ class LinkedKItem(BaseModel):
         None, description="Custom properies of the linked KItem"
     )
 
-    kitem_apps: List[App] = Field([], description="Apps of the linked KItem")
+    apps: List[App] = Field(
+        [],
+        description="Apps of the linked KItem",
+        alias=AliasChoices("kitem_apps", "apps"),
+    )
 
     created_at: Optional[Union[str, datetime]] = Field(
         None, description="Time and date when the KItem was created."
@@ -170,14 +175,16 @@ class LinkedKItem(BaseModel):
             for key, value in self.__dict__.items()
         }
 
-    @field_validator("custom_properties")
+    @field_validator("custom_properties", mode="before")
     @classmethod
     def validate_custom_properties(
         cls, value: "Optional[Dict[str, Any]]"
     ) -> "Optional[Dict[str, Any]]":
         """Validate the custom properties of the linked KItem"""
-        if value:
+        if isinstance(value, dict):
             value = value.get("content") or value
+            if len(value) == 0:
+                value = None
         return value
 
 

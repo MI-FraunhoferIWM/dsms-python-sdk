@@ -23,6 +23,14 @@ class AdditionalProperties(BaseModel):
         description="File extensions for which the upload shall be triggered.",
     )
 
+    # OVERRIDE
+    def __str__(self):
+        return print_model(self, "additional_properties")
+
+    # OVERRIDE
+    def __repr__(self) -> str:
+        return str(self)
+
 
 class JobStatus(BaseModel):
     """Status of a job"""
@@ -43,6 +51,14 @@ class JobStatus(BaseModel):
     progress: Optional[str] = Field(
         None, description="Relative number of jobs which were finished"
     )
+
+    # OVERRIDE
+    def __str__(self):
+        return print_model(self, "job_status")
+
+    # OVERRIDE
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class App(BaseModel):
@@ -150,6 +166,10 @@ class App(BaseModel):
     def __str__(self):
         return print_model(self, "app", exclude_extra={"id"})
 
+    # OVERRIDE
+    def __repr__(self) -> str:
+        return str(self)
+
 
 class Job(BaseModel):
     """Job running an app"""
@@ -191,6 +211,14 @@ class Job(BaseModel):
         if not response.ok:
             raise RuntimeError(f"Could not fetch job logs: {response.text}")
         return response.text
+
+    # OVERRIDE
+    def __str__(self):
+        return print_model(self, "job")
+
+    # OVERRIDE
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class AppList(list):

@@ -34,7 +34,7 @@ def _uri2kitem_idi(dsms: "DSMS", uri: str) -> str:
     return uri.replace(f"{dsms.config.host_url}/", "").split("/")[0]
 
 
-def _ping_dsms(dsms: "DSMS") -> Response:
+def _ping_backend(dsms: "DSMS") -> Response:
     """General check if the remote DSMS instance is up and running"""
     return _perform_request(dsms, "api/knowledge/docs", "get")
 
