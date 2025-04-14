@@ -2,16 +2,15 @@
 
 from typing import TYPE_CHECKING
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
-from dsms.knowledge.properties.base import KItemProperty, KItemPropertyList
-from dsms.knowledge.utils import _make_annotation_schema, print_model
+from dsms.knowledge.utils import print_model
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict
+    from typing import Any, Dict
 
 
-class Annotation(KItemProperty):
+class Annotation(BaseModel):
     """KItem annotation model"""
 
     iri: str = Field(..., description="IRI of the annotation", max_length=200)
@@ -26,20 +25,13 @@ class Annotation(KItemProperty):
     def __str__(self) -> str:
         return print_model(self, "annotation")
 
-
-class AnnotationsProperty(KItemPropertyList):
-    """KItemPropertyList for annotations"""
-
     # OVERRIDE
-    @property
-    def k_property_item(self) -> "Callable":
-        """Annotation data model"""
-        return Annotation
+    def __repr__(self) -> str:
+        return str(self)
 
-    @property
-    def k_property_helper(self) -> None:
-        """Not defined for Affiliations"""
-        return _make_annotation_schema
+
+class AnnotationList(list):
+    """KItemPropertyList for Annotations"""
 
     @property
     def by_iri(self) -> "Dict[str, Any]":
