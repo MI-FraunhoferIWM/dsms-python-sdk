@@ -82,8 +82,9 @@ class Configuration(BaseSettings):
 
     auto_refresh: bool = Field(
         True,
-        description="""Whether to automatically refresh KItems,
-        KTypes and AppConfigs after commiting""",
+        description="""Determines whether local objects like KItem, KType,
+        and AppConfig should automatically update with the latest backend data
+        after a successful commit.""",
     )
 
     ping_backend: bool = Field(
