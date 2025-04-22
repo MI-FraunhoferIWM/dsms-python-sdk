@@ -697,3 +697,41 @@ class KItemCustomPropertiesModel(BaseWebformModel):
     def __repr__(self) -> str:
         """Pretty print the model fields"""
         return str(self)
+
+    # OVERRIDE
+    def model_dump(self, *args, flat: bool = False, **kwargs):
+        """
+        Dump the custom properties model fields into a dictionary format.
+
+        This method converts the model's sections and entries into a dictionary
+        representation. If the `flat` parameter is set to True, it attempts to
+        create a flat dictionary where each entry's label is a key and its value
+        is the corresponding value. If duplicate labels are found, it raises a
+        ValueError. If `flat` is False, the method utilizes the superclass's
+        `model_dump` method for the output.
+
+        Args:
+            *args: Additional arguments for the superclass's `model_dump`.
+            flat (bool): Whether to produce a flat dictionary. Defaults to False.
+            **kwargs: Additional keyword arguments for the superclass's `model_dump`.
+
+        Returns:
+            dict: A dictionary representation of the custom properties model.
+
+        Raises:
+            ValueError: If `flat` is True and duplicate entry labels are found.
+        """
+
+        if flat:
+            dumped = {}
+            for section in self.sections:  # pylint: disable=not-an-iterable
+                for entry in section.entries:
+                    if entry.label in dumped:
+                        raise ValueError(
+                            f"""Flat model_dump is not possible.
+                            Custom properties model has multiple entries for '{entry.label}'"""
+                        )
+                    dumped[entry.label] = entry.value
+        else:
+            dumped = super().model_dump(*args, **kwargs)
+        return dumped
