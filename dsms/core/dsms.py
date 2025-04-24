@@ -189,10 +189,18 @@ class DSMS:
         limit: int = 10,
         offset: int = 0,
         allow_fuzzy: "Optional[bool]" = True,
+        compact: "Optional[bool]" = False,
     ) -> "List[SearchResult]":
         """Search for KItems in the remote backend."""
         return _search(
-            self, query, ktypes, annotations, limit, offset, allow_fuzzy
+            self,
+            query,
+            ktypes,
+            annotations,
+            limit,
+            offset,
+            allow_fuzzy,
+            compact,
         )
 
     @property

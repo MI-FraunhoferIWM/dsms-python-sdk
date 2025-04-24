@@ -688,9 +688,10 @@ def _search(
     limit: "Optional[int]" = 10,
     offset: "Optional[int]" = 0,
     allow_fuzzy: "Optional[bool]" = True,
+    compact: "Optional[bool]" = False,
 ) -> "List[SearchResult]":
     """Search for KItems in the remote backend"""
-    from dsms import KItem
+    from dsms import KItem, KItemCompactedModel
 
     payload = {
         "search_term": query or "",
@@ -698,6 +699,7 @@ def _search(
         "annotations": [_make_annotation_schema(iri) for iri in annotations],
         "limit": limit,
         "offset": offset,
+        "compact": compact,
     }
     response = _perform_request(
         dsms,
@@ -718,7 +720,12 @@ def _search(
         ) from excep
     return SearchResult(
         hits=[
-            {"kitem": KItem(**item.get("kitem")), "fuzzy": item.get("fuzzy")}
+            {
+                "kitem": KItemCompactedModel(**item.get("kitem"))
+                if compact
+                else KItem(**item.get("kitem")),
+                "fuzzy": item.get("fuzzy"),
+            }
             for item in dumped.get("hits")
         ],
         total_count=dumped.get("total_count"),
