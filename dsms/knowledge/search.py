@@ -8,13 +8,15 @@ from pydantic import BaseModel, Field
 from dsms.core.session import Session
 
 if TYPE_CHECKING:
-    from dsms import KItem
+    from dsms import KItem, KItemCompactedModel
 
 
 class KItemSearchResult(BaseModel):
     """DSMS search result"""
 
-    kitem: "KItem" = Field(..., description="KItem returned by the search")
+    kitem: Union["KItem", "KItemCompactedModel"] = Field(
+        ..., description="KItem returned by the search"
+    )
     fuzzy: Union[bool, float] = Field(
         ...,
         description="""Whether the KItem was found through a similarity hit.

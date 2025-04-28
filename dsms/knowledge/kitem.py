@@ -79,6 +79,24 @@ logger.propagate = False
 DATETIME_FRMT = "%Y-%m-%dT%H:%M:%S.%f"
 
 
+class KItemCompactedModel(BaseModel):
+    """
+    KItem compacted model for the search-endpoint."""
+
+    name: str
+    id: UUID
+    ktype_id: str
+    slug: str
+
+    def __str__(self) -> str:
+        """Pretty print the kitem fields"""
+        return print_model(self, "kitem")
+
+    def __repr__(self) -> str:
+        """Pretty print the kitem Fields"""
+        return str(self)
+
+
 class KItem(BaseModel):
     """
     Knowledge Item of the DSMS.
