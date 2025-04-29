@@ -4,6 +4,7 @@ import os
 import warnings
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Union
+from uuid import UUID
 
 from dotenv import load_dotenv
 
@@ -13,7 +14,7 @@ from dsms.core.configuration import Configuration
 from dsms.core.session import Session
 from dsms.core.utils import _ping_backend
 from dsms.knowledge.kitem import KItem
-from dsms.knowledge.ktype import KType
+from dsms.knowledge.ktype import KType, ProcessSchema
 from dsms.knowledge.sparql_interface import SparqlInterface
 from dsms.knowledge.utils import _search
 
@@ -22,6 +23,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _get_kitem,
     _get_kitem_list,
     _get_remote_ktypes,
+    _get_process_schemas,
 )
 
 if TYPE_CHECKING:
@@ -29,6 +31,7 @@ if TYPE_CHECKING:
 
     from dsms.core.session import Buffers
     from dsms.knowledge.search import KItemListModel, SearchResult
+
 
 warnings.simplefilter("always", DeprecationWarning)
 
@@ -109,21 +112,27 @@ class DSMS:
         """Stage an KItem, KType or AppConfig for the deletion.
         WARNING: Changes only will take place after executing the `commit`-method
         """
-        if isinstance(obj, (KItem, KType)) or (
-            isinstance(obj, Enum) and isinstance(obj.value, KType)
+        if isinstance(obj, (KItem, KType, ProcessSchema)) or (
+            isinstance(obj, Enum)
+            and isinstance(obj.value, KType, ProcessSchema)
         ):
             self.buffers.deleted.update({str(obj.id): obj})
         elif isinstance(obj, AppConfig):
             self.buffers.deleted.update({str(obj.name): obj})
         else:
             raise TypeError(
-                f"Object must be of type {KItem}, {AppConfig} or {KType}, not {type(obj)}. "
+                f"""Object must be of type {KItem}, {AppConfig}, {ProcessSchema} or {KType}.
+                Not {type(obj)}. """
             )
 
     def delete(
         self,
         obj: Union[
-            KItem, KType, AppConfig, List[Union[KItem, KType, AppConfig]]
+            KItem,
+            KType,
+            AppConfig,
+            ProcessSchema,
+            List[Union[KItem, KType, AppConfig, ProcessSchema]],
         ],
     ) -> None:
         """Stage an KItem, KType or AppConfig for the deletion.
@@ -141,7 +150,11 @@ class DSMS:
     def add(
         self,
         obj: Union[
-            KItem, KType, AppConfig, List[Union[KItem, KType, AppConfig]]
+            KItem,
+            KType,
+            AppConfig,
+            ProcessSchema,
+            List[Union[KItem, KType, AppConfig, ProcessSchema]],
         ],
     ) -> None:
         """Stage an KItem, KType or AppConfig for the addition.
@@ -207,6 +220,11 @@ class DSMS:
     def sparql_interface(self) -> SparqlInterface:
         """Sparql interface of the DSMS instance."""
         return self._sparql_interface
+
+    @property
+    def process_schemas(self) -> "Dict[UUID, ProcessSchema]":
+        """Process schemas interface of the DSMS instance."""
+        return _get_process_schemas(self)
 
     @property
     def ktypes(self) -> "Enum":

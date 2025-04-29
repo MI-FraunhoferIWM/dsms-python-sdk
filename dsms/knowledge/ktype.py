@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_serializer
@@ -21,6 +21,46 @@ logger.addHandler(handler)
 logger.propagate = False
 
 
+class ProcessSchema(BaseModel):
+    """Process Schema of the KType"""
+
+    id: Optional[Union[str, UUID]] = Field(
+        None, description="ID of the process schema"
+    )
+    name: str = Field(..., description="Name of the process schema")
+    schema: List[Any] = Field(..., description="Schema of the process schema")
+    created_at: datetime = Field(
+        ..., description="Time and date when the process schema was created."
+    )
+    updated_at: datetime = Field(
+        ..., description="Time and date when the process schema was updated."
+    )
+
+    def refresh(self) -> None:
+        """Refresh the process schema"""
+        new = self.session.dsms.process_schemas.get(self.id)
+        if not new:
+            return
+        for key, value in new.model_dump().items():
+            logger.debug(
+                "Set updated property `%s` for ProcessSchema with id `%s` after commiting: %s",
+                key,
+                self.id,
+                value,
+            )
+            setattr(self, key, value)
+
+    @property
+    def dsms(self) -> "DSMS":
+        """DSMS session getter"""
+        return self.session.dsms
+
+    @property
+    def session(self) -> "Session":
+        """Getter for Session"""
+        return Session
+
+
 class KType(BaseModel):
     """Knowledge type of the knowledge item."""
 
@@ -35,6 +75,9 @@ class KType(BaseModel):
     )
     json_schema: Optional[Any] = Field(
         None, description="OpenAPI schema of the KType."
+    )
+    process_schema: Optional[ProcessSchema] = Field(
+        None, description="Process schema of the KType."
     )
     created_at: Optional[Union[str, datetime]] = Field(
         None, description="Time and date when the KType was created."

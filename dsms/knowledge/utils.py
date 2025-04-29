@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from dsms import DSMS
     from dsms.apps import AppConfig
     from dsms.core.session import Buffers
-    from dsms.knowledge import KItem, KType
+    from dsms.knowledge import KItem, KType, ProcessSchema
     from dsms.knowledge.properties import Attachment
 
 logger = logging.getLogger(__name__)
@@ -201,8 +201,7 @@ def _get_ktype(
 def _update_ktype(dsms: "DSMS", ktype: "KType") -> Response:
     """Update a KType in the remote backend."""
     payload = ktype.model_dump(
-        exclude_none=True,
-        by_alias=True,
+        exclude_none=True, by_alias=True, exclude={"process_schema"}
     )
     logger.debug("Update KType for `%s` with body: %s", ktype.id, payload)
     response = _perform_request(
@@ -212,6 +211,14 @@ def _update_ktype(dsms: "DSMS", ktype: "KType") -> Response:
         raise ValueError(
             f"KType with uuid `{ktype.id}` could not be updated in DSMS: {response.text}`"
         )
+    if ktype.process_schema:
+        if (
+            not ktype.process_schema.id
+            or ktype.process_schema.id not in dsms.process_schemas
+        ):
+            _create_process_schema(dsms, ktype.process_schema)
+        else:
+            _update_process_schema(dsms, ktype.process_schema)
     return response
 
 
@@ -552,7 +559,7 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
 def _commit(buffers: "Buffers") -> None:
     """Commit the buffers for the
     created, updated and deleted buffers"""
-    from dsms import AppConfig, KItem, KType
+    from dsms import AppConfig, KItem, KType, ProcessSchema
 
     logger.debug("Committing KItems in buffers. Current buffers:")
     logger.debug("Current Addded-buffer: %s", buffers.added)
@@ -600,6 +607,11 @@ def _commit(buffers: "Buffers") -> None:
 
         elif isinstance(obj, AppConfig):
             _create_or_update_app_spec(obj, overwrite=True)
+        elif isinstance(obj, ProcessSchema):
+            if not obj.id or obj.id not in obj.dsms.process_schemas:
+                _create_process_schema(obj.dsms, obj)
+            else:
+                _update_process_schema(obj.dsms, obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed."
@@ -617,6 +629,8 @@ def _commit(buffers: "Buffers") -> None:
         ):
             _delete_ktype(obj)
             had_ktypes = True
+        elif isinstance(obj, ProcessSchema):
+            _delete_process_schema(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed or deleted."
@@ -624,6 +638,24 @@ def _commit(buffers: "Buffers") -> None:
     if Session.dsms.config.auto_refresh and had_ktypes:
         Session.dsms.refresh_ktypes()
     logger.debug("Committing successful, clearing buffers.")
+
+
+def _create_process_schema(
+    dsms: "DSMS", process_schema: "ProcessSchema"
+) -> None:
+    """Create a new process schema in the remote backend"""
+
+    response = _perform_request(
+        dsms,
+        "POST",
+        "api/knowledge-type/process_schemas",
+        json=process_schema.model_dump(include={"name", "schema"}),
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to create process schema: {response.text}"
+        )
+    process_schema.refresh()
 
 
 def _refresh_kitem(kitem: "KItem") -> None:
@@ -1081,3 +1113,51 @@ def generate_id(prefix: str = "id") -> str:
     # Combine prefix, unique part, and random part
     generated_id = f"{prefix}{unique_part}{random_part}"
     return generated_id
+
+
+def _get_process_schemas(dsms: "DSMS"):
+    from dsms.knowledge.ktype import ProcessSchema
+
+    response = _perform_request(
+        dsms,
+        "GET",
+        "api/knowledge-type/process-schemas/",
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to fetch process schemas: {response.text}"
+        )
+    schemas = {
+        schema["id"]: ProcessSchema(**schema) for schema in response.json()
+    }
+    return schemas
+
+
+def _update_process_schema(
+    dsms: "DSMS", process_schema: "ProcessSchema"
+) -> None:
+    response = _perform_request(
+        dsms,
+        "PUT",
+        f"api/knowledge-type/process-schemas/{process_schema.id}",
+        json=process_schema.model_dump(include={"name", "schema"}),
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to update process schema: {response.text}"
+        )
+    process_schema.refresh()
+
+
+def _delete_process_schema(
+    dsms: "DSMS", process_schema: "ProcessSchema"
+) -> None:
+    response = _perform_request(
+        dsms,
+        "DELETE",
+        f"api/knowledge-type/process-schemas/{process_schema.id}",
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to delete process schema: {response.text}"
+        )
