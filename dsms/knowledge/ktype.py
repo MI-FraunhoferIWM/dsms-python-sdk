@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, model_serializer
 
 from dsms.core.logging import handler
 from dsms.core.session import Session
-from dsms.knowledge.utils import _refresh_ktype, print_ktype
+from dsms.knowledge.utils import _refresh_ktype, print_ktype, print_model
 from dsms.knowledge.webform import Webform
 
 if TYPE_CHECKING:
@@ -29,11 +29,11 @@ class ProcessSchema(BaseModel):
     )
     name: str = Field(..., description="Name of the process schema")
     schema: List[Any] = Field(..., description="Schema of the process schema")
-    created_at: datetime = Field(
-        ..., description="Time and date when the process schema was created."
+    created_at: Optional[datetime] = Field(
+        None, description="Time and date when the process schema was created."
     )
-    updated_at: datetime = Field(
-        ..., description="Time and date when the process schema was updated."
+    updated_at: Optional[datetime] = Field(
+        None, description="Time and date when the process schema was updated."
     )
 
     def refresh(self) -> None:
@@ -59,6 +59,17 @@ class ProcessSchema(BaseModel):
     def session(self) -> "Session":
         """Getter for Session"""
         return Session
+
+    def __hash__(self) -> int:
+        return hash(str(self))
+
+    def __repr__(self) -> str:
+        """Print the KType"""
+        return str(self)
+
+    def __str__(self) -> str:
+        """Print the KType"""
+        return print_model(self, "process_schema")
 
 
 class KType(BaseModel):

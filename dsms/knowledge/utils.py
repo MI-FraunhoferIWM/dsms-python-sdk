@@ -1120,8 +1120,8 @@ def _get_process_schemas(dsms: "DSMS"):
 
     response = _perform_request(
         dsms,
-        "GET",
         "api/knowledge-type/process-schemas/",
+        "GET",
     )
     if not response.ok:
         raise ConnectionError(
@@ -1138,8 +1138,8 @@ def _update_process_schema(
 ) -> None:
     response = _perform_request(
         dsms,
-        "PUT",
         f"api/knowledge-type/process-schemas/{process_schema.id}",
+        "PUT",
         json=process_schema.model_dump(include={"name", "schema"}),
     )
     if not response.ok:
@@ -1154,8 +1154,8 @@ def _delete_process_schema(
 ) -> None:
     response = _perform_request(
         dsms,
-        "DELETE",
         f"api/knowledge-type/process-schemas/{process_schema.id}",
+        "DELETE",
     )
     if not response.ok:
         raise ConnectionError(
