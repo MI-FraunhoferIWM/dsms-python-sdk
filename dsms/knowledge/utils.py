@@ -37,6 +37,32 @@ logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.propagate = False
 
+FIELDTYPE_TO_XSD = {
+    "Text": "string",
+    "Number": "float",
+    "Slider": "float",
+    "Textarea": "string",
+    "Radio": "string",
+    "Select": "string",
+    "File": "string",
+    "Checkbox": "boolean",
+    "Knowledge item": "anyURI",
+    "VocabularyTerm": "anyURI",
+}
+
+
+def map_fieldtype_to_xsd(fieldtype):
+    """
+    Maps the fieldtype to an XSD type.
+
+    Args:
+        fieldtype (str): The fieldtype to map.
+
+    Returns:
+        str: The XSD type.
+    """
+    return FIELDTYPE_TO_XSD.get(fieldtype, "string")
+
 
 def _is_number(value):
     try:
@@ -1161,3 +1187,119 @@ def _delete_process_schema(
         raise ConnectionError(
             f"Failed to delete process schema: {response.text}"
         )
+
+
+def to_kebab_case(name: str):
+    """
+    Converts a multi word string into single string representation.
+
+    :param name: the string representing multi values.
+    :return: ID representation of the given string.
+    """
+    sentence = name.lower().replace(" ", "-")
+    return sentence
+
+
+def generate_mapping(ktype_id: str, webform: dict):
+    """
+    Extracts the RDF mapping from the webform spec
+
+    :param ktype_id: ID of the knowledge type.
+    :param webform: Webform data.
+    :return: mapping in the form of a dictionary.
+    """
+    name_exists = False
+
+    sections = webform["sections"]
+    mappings = {}
+    mappings["iri"] = webform.get("classMapping")
+    mappings["suffix"] = "slug"
+    mappings["source"] = f"{ktype_id}[*]"
+    mappings["suffix_from_location"] = True
+    mappings["custom_relations"] = []
+
+    for section in sections:
+        params = section.get("inputs")
+        if params:
+            for param in params:
+                label = param.get("label")
+                relation_mapping = param.get("relationMapping")
+                relation_mapping_extra = param.get("relationMappingExtra")
+                if relation_mapping:
+                    widget = param.get("widget")
+                    location = to_kebab_case(label)
+                    rel_type = relation_mapping.get("type")
+                    relation = relation_mapping.get("iri")
+                    iri = relation_mapping.get("classIri")
+                    unit = param.get("measurementUnit")
+                    unit = (
+                        {"unit": unit.get("iri") or unit.get("symbol")}
+                        if unit
+                        else {}
+                    )
+
+                    if rel_type == "object_property":
+                        object_type = {"iri": iri, **unit}
+                    else:
+                        object_type = map_fieldtype_to_xsd(widget)
+
+                    if widget == "Knowledge item":
+                        object_type = "anyURI"
+                        rel_type = "object_property"
+
+                    custom_relation = {
+                        "object_location": location,
+                        "relation": relation,
+                        "relation_type": rel_type,
+                        "object_type": object_type,
+                    }
+                    mappings["custom_relations"].append(custom_relation)
+
+                    if widget == "Slider" and relation_mapping_extra:
+                        custom_relation["object_location"] += "[0]"
+                        if rel_type == "object_property":
+                            custom_relation["object_type"] = {
+                                "suffix": "min",
+                                "iri": iri,
+                                **unit,
+                            }
+
+                        mappings["custom_relations"].append(
+                            {
+                                "object_location": location + "[1]",
+                                "relation": relation_mapping_extra.get("iri"),
+                                "relation_type": relation_mapping_extra.get(
+                                    "type"
+                                ),
+                                "object_type": {
+                                    "suffix": "max",
+                                    "iri": relation_mapping_extra.get(
+                                        "classIri"
+                                    ),
+                                    **unit,
+                                }
+                                if relation_mapping_extra.get("type")
+                                == "object_property"
+                                else object_type,
+                            }
+                        )
+
+                if label and label.lower() == "name":
+                    name_exists = True
+
+    # if there is no Name field associated in the the custom form
+    # then use default kitem name
+    if not name_exists:
+        mappings["custom_relations"].append(
+            {
+                "object_location": "Name",
+                "relation": "http://www.w3.org/2000/01/rdf-schema#label",
+                "relation_type": "annotation_property",
+                "object_data_type": "string",
+            }
+        )
+    if len(mappings["custom_relations"]) == 0:
+        mapping = None
+    else:
+        mapping = mappings
+    return mapping
