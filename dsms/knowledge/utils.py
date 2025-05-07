@@ -742,6 +742,12 @@ def _slug_is_available(dsms: "DSMS", ktype_id: str, value: str) -> bool:
     )
     return response.status_code == 404
 
+def _kitem_id_is_available(dsms: "DSMS", kitem_id: str) -> bool:
+    """Check whether the kitem_id is available in the DSMS or not"""
+    response = _perform_request(
+        dsms, f"api/knowledge/kitems/{kitem_id}", "head"
+    )
+    return response.status_code == 404
 
 def _get_dataframe_column(
     dsms: "DSMS", kitem_id: str, column_id: int
