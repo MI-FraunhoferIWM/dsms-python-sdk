@@ -109,7 +109,7 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
 
     expected = {
         "kitems_to_link": [
-            {"id": str(obj.id)} for obj in kitem_new.linked_kitems
+            {"id": str(obj.kitem.id)} for obj in kitem_new.linked_kitems
         ],
         "annotations_to_link": [
             {
@@ -148,6 +148,8 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 "additional_properties": None,
             }
         ],
+        "contexts_to_add_in": [],
+        "contexts_to_remove_from": [],
     }
     diffs = _get_kitems_diffs(kitem_old, kitem_new)
 

@@ -188,12 +188,29 @@ class LinkedKItem(BaseModel):
         return value
 
 
+class KItemRelationshipModel(BaseModel):
+
+    """Data model for a relation between two linked KItems"""
+
+    is_incoming: bool = Field(
+        False, description="Whether the relation is incoming"
+    )
+    label: Optional[str] = Field(None, description="Label of the relation")
+    kitem: Union[LinkedKItem, "KItem"] = Field(..., description="Linked KItem")
+    iri: str = Field(
+        "http://purl.org/dc/terms/hasPart",
+        description="IRI of the linked KItem",
+    )
+
+
 class LinkedKItemsList(list):
     """KItemPropertyList for linked KItems"""
 
     def get(self, kitem_id: "Union[str, UUID]") -> "KItem":
         """Get the kitem with a certain id which is linked to the source KItem."""
-        if not str(kitem_id) in [str(item.id) for item in self]:
+        if not str(kitem_id) in [
+            str(connection.kitem.id) for connection in self
+        ]:
             raise KeyError(f"A KItem with ID `{kitem_id} is not linked.")
         return Session.kitems.get(str(kitem_id)) or _get_kitem(kitem_id)
 
@@ -202,7 +219,7 @@ class LinkedKItemsList(list):
         """Get the kitems grouped by annotation"""
         grouped = {}
         for linked in self:
-            for annotation in linked.annotations:
+            for annotation in linked.kitem.annotations:
                 if not annotation.iri in grouped:
                     grouped[annotation.iri] = []
                 if not linked in grouped[annotation.iri]:
@@ -215,9 +232,9 @@ class LinkedKItemsList(list):
 
         grouped = {}
         for linked in self:
-            ktype = Session.dsms.ktypes[_name_to_camel(linked.ktype_id)]
+            ktype = Session.dsms.ktypes[_name_to_camel(linked.kitem.ktype_id)]
             if not ktype in grouped:
                 grouped[ktype] = []
             if not linked in grouped[ktype]:
-                grouped[ktype].append(linked)
+                grouped[ktype].append(linked.kitem)
         return grouped

@@ -518,7 +518,9 @@ def _get_linked_diffs(
     """Get differences in linked kitem from previous KItem state"""
     differences = {}
     old_linked = [old.get("id") for old in old_kitem.get("linked_kitems")]
-    new_linked = [str(new_kitem.id) for new_kitem in new_kitem.linked_kitems]
+    new_linked = [
+        str(new_kitem.kitem.id) for new_kitem in new_kitem.linked_kitems
+    ]
     differences["kitems_to_link"] = [
         {"id": attr} for attr in new_linked if attr not in old_linked
     ]
@@ -556,13 +558,16 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     attributes = [
         ("annotations", ("annotations", "link", "unlink")),
         ("user_groups", ("user_groups", "add", "remove")),
+        ("contexts", ("contexts", "add_in", "remove_from")),
     ]
-    to_compare = kitem_new.model_dump(include={"annotations", "user_groups"})
+    to_compare = kitem_new.model_dump(
+        include={"annotations", "user_groups", "contexts"}
+    )
     for name, terms in attributes:
         to_add_name = terms[0] + "_to_" + terms[1]
         to_remove_name = terms[0] + "_to_" + terms[2]
-        old_attr = kitem_old.get(name)
-        new_attr = to_compare.get(name)
+        old_attr = kitem_old.get(name, [])
+        new_attr = to_compare.get(name, [])
         differences[to_add_name] = [
             attr for attr in new_attr if attr not in old_attr
         ]

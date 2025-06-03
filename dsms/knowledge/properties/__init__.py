@@ -23,6 +23,7 @@ from dsms.knowledge.properties.attachments import (  # isort:skip
 from dsms.knowledge.properties.linked_kitems import (  # isort:skip
     LinkedKItem,
     LinkedKItemsList,
+    KItemRelationshipModel,
 )
 
 from dsms.knowledge.properties.external_links import (  # isort:skip
@@ -49,4 +50,5 @@ __all__ = [
     "Summary",
     "DataFrameContainer",
     "Column",
+    "KItemRelationshipModel",
 ]
