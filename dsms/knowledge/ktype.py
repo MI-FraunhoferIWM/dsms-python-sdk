@@ -28,7 +28,7 @@ class ProcessSchema(BaseModel):
         None, description="ID of the process schema"
     )
     name: str = Field(..., description="Name of the process schema")
-    schema: List[Any] = Field(..., description="Schema of the process schema")
+    spec: List[Any] = Field(..., description="Schema of the process schema")
     created_at: Optional[datetime] = Field(
         None, description="Time and date when the process schema was created."
     )
@@ -72,6 +72,20 @@ class ProcessSchema(BaseModel):
         return print_model(self, "process_schema")
 
 
+class WebformSchema(BaseModel):
+    """Schema for a webform."""
+
+    id: UUID = Field(..., description="ID of the Webform.")
+    name: str = Field(..., description="Name of the Webform.")
+    spec: Webform = Field(..., description="Specification of the Webform.")
+    created_at: Optional[Union[str, datetime]] = Field(
+        None, description="Time and date when the Webform was created."
+    )
+    updated_at: Optional[Union[str, datetime]] = Field(
+        None, description="Time and date when the Webform was updated."
+    )
+
+
 class KType(BaseModel):
     """Knowledge type of the knowledge item."""
 
@@ -81,11 +95,16 @@ class KType(BaseModel):
     name: Optional[str] = Field(
         None, description="Human readable name of the KType.", max_length=50
     )
-    webform: Optional[Webform] = Field(
+    webform_schema_id: Optional[str] = Field(
+        None,
+        description="ID of the webform schema that is used to create a form for this KType.",
+    )
+    webform_schema: Optional[WebformSchema] = Field(
         None, description="Form data of the KType."
     )
-    json_schema: Optional[Any] = Field(
-        None, description="OpenAPI schema of the KType."
+    process_schema_id: Optional[str] = Field(
+        None,
+        description="ID of the process schema that is used to create a form for this KType.",
     )
     process_schema: Optional[ProcessSchema] = Field(
         None, description="Process schema of the KType."

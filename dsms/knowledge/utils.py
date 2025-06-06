@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from dsms import DSMS
     from dsms.apps import AppConfig
     from dsms.core.session import Buffers
-    from dsms.knowledge import KItem, KType, ProcessSchema
+    from dsms.knowledge import KItem, KType, ProcessSchema, WebformSchema
     from dsms.knowledge.properties import Attachment
 
 logger = logging.getLogger(__name__)
@@ -227,7 +227,9 @@ def _get_ktype(
 def _update_ktype(dsms: "DSMS", ktype: "KType") -> Response:
     """Update a KType in the remote backend."""
     payload = ktype.model_dump(
-        exclude_none=True, by_alias=True, exclude={"process_schema"}
+        exclude_none=True,
+        by_alias=True,
+        exclude={"process_schema", "webform_schema"},
     )
     logger.debug("Update KType for `%s` with body: %s", ktype.id, payload)
     response = _perform_request(
@@ -237,14 +239,25 @@ def _update_ktype(dsms: "DSMS", ktype: "KType") -> Response:
         raise ValueError(
             f"KType with uuid `{ktype.id}` could not be updated in DSMS: {response.text}`"
         )
-    if ktype.process_schema:
-        if (
-            not ktype.process_schema.id
-            or ktype.process_schema.id not in dsms.process_schemas
-        ):
-            _create_process_schema(dsms, ktype.process_schema)
-        else:
-            _update_process_schema(dsms, ktype.process_schema)
+    if (
+        ktype.process_schema
+        and ktype.process_schema.id not in dsms.process_schemas
+    ):
+        warnings.warn(
+            f"KType with uuid `{ktype.id}` has a webform schema that is not present in DSMS. "
+            "This will cause an error when the KType is used in a process. "
+            "Please commit the webform schema to DSMS.",
+        )
+    if (
+        ktype.webform_schema
+        and ktype.webform_schema.id not in dsms.webform_schemas
+    ):
+        warnings.warn(
+            f"KType with uuid `{ktype.id}` has a webform schema that is not present in DSMS. "
+            "This will cause an error when the KType is used in a process. "
+            "Please commit the webform schema to DSMS.",
+        )
+
     return response
 
 
@@ -590,10 +603,10 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
 def _commit(buffers: "Buffers") -> None:
     """Commit the buffers for the
     created, updated and deleted buffers"""
-    from dsms import AppConfig, KItem, KType, ProcessSchema
+    from dsms import AppConfig, KItem, KType, ProcessSchema, WebformSchema
 
     logger.debug("Committing KItems in buffers. Current buffers:")
-    logger.debug("Current Addded-buffer: %s", buffers.added)
+    logger.debug("Current Added-buffer: %s", buffers.added)
     logger.debug("Current Deleted-buffer: %s", buffers.deleted)
     had_ktypes = False
     for obj in buffers.added.values():
@@ -639,10 +652,15 @@ def _commit(buffers: "Buffers") -> None:
         elif isinstance(obj, AppConfig):
             _create_or_update_app_spec(obj, overwrite=True)
         elif isinstance(obj, ProcessSchema):
-            if not obj.id or obj.id not in obj.dsms.process_schemas:
+            if obj.id not in obj.dsms.process_schemas:
                 _create_process_schema(obj.dsms, obj)
             else:
                 _update_process_schema(obj.dsms, obj)
+        elif isinstance(obj, WebformSchema):
+            if obj.id not in obj.dsms.webform_schemas:
+                _create_webform_schema(obj.dsms, obj)
+            else:
+                _update_webform_schema(obj.dsms, obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed."
@@ -662,6 +680,8 @@ def _commit(buffers: "Buffers") -> None:
             had_ktypes = True
         elif isinstance(obj, ProcessSchema):
             _delete_process_schema(obj)
+        elif isinstance(obj, WebformSchema):
+            _delete_webform_schema(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed or deleted."
@@ -669,6 +689,55 @@ def _commit(buffers: "Buffers") -> None:
     if Session.dsms.config.auto_refresh and had_ktypes:
         Session.dsms.refresh_ktypes()
     logger.debug("Committing successful, clearing buffers.")
+
+
+def _create_webform_schema(
+    dsms: "DSMS", webform_schema: "WebformSchema"
+) -> None:
+    """Create a new webform schema in the remote backend"""
+    response = _perform_request(
+        dsms,
+        "POST",
+        "api/knowledge-type/webform-schemas",
+        json=webform_schema.model_dump(include={"name", "id", "spec"}),
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to create process schema: {response.text}"
+        )
+    for key, value in response.json().items():
+        setattr(webform_schema, key, value)
+
+
+def _update_webform_schema(
+    dsms: "DSMS", webform_schema: "WebformSchema"
+) -> None:
+    """Update an existing webform schema in the remote backend"""
+    response = _perform_request(
+        dsms,
+        "PUT",
+        f"api/knowledge-type/webform-schemas/{webform_schema.id}",
+        json=webform_schema.model_dump(include={"name", "spec"}),
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to update webform schema: {response.text}"
+        )
+    for key, value in response.json().items():
+        setattr(webform_schema, key, value)
+
+
+def _delete_webform_schema(dsms: "DSMS", webform_schema_id: str) -> None:
+    """Delete an existing webform schema in the remote backend"""
+    response = _perform_request(
+        dsms,
+        "DELETE",
+        f"api/knowledge-type/webform-schemas/{webform_schema_id}",
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to delete webform schema: {response.text}"
+        )
 
 
 def _create_process_schema(
@@ -679,14 +748,15 @@ def _create_process_schema(
     response = _perform_request(
         dsms,
         "POST",
-        "api/knowledge-type/process_schemas",
-        json=process_schema.model_dump(include={"name", "schema"}),
+        "api/knowledge-type/process-schemas",
+        json=process_schema.model_dump(include={"id", "name", "spec"}),
     )
     if not response.ok:
         raise ConnectionError(
             f"Failed to create process schema: {response.text}"
         )
-    process_schema.refresh()
+    for key, value in response.json().items():
+        setattr(process_schema, key, value)
 
 
 def _refresh_kitem(kitem: "KItem") -> None:
