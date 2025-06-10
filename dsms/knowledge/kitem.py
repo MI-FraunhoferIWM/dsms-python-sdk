@@ -514,7 +514,7 @@ class KItem(KItemCompactedModel):
                     Will be transformed into `KItemCustomPropertiesModel`."""
                 )
                 value = _transform_custom_properties_schema(
-                    value, ktype.webform
+                    value, ktype.webform_schema
                 )
             value = KItemCustomPropertiesModel(**value)
         elif not isinstance(value, (KItemCustomPropertiesModel, type(None))):
@@ -599,8 +599,12 @@ class KItem(KItemCompactedModel):
         """
 
         spec: "List[Input]" = []
-        if ktype.webform:  # pylint: disable=no-member
-            for section in ktype.webform.sections:  # pylint: disable=no-member
+        if ktype.webform_schema:  # pylint: disable=no-member
+            for (
+                section
+            ) in (
+                ktype.webform_schema.spec.sections
+            ):  # pylint: disable=no-member
                 for inp in section.inputs:
                     if inp.id == entry.id:
                         spec.append(inp)

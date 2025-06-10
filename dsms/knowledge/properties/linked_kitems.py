@@ -202,6 +202,12 @@ class KItemRelationshipModel(BaseModel):
         description="IRI of the linked KItem",
     )
 
+    @field_validator("kitem", mode="after")
+    @classmethod
+    def validate_kitem(cls, value: Union[LinkedKItem, "KItem"]) -> LinkedKItem:
+        """Validate the custom properties of the linked KItem"""
+        return LinkedKItem(**value.model_dump())
+
 
 class LinkedKItemsList(list):
     """KItemPropertyList for linked KItems"""

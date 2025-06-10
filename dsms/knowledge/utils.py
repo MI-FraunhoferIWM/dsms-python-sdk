@@ -1048,7 +1048,7 @@ def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
     if webform:
         copy_properties = custom_properties.copy()
         transformed_sections = {}
-        for section_def in webform.sections:
+        for section_def in webform.spec.sections:
             for input_def in section_def.inputs:
                 if input_def.label in copy_properties:
                     if input_def.measurement_unit:
