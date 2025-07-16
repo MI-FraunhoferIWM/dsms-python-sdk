@@ -2,15 +2,15 @@
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import TYPE_CHECKING, List, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_serializer
+from pydantic import BaseModel, Field, field_validator
 
 from dsms.core.logging import handler
 from dsms.core.session import Session
 from dsms.knowledge.utils import _refresh_ktype, print_ktype, print_model
-from dsms.knowledge.webform import Webform
+from dsms.knowledge.webform import BaseWebformModel, Webform
 
 if TYPE_CHECKING:
     from dsms import DSMS
@@ -21,6 +21,39 @@ logger.addHandler(handler)
 logger.propagate = False
 
 
+class KTypeMapping(BaseWebformModel):
+    """KType mapping for process schema specification"""
+
+    dst_ktype_id: str = Field(
+        ..., description="The ID of the destination K-type"
+    )
+    relation_iri: str = Field(..., description="The IRI of the relation")
+    relation_name: str = Field(..., description="The name of the relation")
+
+
+class ProcessSchemaSpec(BaseWebformModel):
+    """Process schema specification"""
+
+    id: Optional[Union[str, UUID]] = Field(
+        None, description="ID of the process schema spec"
+    )
+    label: str = Field(..., description="The label of the process schema spec")
+    is_child: bool = Field(
+        False, description="Indicates if it is a child element"
+    )
+    mappings: List[KTypeMapping] = Field(
+        [], description="List of associated KTypeMappings"
+    )
+    children: List[Optional["ProcessSchemaSpec"]] = Field(
+        [], description="Nested child ProcessSchemaSpecs"
+    )
+
+    @field_validator("id")
+    @classmethod
+    def _validate_uuid(cls, value: Union[str, UUID]) -> str:
+        return str(value)
+
+
 class ProcessSchema(BaseModel):
     """Process Schema of the KType"""
 
@@ -28,7 +61,9 @@ class ProcessSchema(BaseModel):
         None, description="ID of the process schema"
     )
     name: str = Field(..., description="Name of the process schema")
-    spec: List[Any] = Field(..., description="Schema of the process schema")
+    spec: List[ProcessSchemaSpec] = Field(
+        ..., description="Schema of the process schema"
+    )
     created_at: Optional[datetime] = Field(
         None, description="Time and date when the process schema was created."
     )
@@ -71,11 +106,16 @@ class ProcessSchema(BaseModel):
         """Print the KType"""
         return print_model(self, "process_schema")
 
+    @field_validator("id")
+    @classmethod
+    def _validate_uuid(cls, value: Union[str, UUID]) -> str:
+        return str(value)
 
-class WebformSchema(BaseModel):
+
+class WebformSchema(BaseWebformModel):
     """Schema for a webform."""
 
-    id: UUID = Field(..., description="ID of the Webform.")
+    id: Union[str, UUID] = Field(..., description="ID of the Webform.")
     name: str = Field(..., description="Name of the Webform.")
     spec: Webform = Field(..., description="Specification of the Webform.")
     created_at: Optional[Union[str, datetime]] = Field(
@@ -84,6 +124,11 @@ class WebformSchema(BaseModel):
     updated_at: Optional[Union[str, datetime]] = Field(
         None, description="Time and date when the Webform was updated."
     )
+
+    @field_validator("id")
+    @classmethod
+    def _validate_uuid(cls, value: Union[str, UUID]) -> str:
+        return str(value)
 
 
 class KType(BaseModel):
@@ -130,22 +175,6 @@ class KType(BaseModel):
     def refresh(self) -> None:
         """Refresh the KType"""
         _refresh_ktype(self)
-
-    @model_serializer
-    def serialize(self):
-        """Serialize ktype."""
-        return {
-            key: (
-                value.model_dump(  # pylint: disable=no-member
-                    exclude_none=False, by_alias=True
-                )
-                if key == "webform"
-                and value is not None
-                and not isinstance(value, dict)
-                else value
-            )
-            for key, value in self.__dict__.items()
-        }
 
     @property
     def dsms(self) -> "DSMS":

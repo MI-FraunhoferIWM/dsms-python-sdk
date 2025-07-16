@@ -24,6 +24,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _get_kitem_list,
     _get_remote_ktypes,
     _get_process_schemas,
+    _get_webform_schemas,
 )
 
 if TYPE_CHECKING:
@@ -225,6 +226,11 @@ class DSMS:
     def process_schemas(self) -> "Dict[UUID, ProcessSchema]":
         """Process schemas interface of the DSMS instance."""
         return _get_process_schemas(self)
+
+    @property
+    def webform_schemas(self) -> "Dict[UUID, ProcessSchema]":
+        """Process schemas interface of the DSMS instance."""
+        return _get_webform_schemas(self)
 
     @property
     def ktypes(self) -> "Enum":

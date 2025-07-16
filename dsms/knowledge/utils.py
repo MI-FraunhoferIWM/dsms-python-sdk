@@ -229,7 +229,10 @@ def _update_ktype(dsms: "DSMS", ktype: "KType") -> Response:
     payload = ktype.model_dump(
         exclude_none=True,
         by_alias=True,
-        exclude={"process_schema", "webform_schema"},
+        exclude={
+            "created_at",
+            "updated_at",
+        },
     )
     logger.debug("Update KType for `%s` with body: %s", ktype.id, payload)
     response = _perform_request(
@@ -238,24 +241,6 @@ def _update_ktype(dsms: "DSMS", ktype: "KType") -> Response:
     if not response.ok:
         raise ValueError(
             f"KType with uuid `{ktype.id}` could not be updated in DSMS: {response.text}`"
-        )
-    if (
-        ktype.process_schema
-        and ktype.process_schema.id not in dsms.process_schemas
-    ):
-        warnings.warn(
-            f"KType with uuid `{ktype.id}` has a webform schema that is not present in DSMS. "
-            "This will cause an error when the KType is used in a process. "
-            "Please commit the webform schema to DSMS.",
-        )
-    if (
-        ktype.webform_schema
-        and ktype.webform_schema.id not in dsms.webform_schemas
-    ):
-        warnings.warn(
-            f"KType with uuid `{ktype.id}` has a webform schema that is not present in DSMS. "
-            "This will cause an error when the KType is used in a process. "
-            "Please commit the webform schema to DSMS.",
         )
 
     return response
@@ -641,6 +626,16 @@ def _commit(buffers: "Buffers") -> None:
         elif isinstance(obj, KType) or (
             isinstance(obj, Enum) and isinstance(obj.value, KType)
         ):
+            if obj.webform_schema:
+                if obj.webform_schema_id not in obj.dsms.webform_schemas:
+                    _create_webform_schema(obj.dsms, obj.webform_schema)
+                else:
+                    _update_webform_schema(obj.dsms, obj.webform_schema)
+            if obj.process_schema:
+                if obj.process_schema_id not in obj.dsms.process_schemas:
+                    _create_process_schema(obj.dsms, obj.process_schema)
+                else:
+                    _update_process_schema(obj.dsms, obj.process_schema)
             old_ktype = _get_ktype(
                 obj.dsms, obj.id, as_json=True, raise_error=False
             )
@@ -656,6 +651,7 @@ def _commit(buffers: "Buffers") -> None:
                 _create_process_schema(obj.dsms, obj)
             else:
                 _update_process_schema(obj.dsms, obj)
+
         elif isinstance(obj, WebformSchema):
             if obj.id not in obj.dsms.webform_schemas:
                 _create_webform_schema(obj.dsms, obj)
@@ -697,9 +693,11 @@ def _create_webform_schema(
     """Create a new webform schema in the remote backend"""
     response = _perform_request(
         dsms,
-        "POST",
-        "api/knowledge-type/webform-schemas",
-        json=webform_schema.model_dump(include={"name", "id", "spec"}),
+        "api/knowledge-type/webform-schemas/",
+        "post",
+        json=webform_schema.model_dump(
+            include={"name", "id", "spec"}, by_alias=True
+        ),
     )
     if not response.ok:
         raise ConnectionError(
@@ -715,8 +713,8 @@ def _update_webform_schema(
     """Update an existing webform schema in the remote backend"""
     response = _perform_request(
         dsms,
-        "PUT",
         f"api/knowledge-type/webform-schemas/{webform_schema.id}",
+        "put",
         json=webform_schema.model_dump(include={"name", "spec"}),
     )
     if not response.ok:
@@ -727,12 +725,30 @@ def _update_webform_schema(
         setattr(webform_schema, key, value)
 
 
+def _get_webform_schemas(dsms: "DSMS"):
+    from dsms.knowledge.ktype import WebformSchema
+
+    response = _perform_request(
+        dsms,
+        "api/knowledge-type/webform-schemas/",
+        "get",
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to fetch webform schemas: {response.text}"
+        )
+    schemas = {
+        schema["id"]: WebformSchema(**schema) for schema in response.json()
+    }
+    return schemas
+
+
 def _delete_webform_schema(dsms: "DSMS", webform_schema_id: str) -> None:
     """Delete an existing webform schema in the remote backend"""
     response = _perform_request(
         dsms,
-        "DELETE",
         f"api/knowledge-type/webform-schemas/{webform_schema_id}",
+        "delete",
     )
     if not response.ok:
         raise ConnectionError(
@@ -747,9 +763,11 @@ def _create_process_schema(
 
     response = _perform_request(
         dsms,
-        "POST",
-        "api/knowledge-type/process-schemas",
-        json=process_schema.model_dump(include={"id", "name", "spec"}),
+        "api/knowledge-type/process-schemas/",
+        "post",
+        json=process_schema.model_dump(
+            include={"id", "name", "spec"}, by_alias=True
+        ),
     )
     if not response.ok:
         raise ConnectionError(
@@ -1240,8 +1258,10 @@ def _update_process_schema(
     response = _perform_request(
         dsms,
         f"api/knowledge-type/process-schemas/{process_schema.id}",
-        "PUT",
-        json=process_schema.model_dump(include={"name", "schema"}),
+        "put",
+        json=process_schema.model_dump(
+            include={"name", "spec"}, by_alias=True
+        ),
     )
     if not response.ok:
         raise ConnectionError(
