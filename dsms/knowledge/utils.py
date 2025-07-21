@@ -1307,7 +1307,7 @@ def generate_mapping(ktype_id: str, webform: dict):
 
     sections = webform["sections"]
     mappings = {}
-    mappings["iri"] = webform.get("classMapping")
+    mappings["iri"] = webform.get("class_mapping")
     mappings["suffix"] = "slug"
     mappings["source"] = f"{ktype_id}[*]"
     mappings["suffix_from_location"] = True
