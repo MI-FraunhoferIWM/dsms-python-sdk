@@ -1326,7 +1326,7 @@ def generate_mapping(ktype_id: str, webform: dict):
                     rel_type = relation_mapping.get("type")
                     relation = relation_mapping.get("iri")
                     iri = relation_mapping.get("class_iri")
-                    unit = param.get("measurementUnit")
+                    unit = param.get("measurement_unit")
                     unit = (
                         {"unit": unit.get("iri") or unit.get("symbol")}
                         if unit
@@ -1369,7 +1369,7 @@ def generate_mapping(ktype_id: str, webform: dict):
                                 "object_type": {
                                     "suffix": "max",
                                     "iri": relation_mapping_extra.get(
-                                        "classIri"
+                                        "class_iri"
                                     ),
                                     **unit,
                                 }
