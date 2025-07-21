@@ -497,7 +497,7 @@ def _get_apps_diff(
     exclude = {"id", "kitem_app_id"}
     old_apps = [
         {key: value for key, value in old.items() if key not in exclude}
-        for old in old_kitem.get("kitem_apps")
+        for old in old_kitem.get("apps")
     ]
     new_apps = [new.model_dump() for new in new_kitem.apps]
     differences["kitem_apps_to_update"] = [
@@ -1318,14 +1318,14 @@ def generate_mapping(ktype_id: str, webform: dict):
         if params:
             for param in params:
                 label = param.get("label")
-                relation_mapping = param.get("relationMapping")
-                relation_mapping_extra = param.get("relationMappingExtra")
+                relation_mapping = param.get("relation_mapping")
+                relation_mapping_extra = param.get("relation_mapping_extra")
                 if relation_mapping:
                     widget = param.get("widget")
                     location = to_kebab_case(label)
                     rel_type = relation_mapping.get("type")
                     relation = relation_mapping.get("iri")
-                    iri = relation_mapping.get("classIri")
+                    iri = relation_mapping.get("class_iri")
                     unit = param.get("measurementUnit")
                     unit = (
                         {"unit": unit.get("iri") or unit.get("symbol")}
