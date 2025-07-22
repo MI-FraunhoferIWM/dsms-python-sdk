@@ -115,7 +115,7 @@ class DSMS:
         """
         if isinstance(obj, (KItem, KType, ProcessSchema)) or (
             isinstance(obj, Enum)
-            and isinstance(obj.value, KType, ProcessSchema)
+            and isinstance(obj.value, (KType, ProcessSchema))
         ):
             self.buffers.deleted.update({str(obj.id): obj})
         elif isinstance(obj, AppConfig):

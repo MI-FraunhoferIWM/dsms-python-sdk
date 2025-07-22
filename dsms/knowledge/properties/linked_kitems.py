@@ -208,6 +208,14 @@ class KItemRelationshipModel(BaseModel):
         """Validate the custom properties of the linked KItem"""
         return LinkedKItem(**value.model_dump())
 
+    def fetch(self) -> "KItem":
+        """Fetch remote KItem"""
+        if isinstance(self.kitem, LinkedKItem):
+            item = self.kitem.fetch()  # pylint: disable=no-member
+        else:
+            item = self.kitem
+        return item
+
 
 class LinkedKItemsList(list):
     """KItemPropertyList for linked KItems"""
