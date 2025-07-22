@@ -196,7 +196,7 @@ class KItemRelationshipModel(BaseModel):
         False, description="Whether the relation is incoming"
     )
     label: Optional[str] = Field(None, description="Label of the relation")
-    kitem: Union[LinkedKItem, "KItem"] = Field(..., description="Linked KItem")
+    kitem: Union[LinkedKItem, Any] = Field(..., description="Linked KItem")
     iri: str = Field(
         "http://purl.org/dc/terms/hasPart",
         description="IRI of the linked KItem",
