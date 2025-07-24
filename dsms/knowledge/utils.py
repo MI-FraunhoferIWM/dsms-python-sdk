@@ -1307,7 +1307,7 @@ def generate_mapping(ktype_id: str, webform: dict):
 
     sections = webform["sections"]
     mappings = {}
-    mappings["iri"] = webform.get("class_mapping")
+    mappings["iri"] = webform.get("classMapping")
     mappings["suffix"] = "slug"
     mappings["source"] = f"{ktype_id}[*]"
     mappings["suffix_from_location"] = True
@@ -1318,15 +1318,15 @@ def generate_mapping(ktype_id: str, webform: dict):
         if params:
             for param in params:
                 label = param.get("label")
-                relation_mapping = param.get("relation_mapping")
-                relation_mapping_extra = param.get("relation_mapping_extra")
+                relation_mapping = param.get("relationMapping")
+                relation_mapping_extra = param.get("relationMappingExtra")
                 if relation_mapping:
                     widget = param.get("widget")
                     location = to_kebab_case(label)
                     rel_type = relation_mapping.get("type")
                     relation = relation_mapping.get("iri")
-                    iri = relation_mapping.get("class_iri")
-                    unit = param.get("measurement_unit")
+                    iri = relation_mapping.get("classIri")
+                    unit = param.get("measurementUnit")
                     unit = (
                         {"unit": unit.get("iri") or unit.get("symbol")}
                         if unit
@@ -1369,7 +1369,7 @@ def generate_mapping(ktype_id: str, webform: dict):
                                 "object_type": {
                                     "suffix": "max",
                                     "iri": relation_mapping_extra.get(
-                                        "class_iri"
+                                        "classIri"
                                     ),
                                     **unit,
                                 }
