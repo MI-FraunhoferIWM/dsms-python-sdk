@@ -206,7 +206,14 @@ class KItemRelationshipModel(BaseModel):
     @classmethod
     def validate_kitem(cls, value: Union[LinkedKItem, "KItem"]) -> LinkedKItem:
         """Validate the custom properties of the linked KItem"""
-        return LinkedKItem(**value.model_dump())
+
+        if isinstance(value, BaseModel):
+            value = value.model_dump()
+        if not isinstance(value, dict):
+            raise TypeError(
+                f"Linked KItem does not have a valid type: {type(value)}"
+            )
+        return LinkedKItem(**value)
 
     def fetch(self) -> "KItem":
         """Fetch remote KItem"""
