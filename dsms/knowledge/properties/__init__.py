@@ -21,7 +21,6 @@ from dsms.knowledge.properties.attachments import (  # isort:skip
 
 
 from dsms.knowledge.properties.linked_kitems import (  # isort:skip
-    LinkedKItem,
     LinkedKItemsList,
     KItemRelationshipModel,
 )
@@ -42,7 +41,6 @@ __all__ = [
     "LinkedKItemsList",
     "Author",
     "Avatar",
-    "LinkedKItem",
     "ContactInfo",
     "ExternalLink",
     "Affiliation",
