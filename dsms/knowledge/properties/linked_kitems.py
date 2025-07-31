@@ -1,5 +1,6 @@
 """Linked KItems of a KItem"""
 
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
@@ -12,6 +13,12 @@ from dsms.knowledge.utils import _get_kitem, print_model
 
 if TYPE_CHECKING:
     from dsms import KItem, KType
+
+
+class GeneratedBy(Enum):
+    """Enum to indiacte where the kitem link was generated from"""
+
+    CUSTOM_PROPERTIES = "CUSTOM_PROPERTIES"
 
 
 class LinkedLinkedKItem(BaseModel):
@@ -34,7 +41,8 @@ class KItemRelationshipModel(BaseModel):
 
     is_incoming: bool = Field(
         False,
-        description="Whether the relation is incoming",
+        description="""Whether the relation is incoming. This field is read-only.
+        Link with the field set to `true` are ignored during the commit""",
         allow_mutation=False,
     )
     label: Optional[str] = Field(None, description="Label of the relation")
@@ -44,6 +52,12 @@ class KItemRelationshipModel(BaseModel):
     iri: str = Field(
         "http://purl.org/dc/terms/hasPart",
         description="IRI of the linked KItem",
+    )
+    generated_by: Optional[GeneratedBy] = Field(
+        None,
+        description="""Indicates where the KItem link was generated from.
+        This field is read-only and not pushed to the backend.""",
+        allow_mutation=False,
     )
 
     @field_validator("kitem", mode="after")
