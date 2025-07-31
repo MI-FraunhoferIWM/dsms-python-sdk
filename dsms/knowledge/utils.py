@@ -515,7 +515,9 @@ def _get_linked_diffs(
 ) -> "Dict[str, List[Dict[str, UUID]]]":
     """Get differences in linked kitem from previous KItem state"""
     differences = {}
-    old_linked = [old.get("id") for old in old_kitem.get("linked_kitems")]
+    old_linked = [
+        old["kitem"].get("id") for old in old_kitem.get("linked_kitems")
+    ]
     new_linked = [
         str(new_kitem.kitem.id) for new_kitem in new_kitem.linked_kitems
     ]

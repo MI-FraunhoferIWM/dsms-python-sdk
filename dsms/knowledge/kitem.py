@@ -89,7 +89,7 @@ class KItem(KItemCompactedModel):
     Attributes:
         name (str):
             Human readable name of the KContext.dsms.
-        id (Optional[UUID]):
+        id (Optional[UUID,str]):
             ID of the KItem. Defaults to a new UUID if not provided.
         ktype_id (Union[Enum, str]):
             Type ID of the KItem.
