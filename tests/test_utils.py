@@ -67,14 +67,22 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         ],
         "linked_kitems": [
             {
-                "id": str(get_mock_kitem_ids[1]),
-                "ktype_id": dsms.ktypes.Organization.value,
-                "name": "foo456",
+                "iri": "https://example.org/has_part",
+                "label": "has part",
+                "kitem": {
+                    "id": str(get_mock_kitem_ids[1]),
+                    "ktype_id": dsms.ktypes.Organization.value,
+                    "name": "foo456",
+                },
             },
             {
-                "id": str(get_mock_kitem_ids[2]),
-                "ktype_id": dsms.ktypes.Organization.value,
-                "name": "foo789",
+                "iri": "https://example.org/has_part",
+                "label": "has part",
+                "kitem": {
+                    "id": str(get_mock_kitem_ids[2]),
+                    "ktype_id": dsms.ktypes.Organization.value,
+                    "name": "foo789",
+                },
             },
         ],
         "user_groups": [user_group],
@@ -109,7 +117,8 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
 
     expected = {
         "kitems_to_link": [
-            {"id": str(obj.kitem.id)} for obj in kitem_new.linked_kitems
+            {"id": str(obj.kitem.id), "label": obj.label, "iri": obj.iri}
+            for obj in kitem_new.linked_kitems
         ],
         "annotations_to_link": [
             {
@@ -129,7 +138,12 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
             }
         ],
         "kitems_to_unlink": [
-            {"id": str(linked.id)} for linked in [linked_kitem1, linked_kitem2]
+            {
+                "id": str(linked.id),
+                "label": "has part",
+                "iri": "https://example.org/has_part",
+            }
+            for linked in [linked_kitem1, linked_kitem2]
         ],
         "annotations_to_unlink": [
             {

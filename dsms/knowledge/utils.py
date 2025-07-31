@@ -516,18 +516,29 @@ def _get_linked_diffs(
     """Get differences in linked kitem from previous KItem state"""
     differences = {}
     old_linked = [
-        old["kitem"].get("id") for old in old_kitem.get("linked_kitems")
+        {
+            "id": old["kitem"].get("id"),
+            "label": old["label"],
+            "iri": old["iri"],
+        }
+        for old in old_kitem.get("linked_kitems")
     ]
     new_linked = [
-        str(new_kitem.kitem.id) for new_kitem in new_kitem.linked_kitems
+        {
+            "id": str(new_kitem.kitem.id),
+            "label": new_kitem.label,
+            "iri": new_kitem.iri,
+        }
+        for new_kitem in new_kitem.linked_kitems
     ]
     differences["kitems_to_link"] = [
-        {"id": attr} for attr in new_linked if attr not in old_linked
+        attr for attr in new_linked if attr not in old_linked
     ]
     differences["kitems_to_unlink"] = [
-        {"id": attr} for attr in old_linked if attr not in new_linked
+        attr for attr in old_linked if attr not in new_linked
     ]
     logger.debug("Found differences in linked KItems: %s", differences)
+
     return differences
 
 

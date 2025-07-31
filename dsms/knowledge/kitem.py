@@ -297,6 +297,7 @@ class KItem(KItemCompactedModel):
         """Validate each single kitem to be linked"""
         linked_kitems = []
         logger.debug("Found KItem to link: %s", value)
+
         for item in value:
             if isinstance(item, dict):
                 item = KItemRelationshipModel(**item)

@@ -33,7 +33,9 @@ class KItemRelationshipModel(BaseModel):
     """Data model for a relation between two linked KItems"""
 
     is_incoming: bool = Field(
-        False, description="Whether the relation is incoming"
+        False,
+        description="Whether the relation is incoming",
+        allow_mutation=False,
     )
     label: Optional[str] = Field(None, description="Label of the relation")
     kitem: Union[KItemCompactedModel, Any] = Field(
