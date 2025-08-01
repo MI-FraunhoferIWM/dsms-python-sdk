@@ -21,18 +21,14 @@ class GeneratedBy(Enum):
     CUSTOM_PROPERTIES = "CUSTOM_PROPERTIES"
 
 
-class LinkedLinkedKItem(BaseModel):
-    """Linked KItem of linked KItems"""
+class KItemLinkedModel(KItemCompactedModel):
+    """KItem Linked Model"""
 
-    id: str = Field(..., description="ID of a linked KItem of a linked KItem")
-
-    def __str__(self) -> str:
-        """Pretty print the linked KItems of the linked KItem"""
-        return print_model(self, "linked_kitem")
-
-    def __repr__(self) -> str:
-        """Pretty print the linked KItems of the linked KItem"""
-        return str(self)
+    def fetch(self) -> "KItem":
+        """Fetch the linked KItem"""
+        return Session.kitems.get(str(self.id)) or _get_kitem(
+            Session.dsms, self.id
+        )
 
 
 class KItemRelationshipModel(BaseModel):
@@ -46,7 +42,7 @@ class KItemRelationshipModel(BaseModel):
         allow_mutation=False,
     )
     label: Optional[str] = Field(None, description="Label of the relation")
-    kitem: Union[KItemCompactedModel, Any] = Field(
+    kitem: Union[KItemCompactedModel, KItemLinkedModel, Any] = Field(
         ..., description="Linked KItem"
     )
     iri: str = Field(
@@ -63,8 +59,8 @@ class KItemRelationshipModel(BaseModel):
     @field_validator("kitem", mode="after")
     @classmethod
     def validate_kitem(
-        cls, value: Union[KItemCompactedModel, "KItem"]
-    ) -> KItemCompactedModel:
+        cls, value: Union[KItemCompactedModel, KItemLinkedModel, "KItem"]
+    ) -> KItemLinkedModel:
         """Validate the custom properties of the linked KItem"""
 
         if isinstance(value, BaseModel):
@@ -73,7 +69,7 @@ class KItemRelationshipModel(BaseModel):
             raise TypeError(
                 f"Linked KItem does not have a valid type: {type(value)}"
             )
-        return KItemCompactedModel(**value)
+        return KItemLinkedModel(**value)
 
     def fetch(self) -> "KItem":
         """Fetch remote KItem"""
@@ -83,29 +79,32 @@ class KItemRelationshipModel(BaseModel):
             item = self.kitem
         return item
 
+    def __str__(self) -> str:
+        """Pretty print the relationship fields"""
+        return print_model(
+            self,
+            "relationship",
+            exclude_extra=Session.dsms.config.hide_properties,
+        )
+
+    def __repr__(self) -> str:
+        """Pretty print the relationship Fields"""
+        return str(self)
+
 
 class LinkedKItemsList(list):
     """KItemPropertyList for linked KItems"""
 
     def get(self, kitem_id: "Union[str, UUID]") -> "KItem":
         """Get the kitem with a certain id which is linked to the source KItem."""
-        if not str(kitem_id) in [
-            str(connection.kitem.id) for connection in self
-        ]:
-            raise KeyError(f"A KItem with ID `{kitem_id} is not linked.")
-        return Session.kitems.get(str(kitem_id)) or _get_kitem(kitem_id)
+        return self.by_id[str(kitem_id)]
 
     @property
-    def by_annotation(self) -> "Dict[str, List[KItem]]":
-        """Get the kitems grouped by annotation"""
-        grouped = {}
-        for linked in self:
-            for annotation in linked.kitem.annotations:
-                if not annotation.iri in grouped:
-                    grouped[annotation.iri] = []
-                if not linked in grouped[annotation.iri]:
-                    grouped[annotation.iri].append(linked)
-        return grouped
+    def by_id(self) -> "Dict[str, KItemLinkedModel]":
+        """Get the linked kitems by id"""
+        return {
+            str(connection.kitem.id): connection.kitem for connection in self
+        }
 
     @property
     def by_ktype(self) -> "Dict[KType, List[KItem]]":
@@ -119,3 +118,13 @@ class LinkedKItemsList(list):
             if not linked in grouped[ktype]:
                 grouped[ktype].append(linked.kitem)
         return grouped
+
+    @property
+    def by_relation(self) -> "Dict[str, List[KItem]]":
+        """Get the linked kitems by relation"""
+        by_relation = {}
+        for connection in self:
+            if connection.iri not in by_relation:
+                by_relation[connection.iri] = []
+            by_relation[connection.iri] += [connection.kitem]
+        return by_relation
