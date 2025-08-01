@@ -23,6 +23,7 @@ from dsms.knowledge.properties.attachments import (  # isort:skip
 from dsms.knowledge.properties.linked_kitems import (  # isort:skip
     LinkedKItemsList,
     KItemRelationshipModel,
+    GeneratedBy,
 )
 
 from dsms.knowledge.properties.external_links import (  # isort:skip
@@ -39,6 +40,7 @@ __all__ = [
     "AnnotationList",
     "AttachmentList",
     "LinkedKItemsList",
+    "GeneratedBy",
     "Author",
     "Avatar",
     "ContactInfo",

@@ -541,7 +541,10 @@ def _get_linked_diffs(
     differences["kitems_to_link"] = []
     for attr in new_linked:
         if attr not in old_linked:
-            if attr["generated_by"] == GeneratedBy.CUSTOM_PROPERTIES.value:
+            if attr["generated_by"] in (
+                GeneratedBy.CUSTOM_PROPERTIES.value,
+                GeneratedBy.CUSTOM_PROPERTIES,
+            ):
                 warnings.warn(
                     f"""Link between KItem with id {new_kitem.id} with relation
                     `{attr["iri"]}` to KItem with {attr["id"]}
@@ -562,7 +565,10 @@ def _get_linked_diffs(
     differences["kitems_to_unlink"] = []
     for attr in old_linked:
         if attr not in new_linked:
-            if attr["generated_by"] == GeneratedBy.CUSTOM_PROPERTIES.value:
+            if attr["generated_by"] in (
+                GeneratedBy.CUSTOM_PROPERTIES.value,
+                GeneratedBy.CUSTOM_PROPERTIES,
+            ):
                 warnings.warn(
                     f"""Link between KItem with id {new_kitem.id} with relation
                     `{attr["iri"]}` to KItem with {attr["id"]}
@@ -580,7 +586,6 @@ def _get_linked_diffs(
                 )
             else:
                 differences["kitems_to_unlink"].append(attr)
-
     logger.debug("Found differences in linked KItems: %s", differences)
 
     return differences

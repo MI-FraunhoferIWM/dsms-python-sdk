@@ -2,6 +2,7 @@
 
 from dsms.knowledge.kitem import KItem, KItemCompactedModel
 from dsms.knowledge.ktype import KType, ProcessSchema, WebformSchema
+from dsms.knowledge.properties import GeneratedBy
 
 __all__ = [
     "KItem",
@@ -9,4 +10,5 @@ __all__ = [
     "KItemCompactedModel",
     "ProcessSchema",
     "WebformSchema",
+    "GeneratedBy",
 ]
