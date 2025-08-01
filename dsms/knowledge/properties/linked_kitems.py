@@ -4,6 +4,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
+import yaml
 from pydantic import BaseModel, Field, field_validator
 
 from dsms.core.session import Session
@@ -98,6 +99,24 @@ class LinkedKItemsList(list):
     def get(self, kitem_id: "Union[str, UUID]") -> "KItem":
         """Get the kitem with a certain id which is linked to the source KItem."""
         return self.by_id[str(kitem_id)]
+
+    def __str__(self):
+        """Pretty print the LinkedKItemList"""
+        from dsms.knowledge.utils import dump_model
+
+        return yaml.dump(
+            [
+                dump_model(
+                    connection,
+                    exclude_extra=Session.dsms.config.hide_properties,
+                )
+                for connection in self
+            ]
+        )
+
+    def __repr__(self):
+        """Pretty print the LinkedKItemList"""
+        return str(self)
 
     @property
     def by_id(self) -> "Dict[str, KItemLinkedModel]":

@@ -10,6 +10,7 @@ from pydantic import (  # isort: skip
     Field,
     ValidationInfo,
     field_validator,
+    field_serializer,
 )
 
 from dsms.core.session import Session  # isort: skip
@@ -116,6 +117,11 @@ class KItemCompactedModel(KItemBaseModel):
             )
 
         return value
+
+    @field_serializer("id")
+    def serialize_id(self, value: Union[str, UUID]) -> str:
+        """Serialize KItem ID"""
+        return str(value)
 
     model_config = ConfigDict(
         validate_assignment=True,
