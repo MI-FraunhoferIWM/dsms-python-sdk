@@ -69,6 +69,8 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
             {
                 "iri": "https://example.org/has_part",
                 "label": "has part",
+                "generated_by": None,
+                "is_incoming": False,
                 "kitem": {
                     "id": str(get_mock_kitem_ids[1]),
                     "ktype_id": dsms.ktypes.Organization.value,
@@ -78,6 +80,8 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
             {
                 "iri": "https://example.org/has_part",
                 "label": "has part",
+                "generated_by": None,
+                "is_incoming": False,
                 "kitem": {
                     "id": str(get_mock_kitem_ids[2]),
                     "ktype_id": dsms.ktypes.Organization.value,
@@ -117,7 +121,13 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
 
     expected = {
         "kitems_to_link": [
-            {"id": str(obj.kitem.id), "label": obj.label, "iri": obj.iri}
+            {
+                "id": str(obj.kitem.id),
+                "label": obj.label,
+                "iri": obj.iri,
+                "generated_by": None,
+                "is_incoming": False,
+            }
             for obj in kitem_new.linked_kitems
         ],
         "annotations_to_link": [
@@ -142,6 +152,8 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 "id": str(linked.id),
                 "label": "has part",
                 "iri": "https://example.org/has_part",
+                "generated_by": None,
+                "is_incoming": False,
             }
             for linked in [linked_kitem1, linked_kitem2]
         ],
