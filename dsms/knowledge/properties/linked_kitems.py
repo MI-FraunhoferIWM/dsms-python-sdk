@@ -53,8 +53,7 @@ class KItemRelationshipModel(BaseModel):
     generated_by: Optional[GeneratedBy] = Field(
         None,
         description="""Indicates where the KItem link was generated from.
-        This field is read-only and not pushed to the backend.""",
-        allow_mutation=False,
+        This field is read-only and will not pushed to the backend.""",
     )
 
     @field_validator("kitem", mode="after")
