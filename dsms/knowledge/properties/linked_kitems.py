@@ -1,6 +1,5 @@
 """Linked KItems of a KItem"""
 
-from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
@@ -14,12 +13,6 @@ from dsms.knowledge.utils import _get_kitem, print_model
 
 if TYPE_CHECKING:
     from dsms import KItem, KType
-
-
-class GeneratedBy(Enum):
-    """Enum to indiacte where the kitem link was generated from"""
-
-    CUSTOM_PROPERTIES = "CUSTOM_PROPERTIES"
 
 
 class KItemLinkedModel(KItemCompactedModel):
@@ -50,9 +43,10 @@ class KItemRelationshipModel(BaseModel):
         "http://purl.org/dc/terms/hasPart",
         description="IRI of the linked KItem",
     )
-    generated_by: Optional[GeneratedBy] = Field(
+    generated_by: Optional[str] = Field(
         None,
-        description="""Indicates where the KItem link was generated from.
+        description="""Indicates from which field in the custom properties
+        section the KItem link was optionally generated from.
         This field is read-only and will not pushed to the backend.""",
     )
 
