@@ -630,7 +630,7 @@ def _get_kitem_contexts(
     """Get KItem contexts"""
 
     differences = {}
-    old_contexts = [old.get("id") for old in old_kitem.get("contexts")]
+    old_contexts = [old.get("id") for old in old_kitem.get("contexts", [])]
     new_contexts = [str(new_kitem.id) for new_kitem in kitem_new.contexts]
 
     differences["contexts_to_add_in"] = [
