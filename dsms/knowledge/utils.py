@@ -363,6 +363,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "created_at",
             "dataframe",
             "access_url",
+            "contexts",
         },
         exclude_defaults=True,
     )
