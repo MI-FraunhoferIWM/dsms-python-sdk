@@ -594,7 +594,6 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     attributes = [
         ("annotations", ("annotations", "link", "unlink")),
         ("user_groups", ("user_groups", "add", "remove")),
-        ("contexts", ("contexts", "add_in", "remove_from")),
     ]
     to_compare = kitem_new.model_dump(
         include={"annotations", "user_groups", "contexts"}
@@ -616,10 +615,32 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     # linked kitems need special treatment since the linked target
     # kitems also might differ in their new properties in some cases.
     linked_kitems = _get_linked_diffs(kitem_old, kitem_new)
+    # contexts
+    context_kitems = _get_kitem_contexts(kitem_old, kitem_new)
     # same holds for kitem apps
     apps = _get_apps_diff(kitem_old, kitem_new)
     # merge with previously found differences
-    differences.update(**linked_kitems, **apps)
+    differences.update(**linked_kitems, **apps, **context_kitems)
+    return differences
+
+
+def _get_kitem_contexts(
+    old_kitem: "Dict[str, Any]", kitem_new: "KItem"
+) -> "Dict[str, list[str]]":
+    """Get KItem contexts"""
+
+    differences = {}
+    old_contexts = [old.get("id") for old in old_kitem.get("contexts")]
+    new_contexts = [str(new_kitem.id) for new_kitem in kitem_new.contexts]
+
+    differences["contexts_to_add_in"] = [
+        attr for attr in new_contexts if attr not in old_contexts
+    ]
+    differences["contexts_to_remove_from"] = [
+        attr for attr in old_contexts if attr not in new_contexts
+    ]
+    logger.debug("Found differences in Context KItems: %s", differences)
+
     return differences
 
 

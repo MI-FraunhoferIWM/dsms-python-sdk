@@ -52,7 +52,6 @@ from dsms.knowledge.ktype import KType  # isort:skip
 
 from dsms.knowledge.utils import (  # isort:skip
     _inspect_dataframe,
-    _get_kitem,
     _make_annotation_schema,
     _refresh_kitem,
     _transform_custom_properties_schema,
@@ -455,12 +454,9 @@ class KItem(KItemCompactedModel):
             for item in value:
                 if isinstance(  # pylint: disable=isinstance-second-argument-not-valid-type
                     item,
-                    cls,
+                    (cls, KItemBaseModel),
                 ):
                     new_list += [KItemCompactedModel(**item.model_dump())]
-                elif isinstance(item, KItemBaseModel):
-                    item = _get_kitem(item.id, as_json=True)
-                    new_list += [KItemCompactedModel(**item)]
                 elif isinstance(item, KItemCompactedModel):
                     new_list += [item]
                 else:
