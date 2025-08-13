@@ -232,6 +232,8 @@ def _update_ktype(dsms: "DSMS", ktype: "KType") -> Response:
         exclude={
             "created_at",
             "updated_at",
+            "webform_schema",
+            "process_schema",
         },
     )
     logger.debug("Update KType for `%s` with body: %s", ktype.id, payload)
