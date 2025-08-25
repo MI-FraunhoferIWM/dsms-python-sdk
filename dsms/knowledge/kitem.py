@@ -1,12 +1,10 @@
-"""Knowledge Item implementation of the DSMS"""
+"""Full Knowledge Item implementation of the DSMS"""
 
 import logging
 import warnings
 from datetime import datetime
-from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
-from uuid import UUID, uuid4
 
 import pandas as pd
 from rdflib import Graph
@@ -14,7 +12,6 @@ from rdflib import Graph
 from pydantic import (  # isort:skip
     BaseModel,
     AliasChoices,
-    ConfigDict,
     Field,
     ValidationInfo,
     field_validator,
@@ -24,6 +21,11 @@ from pydantic import (  # isort:skip
 from dsms.core.logging import handler  # isort:skip
 
 from dsms.core.session import Session  # isort:skip
+
+from dsms.knowledge.compacted import (  # isort:skip
+    KItemBaseModel,
+    KItemCompactedModel,
+)
 
 from dsms.knowledge.properties import (  # isort:skip
     Affiliation,
@@ -39,16 +41,16 @@ from dsms.knowledge.properties import (  # isort:skip
     ExternalLink,
     DataFrameContainer,
     Column,
-    LinkedKItem,
+    KItemRelationshipModel,
     LinkedKItemsList,
     Summary,
     UserGroup,
 )
 
+
 from dsms.knowledge.ktype import KType  # isort:skip
 
 from dsms.knowledge.utils import (  # isort:skip
-    _slugify,
     _inspect_dataframe,
     _make_annotation_schema,
     _refresh_kitem,
@@ -79,42 +81,24 @@ logger.propagate = False
 DATETIME_FRMT = "%Y-%m-%dT%H:%M:%S.%f"
 
 
-class KItemCompactedModel(BaseModel):
-    """
-    KItem compacted model for the search-endpoint."""
-
-    name: str
-    id: UUID
-    ktype_id: str
-    slug: str
-
-    def __str__(self) -> str:
-        """Pretty print the kitem fields"""
-        return print_model(self, "kitem")
-
-    def __repr__(self) -> str:
-        """Pretty print the kitem Fields"""
-        return str(self)
-
-
-class KItem(BaseModel):
+class KItem(KItemCompactedModel):
     """
     Knowledge Item of the DSMS.
 
     Attributes:
         name (str):
-            Human readable name of the KContext.dsms.
-        id (Optional[UUID]):
+            Human readable name of the KItem
+        id (Optional[UUID,str]):
             ID of the KItem. Defaults to a new UUID if not provided.
         ktype_id (Union[Enum, str]):
             Type ID of the KItem.
         slug (Optional[str]):
-            Slug of the KContext.dsms. Minimum length: 4.
+            Slug of the KItem. Minimum length: 4.
         annotations (List[Annotation]):
             Annotations of the KItem.
         attachments (List[Union[Attachment, str]]):
             File attachments of the DSMS.
-        linked_kitems (List[Union[LinkedKItem, "KItem"]]):
+        linked_kitems (List[Union[KItemRelationshipModel, "KItem"]]):
             KItems linked to the current KItem.
         affiliations (List[Affiliation]):
             Affiliations related to a KItem.
@@ -139,27 +123,12 @@ class KItem(BaseModel):
             Custom properties associated with the KItem.
         dataframe (Optional[Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]]):
             DataFrame interface.
+        contexts (Optional[List[Union["KItem", KItemBaseModel, KItemCompactedModel]]])
+            Context KItems related to the KItem.
     """
 
     # public
 
-    name: str = Field(
-        ..., description="Human readable name of the KItem", max_length=300
-    )
-    id: Optional[UUID] = Field(
-        default_factory=uuid4,
-        description="ID of the KItem",
-    )
-    ktype_id: Union[Enum, str] = Field(..., description="Type ID of the KItem")
-    ktype: Optional[Union[Enum, KType]] = Field(
-        None, description="KType of the KItem", exclude=True
-    )
-    slug: Optional[str] = Field(
-        None,
-        description="Slug of the KItem",
-        min_length=4,
-        max_length=1000,
-    )
     annotations: List[Union[str, Annotation]] = Field(
         [], description="Annotations of the KItem"
     )
@@ -167,7 +136,7 @@ class KItem(BaseModel):
         [],
         description="File attachements of the DSMS",
     )
-    linked_kitems: List[Union[LinkedKItem, "KItem"]] = Field(
+    linked_kitems: List[Union[KItemRelationshipModel, "KItem"]] = Field(
         [],
         description="KItems linked to the current KItem.",
     )
@@ -223,11 +192,11 @@ class KItem(BaseModel):
         default_factory=Avatar, description="KItem avatar interface"
     )
 
-    model_config = ConfigDict(
-        validate_assignment=True,
-        validate_default=True,
-        exclude={"ktype", "avatar"},
-        arbitrary_types_allowed=True,
+    contexts: List[
+        Union["KItem", KItemCompactedModel, KItemBaseModel]
+    ] = Field(
+        [],
+        description="Contextualized KItems related to this one.",
     )
 
     def __init__(self, **kwargs: "Any") -> None:
@@ -322,19 +291,26 @@ class KItem(BaseModel):
     @classmethod
     def validate_linked_kitems_list(
         cls,
-        value: "List[Union[LinkedKItem, KItem]]",
-    ) -> List[LinkedKItem]:
+        value: "List[Union[KItemRelationshipModel, KItem]]",
+    ) -> List[KItemRelationshipModel]:
         """Validate each single kitem to be linked"""
         linked_kitems = []
         logger.debug("Found KItem to link: %s", value)
+
         for item in value:
             if isinstance(item, dict):
-                item = LinkedKItem(**item)
-            elif isinstance(item, BaseModel):
-                item = LinkedKItem(**item.model_dump())
+                item = KItemRelationshipModel(**item)
+            elif isinstance(item, BaseModel) and not isinstance(item, cls):
+                item = KItemRelationshipModel(**item.model_dump())
+            elif isinstance(item, cls):
+                warnings.warn(
+                    f"Found a {type(item)} to be linked instead of an {KItemRelationshipModel}."
+                    " Will link it with the default relationship 'dcterms:haspart'."
+                )
+                item = KItemRelationshipModel(kitem=item, label="Has Part")
             else:
                 raise TypeError(
-                    "Expected either a LinkedKItem or a KItem to be linked."
+                    "Expected either a {KItemRelationshipModel} or a KItem to be linked."
                 )
             linked_kitems.append(item)
         return linked_kitems
@@ -343,7 +319,7 @@ class KItem(BaseModel):
     @classmethod
     def validate_linked_kitems(
         cls,
-        value: List[LinkedKItem],
+        value: List[KItemRelationshipModel],
     ) -> LinkedKItemsList:
         """Validate the list out of linked KItems"""
         return LinkedKItemsList(value)
@@ -364,71 +340,6 @@ class KItem(BaseModel):
 
         if isinstance(value, str):
             value = datetime.strptime(value, DATETIME_FRMT)
-        return value
-
-    @field_validator("ktype_id")
-    @classmethod
-    def validate_ktype_id(cls, value: Union[str, Enum]) -> KType:
-        """Validate the ktype id of the KItem"""
-
-        if isinstance(value, str):
-            ktype = Session.ktypes.get(value)
-            if not ktype:
-                raise TypeError(
-                    f"KType for `ktype_id={value}` does not exist."
-                )
-            value = ktype
-        if not hasattr(value, "id"):
-            raise TypeError(
-                "Not a valid KType. Provided Enum does not have an `id`."
-            )
-
-        return value.id
-
-    @field_validator("ktype")
-    @classmethod
-    def validate_ktype(
-        cls, value: Optional[Union[KType, Enum]], info: ValidationInfo
-    ) -> KType:
-        """Validate the ktype of the KItem"""
-
-        ktype_id = info.data.get("ktype_id")
-
-        if not value:
-            value = Session.ktypes.get(ktype_id)
-            if not value:
-                raise TypeError(
-                    f"KType for `ktype_id={ktype_id}` does not exist."
-                )
-        if not hasattr(value, "id"):
-            raise TypeError(
-                "Not a valid KType. Provided Enum does not have an `id`."
-            )
-
-        if value.id != ktype_id:
-            raise TypeError(
-                f"KType for `ktype_id={ktype_id}` does not match "
-                f"the provided `ktype`."
-            )
-
-        return value
-
-    @field_validator("slug")
-    @classmethod
-    def validate_slug(cls, value: str, info: ValidationInfo) -> str:
-        """Validate slug"""
-
-        kitem_id = info.data["id"]
-        name = info.data["name"]
-
-        if not value:
-            value = _slugify(name)
-            if len(value) < 4:
-                raise ValueError(
-                    "Slug length must have a minimum length of 4."
-                )
-            if Session.dsms.config.individual_slugs:
-                value += f"-{str(kitem_id).split('-', maxsplit=1)[0]}"
         return value
 
     @field_validator("summary")
@@ -497,7 +408,7 @@ class KItem(BaseModel):
                     Will be transformed into `KItemCustomPropertiesModel`."""
                 )
                 value = _transform_custom_properties_schema(
-                    value, ktype.webform
+                    value, ktype.webform_schema
                 )
             value = KItemCustomPropertiesModel(**value)
         elif not isinstance(value, (KItemCustomPropertiesModel, type(None))):
@@ -517,6 +428,42 @@ class KItem(BaseModel):
                 for entry in section.entries:
                     entry.kitem_id = kitem_id
                     cls.validate_custom_property_entry(entry, ktype)
+        return value
+
+    @field_validator("contexts")
+    def _validate_contexts(
+        cls,
+        value: Optional[
+            List[Union["KItem", KItemBaseModel, KItemCompactedModel]]
+        ],
+    ) -> List[Optional[KItemCompactedModel]]:
+        """
+        Ensure that all items in the contexts list are instances of the `KItemCompactModel`.
+        Accepted class instances such as `KItem` or `KItemBaseModel` will be transformed into
+        an instance of `KItemCompactedModel`. If any item is not an instance of either class,
+        raise a TypeError.
+        Args:
+            value (Optional[List[KItem, KItemBaseModel, KItemCompactedModel]]):
+                The list of items to validate.
+        Returns:
+            List[KItemCompactedModel]: The validated list of items.
+        Raises:
+            TypeError: If any item in the contexts list is not an instance of either class.
+        """
+
+        if value is not None:
+            new_list = []
+            for item in value:
+                if isinstance(  # pylint: disable=isinstance-second-argument-not-valid-type
+                    item,
+                    (cls, KItemBaseModel),
+                ):
+                    new_list += [KItemCompactedModel(**item.model_dump())]
+                elif isinstance(item, KItemCompactedModel):
+                    new_list += [item]
+                else:
+                    raise TypeError(f"Invalid item in contexts list: {item}")
+            value = new_list
         return value
 
     @classmethod
@@ -545,8 +492,12 @@ class KItem(BaseModel):
         """
 
         spec: "List[Input]" = []
-        if ktype.webform:  # pylint: disable=no-member
-            for section in ktype.webform.sections:  # pylint: disable=no-member
+        if ktype.webform_schema:  # pylint: disable=no-member
+            for (
+                section
+            ) in (
+                ktype.webform_schema.spec.sections
+            ):  # pylint: disable=no-member
                 for inp in section.inputs:
                     if inp.id == entry.id:
                         spec.append(inp)

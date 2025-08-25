@@ -48,7 +48,9 @@ Please take the compability of the SDK version with the DSMS version into accoun
 | >=3.0.0, <3.0.4 | >=3.0.0, <3.0.5 |
 | >=3.0.4, <3.1.0 | >=3.0.5, <3.1.0 |
 | >=3.1.0, <3.2.2 | >=3.1.0, <3.2.1 |
-| >=3.2.2 | >=3.2.1 |
+| >=3.2.2 | >=3.2.1, <4.0.0 |
+| >=4.0.0 | >=4.0.0 |
+
 
 ## Tutorials
 

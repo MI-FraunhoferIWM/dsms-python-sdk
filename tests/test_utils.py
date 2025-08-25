@@ -67,18 +67,28 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         ],
         "linked_kitems": [
             {
-                "id": str(get_mock_kitem_ids[1]),
-                "ktype_id": dsms.ktypes.Organization.value,
-                "name": "foo456",
+                "iri": "https://example.org/has_part",
+                "label": "has part",
+                "is_incoming": False,
+                "kitem": {
+                    "id": str(get_mock_kitem_ids[1]),
+                    "ktype_id": dsms.ktypes.Organization.value,
+                    "name": "foo456",
+                },
             },
             {
-                "id": str(get_mock_kitem_ids[2]),
-                "ktype_id": dsms.ktypes.Organization.value,
-                "name": "foo789",
+                "iri": "https://example.org/has_part",
+                "label": "has part",
+                "is_incoming": False,
+                "kitem": {
+                    "id": str(get_mock_kitem_ids[2]),
+                    "ktype_id": dsms.ktypes.Organization.value,
+                    "name": "foo789",
+                },
             },
         ],
         "user_groups": [user_group],
-        "kitem_apps": [
+        "apps": [
             {
                 "id": get_mock_kitem_ids[0],
                 "kitem_app_id": 17,
@@ -104,12 +114,18 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         ],
         linked_kitems=[linked_kitem3],
         user_groups=[user_group],
-        kitem_apps=[app],
+        apps=[app],
     )
 
     expected = {
         "kitems_to_link": [
-            {"id": str(obj.id)} for obj in kitem_new.linked_kitems
+            {
+                "id": str(obj.kitem.id),
+                "label": obj.label,
+                "iri": obj.iri,
+                "is_incoming": False,
+            }
+            for obj in kitem_new.linked_kitems
         ],
         "annotations_to_link": [
             {
@@ -129,7 +145,13 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
             }
         ],
         "kitems_to_unlink": [
-            {"id": str(linked.id)} for linked in [linked_kitem1, linked_kitem2]
+            {
+                "id": str(linked.id),
+                "label": "has part",
+                "iri": "https://example.org/has_part",
+                "is_incoming": False,
+            }
+            for linked in [linked_kitem1, linked_kitem2]
         ],
         "annotations_to_unlink": [
             {
@@ -148,6 +170,8 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 "additional_properties": None,
             }
         ],
+        "contexts_to_add_in": [],
+        "contexts_to_remove_from": [],
     }
     diffs = _get_kitems_diffs(kitem_old, kitem_new)
 

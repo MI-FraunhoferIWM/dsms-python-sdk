@@ -184,6 +184,7 @@ class RelationMapping(BaseWebformModel):
     """Relation mapping"""
 
     iri: Optional[str] = Field(None, description="IRI of the annotation")
+    label: Optional[str] = Field(None, description="Label of the annotation")
     type: Optional[RelationMappingType] = Field(
         None, description="Type of the annotation"
     )

@@ -30,12 +30,38 @@ if TYPE_CHECKING:
     from dsms import DSMS
     from dsms.apps import AppConfig
     from dsms.core.session import Buffers
-    from dsms.knowledge import KItem, KType
+    from dsms.knowledge import KItem, KType, ProcessSchema, WebformSchema
     from dsms.knowledge.properties import Attachment
 
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.propagate = False
+
+FIELDTYPE_TO_XSD = {
+    "Text": "string",
+    "Number": "float",
+    "Slider": "float",
+    "Textarea": "string",
+    "Radio": "string",
+    "Select": "string",
+    "File": "string",
+    "Checkbox": "boolean",
+    "Knowledge item": "anyURI",
+    "VocabularyTerm": "anyURI",
+}
+
+
+def map_fieldtype_to_xsd(fieldtype):
+    """
+    Maps the fieldtype to an XSD type.
+
+    Args:
+        fieldtype (str): The fieldtype to map.
+
+    Returns:
+        str: The XSD type.
+    """
+    return FIELDTYPE_TO_XSD.get(fieldtype, "string")
 
 
 def _is_number(value):
@@ -203,6 +229,12 @@ def _update_ktype(dsms: "DSMS", ktype: "KType") -> Response:
     payload = ktype.model_dump(
         exclude_none=True,
         by_alias=True,
+        exclude={
+            "created_at",
+            "updated_at",
+            "webform_schema",
+            "process_schema",
+        },
     )
     logger.debug("Update KType for `%s` with body: %s", ktype.id, payload)
     response = _perform_request(
@@ -212,6 +244,7 @@ def _update_ktype(dsms: "DSMS", ktype: "KType") -> Response:
         raise ValueError(
             f"KType with uuid `{ktype.id}` could not be updated in DSMS: {response.text}`"
         )
+
     return response
 
 
@@ -332,6 +365,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "created_at",
             "dataframe",
             "access_url",
+            "contexts",
         },
         exclude_defaults=True,
     )
@@ -466,7 +500,7 @@ def _get_apps_diff(
     exclude = {"id", "kitem_app_id"}
     old_apps = [
         {key: value for key, value in old.items() if key not in exclude}
-        for old in old_kitem.get("kitem_apps")
+        for old in old_kitem.get("apps")
     ]
     new_apps = [new.model_dump() for new in new_kitem.apps]
     differences["kitem_apps_to_update"] = [
@@ -483,16 +517,55 @@ def _get_linked_diffs(
     old_kitem: "Dict[str, Any]", new_kitem: "KItem"
 ) -> "Dict[str, List[Dict[str, UUID]]]":
     """Get differences in linked kitem from previous KItem state"""
+
     differences = {}
-    old_linked = [old.get("id") for old in old_kitem.get("linked_kitems")]
-    new_linked = [str(new_kitem.id) for new_kitem in new_kitem.linked_kitems]
-    differences["kitems_to_link"] = [
-        {"id": attr} for attr in new_linked if attr not in old_linked
+    old_linked = [
+        {
+            "id": old["kitem"].get("id"),
+            "label": old["label"],
+            "iri": old["iri"],
+            "is_incoming": old["is_incoming"],
+        }
+        for old in old_kitem.get("linked_kitems")
     ]
-    differences["kitems_to_unlink"] = [
-        {"id": attr} for attr in old_linked if attr not in new_linked
+    new_linked = [
+        {
+            "id": str(new_kitem.kitem.id),
+            "label": new_kitem.label,
+            "iri": new_kitem.iri,
+            "is_incoming": new_kitem.is_incoming,
+        }
+        for new_kitem in new_kitem.linked_kitems
     ]
+
+    differences["kitems_to_link"] = []
+    for attr in new_linked:
+        if attr not in old_linked:
+            if attr["is_incoming"] is True:
+                warnings.warn(
+                    f"""KItem with id {new_kitem.id} linked with relation
+                    `{attr["iri"]}` to KItem with {attr["id"]}
+                    is a new link, marked as `incoming`.
+                    Incoming links will be ignored during commit.
+                    Please add the link at the source KItem with id {attr["id"]}"""
+                )
+            else:
+                differences["kitems_to_link"].append(attr)
+    differences["kitems_to_unlink"] = []
+    for attr in old_linked:
+        if attr not in new_linked:
+            if attr["is_incoming"] is True:
+                warnings.warn(
+                    f"""KItem with id {new_kitem.id} linked with relation
+                    `{attr["iri"]}` to KItem with {attr["id"]}
+                    is an existing link, marked as `incoming` and scheduled to be unlinked.
+                    Incoming links will be ignored during commit.
+                    Please edit the link at the source KItem with id {attr["id"]}"""
+                )
+            else:
+                differences["kitems_to_unlink"].append(attr)
     logger.debug("Found differences in linked KItems: %s", differences)
+
     return differences
 
 
@@ -524,12 +597,14 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
         ("annotations", ("annotations", "link", "unlink")),
         ("user_groups", ("user_groups", "add", "remove")),
     ]
-    to_compare = kitem_new.model_dump(include={"annotations", "user_groups"})
+    to_compare = kitem_new.model_dump(
+        include={"annotations", "user_groups", "contexts"}
+    )
     for name, terms in attributes:
         to_add_name = terms[0] + "_to_" + terms[1]
         to_remove_name = terms[0] + "_to_" + terms[2]
-        old_attr = kitem_old.get(name)
-        new_attr = to_compare.get(name)
+        old_attr = kitem_old.get(name, [])
+        new_attr = to_compare.get(name, [])
         differences[to_add_name] = [
             attr for attr in new_attr if attr not in old_attr
         ]
@@ -542,20 +617,42 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     # linked kitems need special treatment since the linked target
     # kitems also might differ in their new properties in some cases.
     linked_kitems = _get_linked_diffs(kitem_old, kitem_new)
+    # contexts
+    context_kitems = _get_kitem_contexts(kitem_old, kitem_new)
     # same holds for kitem apps
     apps = _get_apps_diff(kitem_old, kitem_new)
     # merge with previously found differences
-    differences.update(**linked_kitems, **apps)
+    differences.update(**linked_kitems, **apps, **context_kitems)
+    return differences
+
+
+def _get_kitem_contexts(
+    old_kitem: "Dict[str, Any]", kitem_new: "KItem"
+) -> "Dict[str, list[str]]":
+    """Get KItem contexts"""
+
+    differences = {}
+    old_contexts = [old.get("id") for old in old_kitem.get("contexts", [])]
+    new_contexts = [str(new_kitem.id) for new_kitem in kitem_new.contexts]
+
+    differences["contexts_to_add_in"] = [
+        attr for attr in new_contexts if attr not in old_contexts
+    ]
+    differences["contexts_to_remove_from"] = [
+        attr for attr in old_contexts if attr not in new_contexts
+    ]
+    logger.debug("Found differences in Context KItems: %s", differences)
+
     return differences
 
 
 def _commit(buffers: "Buffers") -> None:
     """Commit the buffers for the
     created, updated and deleted buffers"""
-    from dsms import AppConfig, KItem, KType
+    from dsms import AppConfig, KItem, KType, ProcessSchema, WebformSchema
 
     logger.debug("Committing KItems in buffers. Current buffers:")
-    logger.debug("Current Addded-buffer: %s", buffers.added)
+    logger.debug("Current Added-buffer: %s", buffers.added)
     logger.debug("Current Deleted-buffer: %s", buffers.deleted)
     had_ktypes = False
     for obj in buffers.added.values():
@@ -590,6 +687,16 @@ def _commit(buffers: "Buffers") -> None:
         elif isinstance(obj, KType) or (
             isinstance(obj, Enum) and isinstance(obj.value, KType)
         ):
+            if obj.webform_schema:
+                if obj.webform_schema_id not in obj.dsms.webform_schemas:
+                    _create_webform_schema(obj.dsms, obj.webform_schema)
+                else:
+                    _update_webform_schema(obj.dsms, obj.webform_schema)
+            if obj.process_schema:
+                if obj.process_schema_id not in obj.dsms.process_schemas:
+                    _create_process_schema(obj.dsms, obj.process_schema)
+                else:
+                    _update_process_schema(obj.dsms, obj.process_schema)
             old_ktype = _get_ktype(
                 obj.dsms, obj.id, as_json=True, raise_error=False
             )
@@ -600,6 +707,17 @@ def _commit(buffers: "Buffers") -> None:
 
         elif isinstance(obj, AppConfig):
             _create_or_update_app_spec(obj, overwrite=True)
+        elif isinstance(obj, ProcessSchema):
+            if obj.id not in obj.dsms.process_schemas:
+                _create_process_schema(obj.dsms, obj)
+            else:
+                _update_process_schema(obj.dsms, obj)
+
+        elif isinstance(obj, WebformSchema):
+            if obj.id not in obj.dsms.webform_schemas:
+                _create_webform_schema(obj.dsms, obj)
+            else:
+                _update_webform_schema(obj.dsms, obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed."
@@ -617,6 +735,10 @@ def _commit(buffers: "Buffers") -> None:
         ):
             _delete_ktype(obj)
             had_ktypes = True
+        elif isinstance(obj, ProcessSchema):
+            _delete_process_schema(obj)
+        elif isinstance(obj, WebformSchema):
+            _delete_webform_schema(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed or deleted."
@@ -624,6 +746,96 @@ def _commit(buffers: "Buffers") -> None:
     if Session.dsms.config.auto_refresh and had_ktypes:
         Session.dsms.refresh_ktypes()
     logger.debug("Committing successful, clearing buffers.")
+
+
+def _create_webform_schema(
+    dsms: "DSMS", webform_schema: "WebformSchema"
+) -> None:
+    """Create a new webform schema in the remote backend"""
+    response = _perform_request(
+        dsms,
+        "api/knowledge-type/webform-schemas/",
+        "post",
+        json=webform_schema.model_dump(
+            include={"name", "id", "spec"}, by_alias=True
+        ),
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to create process schema: {response.text}"
+        )
+    for key, value in response.json().items():
+        setattr(webform_schema, key, value)
+
+
+def _update_webform_schema(
+    dsms: "DSMS", webform_schema: "WebformSchema"
+) -> None:
+    """Update an existing webform schema in the remote backend"""
+    response = _perform_request(
+        dsms,
+        f"api/knowledge-type/webform-schemas/{webform_schema.id}",
+        "put",
+        json=webform_schema.model_dump(include={"name", "spec"}),
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to update webform schema: {response.text}"
+        )
+    for key, value in response.json().items():
+        setattr(webform_schema, key, value)
+
+
+def _get_webform_schemas(dsms: "DSMS"):
+    from dsms.knowledge.ktype import WebformSchema
+
+    response = _perform_request(
+        dsms,
+        "api/knowledge-type/webform-schemas/",
+        "get",
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to fetch webform schemas: {response.text}"
+        )
+    schemas = {
+        schema["id"]: WebformSchema(**schema) for schema in response.json()
+    }
+    return schemas
+
+
+def _delete_webform_schema(dsms: "DSMS", webform_schema_id: str) -> None:
+    """Delete an existing webform schema in the remote backend"""
+    response = _perform_request(
+        dsms,
+        f"api/knowledge-type/webform-schemas/{webform_schema_id}",
+        "delete",
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to delete webform schema: {response.text}"
+        )
+
+
+def _create_process_schema(
+    dsms: "DSMS", process_schema: "ProcessSchema"
+) -> None:
+    """Create a new process schema in the remote backend"""
+
+    response = _perform_request(
+        dsms,
+        "api/knowledge-type/process-schemas/",
+        "post",
+        json=process_schema.model_dump(
+            include={"id", "name", "spec"}, by_alias=True
+        ),
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to create process schema: {response.text}"
+        )
+    for key, value in response.json().items():
+        setattr(process_schema, key, value)
 
 
 def _refresh_kitem(kitem: "KItem") -> None:
@@ -915,7 +1127,7 @@ def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
     if webform:
         copy_properties = custom_properties.copy()
         transformed_sections = {}
-        for section_def in webform.sections:
+        for section_def in webform.spec.sections:
             for input_def in section_def.inputs:
                 if input_def.label in copy_properties:
                     if input_def.measurement_unit:
@@ -1081,3 +1293,169 @@ def generate_id(prefix: str = "id") -> str:
     # Combine prefix, unique part, and random part
     generated_id = f"{prefix}{unique_part}{random_part}"
     return generated_id
+
+
+def _get_process_schemas(dsms: "DSMS"):
+    from dsms.knowledge.ktype import ProcessSchema
+
+    response = _perform_request(
+        dsms,
+        "api/knowledge-type/process-schemas/",
+        "GET",
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to fetch process schemas: {response.text}"
+        )
+    schemas = {
+        schema["id"]: ProcessSchema(**schema) for schema in response.json()
+    }
+    return schemas
+
+
+def _update_process_schema(
+    dsms: "DSMS", process_schema: "ProcessSchema"
+) -> None:
+    response = _perform_request(
+        dsms,
+        f"api/knowledge-type/process-schemas/{process_schema.id}",
+        "put",
+        json=process_schema.model_dump(
+            include={"name", "spec"}, by_alias=True
+        ),
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to update process schema: {response.text}"
+        )
+    process_schema.refresh()
+
+
+def _delete_process_schema(
+    dsms: "DSMS", process_schema: "ProcessSchema"
+) -> None:
+    response = _perform_request(
+        dsms,
+        f"api/knowledge-type/process-schemas/{process_schema.id}",
+        "DELETE",
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to delete process schema: {response.text}"
+        )
+
+
+def to_kebab_case(name: str):
+    """
+    Converts a multi word string into single string representation.
+
+    :param name: the string representing multi values.
+    :return: ID representation of the given string.
+    """
+    sentence = name.lower().replace(" ", "-")
+    return sentence
+
+
+def generate_mapping(ktype_id: str, webform: dict):
+    """
+    Extracts the RDF mapping from the webform spec
+
+    :param ktype_id: ID of the knowledge type.
+    :param webform: Webform data.
+    :return: mapping in the form of a dictionary.
+    """
+    name_exists = False
+
+    sections = webform["sections"]
+    mappings = {}
+    mappings["iri"] = webform.get("classMapping")
+    mappings["suffix"] = "slug"
+    mappings["source"] = f"{ktype_id}[*]"
+    mappings["suffix_from_location"] = True
+    mappings["custom_relations"] = []
+
+    for section in sections:
+        params = section.get("inputs")
+        if params:
+            for param in params:
+                label = param.get("label")
+                relation_mapping = param.get("relationMapping")
+                relation_mapping_extra = param.get("relationMappingExtra")
+                if relation_mapping:
+                    widget = param.get("widget")
+                    location = to_kebab_case(label)
+                    rel_type = relation_mapping.get("type")
+                    relation = relation_mapping.get("iri")
+                    iri = relation_mapping.get("classIri")
+                    unit = param.get("measurementUnit")
+                    unit = (
+                        {"unit": unit.get("iri") or unit.get("symbol")}
+                        if unit
+                        else {}
+                    )
+
+                    if rel_type == "object_property":
+                        object_type = {"iri": iri, **unit}
+                    else:
+                        object_type = map_fieldtype_to_xsd(widget)
+
+                    if widget == "Knowledge item":
+                        object_type = "anyURI"
+                        rel_type = "object_property"
+
+                    custom_relation = {
+                        "object_location": location,
+                        "relation": relation,
+                        "relation_type": rel_type,
+                        "object_type": object_type,
+                    }
+                    mappings["custom_relations"].append(custom_relation)
+
+                    if widget == "Slider" and relation_mapping_extra:
+                        custom_relation["object_location"] += "[0]"
+                        if rel_type == "object_property":
+                            custom_relation["object_type"] = {
+                                "suffix": "min",
+                                "iri": iri,
+                                **unit,
+                            }
+
+                        mappings["custom_relations"].append(
+                            {
+                                "object_location": location + "[1]",
+                                "relation": relation_mapping_extra.get("iri"),
+                                "relation_type": relation_mapping_extra.get(
+                                    "type"
+                                ),
+                                "object_type": {
+                                    "suffix": "max",
+                                    "iri": relation_mapping_extra.get(
+                                        "classIri"
+                                    ),
+                                    **unit,
+                                }
+                                if relation_mapping_extra.get("type")
+                                == "object_property"
+                                else object_type,
+                            }
+                        )
+
+                if label and label.lower() == "name":
+                    name_exists = True
+
+    # if there is no Name field associated in the the custom form
+    # then use default kitem name
+    if not name_exists:
+        mappings["custom_relations"].append(
+            {
+                "object_location": "Name",
+                "relation": "http://www.w3.org/2000/01/rdf-schema#label",
+                "relation_type": "annotation_property",
+                "object_data_type": "string",
+            }
+        )
+    if len(mappings["custom_relations"]) == 0:
+        mapping = None
+    else:
+        mapping = mappings
+    return mapping
