@@ -45,7 +45,7 @@ FIELDTYPE_TO_XSD = {
     "Radio": "string",
     "Select": "string",
     "File": "string",
-    "Checkbox": "boolean",
+    "Checkbox": "bool",
     "Knowledge item": "anyURI",
     "VocabularyTerm": "anyURI",
 }

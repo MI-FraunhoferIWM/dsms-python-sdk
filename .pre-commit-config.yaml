@@ -50,6 +50,9 @@ repos:
       - id: bandit
         args: ["-r"]
         files: ^(dsms)/.*
+        additional_dependencies:
+          - "pbr==2.0.0"
+          - setuptools
 
     - repo: local
       hooks:
