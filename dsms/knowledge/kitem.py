@@ -87,13 +87,13 @@ class KItem(KItemCompactedModel):
 
     Attributes:
         name (str):
-            Human readable name of the KContext.dsms.
+            Human readable name of the KItem
         id (Optional[UUID,str]):
             ID of the KItem. Defaults to a new UUID if not provided.
         ktype_id (Union[Enum, str]):
             Type ID of the KItem.
         slug (Optional[str]):
-            Slug of the KContext.dsms. Minimum length: 4.
+            Slug of the KItem. Minimum length: 4.
         annotations (List[Annotation]):
             Annotations of the KItem.
         attachments (List[Union[Attachment, str]]):
@@ -438,15 +438,17 @@ class KItem(KItemCompactedModel):
         ],
     ) -> List[Optional[KItemCompactedModel]]:
         """
-        Ensure that all items in the contexts list are instances of KItem or KItemBaseModel.
-        If any item is not an instance of either class, raise a TypeError.
+        Ensure that all items in the contexts list are instances of the `KItemCompactModel`.
+        Accepted class instances such as `KItem` or `KItemBaseModel` will be transformed into
+        an instance of `KItemCompactedModel`. If any item is not an instance of either class,
+        raise a TypeError.
         Args:
             value (Optional[List[KItem, KItemBaseModel, KItemCompactedModel]]):
                 The list of items to validate.
         Returns:
             List[KItemCompactedModel]: The validated list of items.
         Raises:
-            TypeError: If any item in the contexts list is not an instance of either class
+            TypeError: If any item in the contexts list is not an instance of either class.
         """
 
         if value is not None:
