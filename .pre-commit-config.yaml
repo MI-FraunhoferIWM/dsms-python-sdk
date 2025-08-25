@@ -50,7 +50,8 @@ repos:
       - id: bandit
         args: ["-r"]
         files: ^(dsms)/.*
-
+        additional_dependencies:
+          - "pbr==2.0.0"
     - repo: local
       hooks:
       - id: pylint
