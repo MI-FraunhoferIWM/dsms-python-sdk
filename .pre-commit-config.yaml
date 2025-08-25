@@ -52,6 +52,8 @@ repos:
         files: ^(dsms)/.*
         additional_dependencies:
           - "pbr==2.0.0"
+          - "setuptools==65.5.1"
+
     - repo: local
       hooks:
       - id: pylint
