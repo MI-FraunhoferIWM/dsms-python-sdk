@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Generator, List, Union
 
 import oyaml as yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_serializer
 
 from dsms.core.session import Session
 
@@ -40,6 +40,21 @@ class KItemSearchResult(BaseModel):
     def __repr__(self):
         """Pretty print the KItemSearchResult"""
         return str(self)
+
+    @model_serializer()
+    def serialze_results(self):
+        """
+        Custom model serializer.
+
+        Needs to be added since the `model_dump` was only
+        serializing the compact model, not the full representation.
+        """
+        return {
+            key: (
+                value.model_dump() if isinstance(value, BaseModel) else value
+            )
+            for key, value in self
+        }
 
 
 class SearchResult(BaseModel):
