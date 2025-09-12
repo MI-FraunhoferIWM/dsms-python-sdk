@@ -192,6 +192,10 @@ class RelationMapping(BaseWebformModel):
         None,
         description="Target class IRI if the type of relation is an object property",
     )
+    reverse: Optional[bool] = Field(
+        False,
+        description="If true, the relation is reversed",
+    )
 
     def __str__(self) -> str:
         """Pretty print the model fields"""
@@ -283,6 +287,9 @@ class Webform(BaseWebformModel):
         [], description="Class mapping"
     )
     sections: List[Section] = Field([], description="List of sections")
+    description: Optional[str] = Field(
+        None, description="Description of the webform"
+    )
 
     def __str__(self) -> str:
         """Pretty print the model fields"""
