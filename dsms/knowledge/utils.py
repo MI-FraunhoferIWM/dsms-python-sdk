@@ -895,7 +895,7 @@ def _make_annotation_schema(iri: str) -> Dict[str, Any]:
 def _search(
     dsms: "DSMS",
     query: Optional[str] = None,
-    ktypes: "Optional[List[Union[Enum, KType]]]" = [],
+    ktypes: "Optional[Union[List[Union[Enum, KType]], Union[Enum,KType]]]" = [],
     annotations: "Optional[List[str]]" = [],
     limit: "Optional[int]" = 10,
     offset: "Optional[int]" = 0,
@@ -904,6 +904,9 @@ def _search(
 ) -> "List[SearchResult]":
     """Search for KItems in the remote backend"""
     from dsms import KItem, KItemCompactedModel
+
+    if not isinstance(ktypes, list):
+        ktypes = [ktypes]
 
     payload = {
         "search_term": query or "",

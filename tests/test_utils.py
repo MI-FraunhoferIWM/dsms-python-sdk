@@ -100,22 +100,24 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
             }
         ],
     }
-
-    kitem_new = KItem(
-        id=get_mock_kitem_ids[0],
-        name="foo123",
-        ktype_id=dsms.ktypes.Organization,
-        annotations=[
-            {
-                "iri": "http://example.org/",
-                "label": "foo",
-                "namespace": "example",
-            }
-        ],
-        linked_kitems=[linked_kitem3],
-        user_groups=[user_group],
-        apps=[app],
-    )
+    with pytest.warns(
+        UserWarning, match="Found a <class 'dsms.knowledge.kitem.KItem'>"
+    ):
+        kitem_new = KItem(
+            id=get_mock_kitem_ids[0],
+            name="foo123",
+            ktype_id=dsms.ktypes.Organization,
+            annotations=[
+                {
+                    "iri": "http://example.org/",
+                    "label": "foo",
+                    "namespace": "example",
+                }
+            ],
+            linked_kitems=[linked_kitem3],
+            user_groups=[user_group],
+            apps=[app],
+        )
 
     expected = {
         "kitems_to_link": [
@@ -173,6 +175,7 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         "contexts_to_add_in": [],
         "contexts_to_remove_from": [],
     }
+
     diffs = _get_kitems_diffs(kitem_old, kitem_new)
 
     for key, value in diffs.items():
