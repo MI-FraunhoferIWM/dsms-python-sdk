@@ -70,6 +70,7 @@ def _perform_request(
         and dsms.config.enable_auto_reauth
         and retry
     ):
+        logger.info("Token expired. Will re-authenticate.")
         dsms.config = dsms.config.model_validate(dsms.config)
         response = _perform_request(
             dsms, route, method, retry=False, headers=None, **kwargs

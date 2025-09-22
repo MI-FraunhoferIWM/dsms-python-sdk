@@ -49,22 +49,6 @@ class Configuration(BaseSettings):
     host_url: AnyUrl = Field(
         ..., description="Url of the DSMS instance to connect."
     )
-    request_timeout: int = Field(
-        120,
-        description="Timeout in seconds until the request to the DSMS is timed out.",
-    )
-
-    ssl_verify: bool = Field(
-        True,
-        description="Whether the SSL of the DSMS shall be verified during connection.",
-    )
-
-    strict_validation: bool = Field(
-        True,
-        description="""Whether the validation of custom properties shall be strict.
-        Disabling this might be helpful when e.g. the schema of a KType has been changed
-        and the custom properties are not compatible anymore and should be updated accordingly.""",
-    )
 
     username: Optional[SecretStr] = Field(
         None,
@@ -102,15 +86,26 @@ class Configuration(BaseSettings):
         validation_alias=AliasChoices("DSMS_REALM", "KEYCLOAK_REALM_NAME"),
     )
 
-    loglevel: Optional[Union[Loglevel, str]] = Field(
-        None,
-        description="Set level of logging messages",
-        alias=AliasChoices("loglevel", "log_level"),
-    )
-
     token: Optional[SecretStr] = Field(
         None,
         description="JWT bearer token for connecting to the DSMS instance",
+    )
+
+    request_timeout: int = Field(
+        120,
+        description="Timeout in seconds until the request to the DSMS is timed out.",
+    )
+
+    ssl_verify: bool = Field(
+        True,
+        description="Whether the SSL of the DSMS shall be verified during connection.",
+    )
+
+    strict_validation: bool = Field(
+        True,
+        description="""Whether the validation of custom properties shall be strict.
+        Disabling this might be helpful when e.g. the schema of a KType has been changed
+        and the custom properties are not compatible anymore and should be updated accordingly.""",
     )
 
     enable_auto_reauth: bool = Field(
@@ -176,6 +171,12 @@ class Configuration(BaseSettings):
     kitem_repo: str = Field(
         DEFAULT_REPO,
         description="Repository of the triplestore for KItems in the DSMS",
+    )
+
+    loglevel: Optional[Union[Loglevel, str]] = Field(
+        None,
+        description="Set level of logging messages",
+        alias=AliasChoices("loglevel", "log_level"),
     )
 
     qudt_units: AnyUrl = Field(
