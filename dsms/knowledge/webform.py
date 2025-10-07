@@ -192,7 +192,7 @@ class RelationMapping(BaseWebformModel):
         None,
         description="Target class IRI if the type of relation is an object property",
     )
-    reverse: Optional[bool] = Field(
+    inverse: Optional[bool] = Field(
         False,
         description="If true, the relation is reversed",
     )
