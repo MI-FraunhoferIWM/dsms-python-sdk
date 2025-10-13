@@ -8,7 +8,6 @@ from urllib.parse import urljoin
 from uuid import UUID
 
 import requests
-from pydantic import SecretStr
 from requests import Response
 
 from dsms.core.logging import handler  # isort:skip
@@ -71,30 +70,11 @@ def _perform_request(
         and dsms.config.enable_auto_reauth
         and retry
     ):
-        if dsms.config.username and dsms.config.password:
-            username = dsms.config.username.get_secret_value()
-            passwd = dsms.config.password.get_secret_value()
-            authorization = f"Basic {username}:{passwd}"
-            reauth = _perform_request(
-                dsms,
-                "api/users/token",
-                "get",
-                retry=False,
-                headers={"Authorization": authorization},
-            )
-            if not reauth.ok:
-                raise RuntimeError(f"Reauthentication failed: {reauth.text}")
-            logger.debug("Reauthentication successful.")
-            token = reauth.json().get("token")
-            if "Bearer " not in token:
-                dsms.config.token = SecretStr(f"Bearer {token}")
-            else:
-                dsms.config.token = SecretStr(token)
-            response = _perform_request(
-                dsms, route, method, retry=False, headers=None, **kwargs
-            )
-        else:
-            logger.debug("No credentials found for reauthentication.")
+        logger.info("Token expired. Will re-authenticate.")
+        dsms.config = dsms.config.model_validate(dsms.config)
+        response = _perform_request(
+            dsms, route, method, retry=False, headers=None, **kwargs
+        )
     else:
         logger.debug(
             "Reauthentication skipped. Either not needed or not enabled."

@@ -33,7 +33,7 @@ class KItemRelationshipModel(BaseModel):
         False,
         description="""Whether the relation is incoming. This field is read-only.
         Link with the field set to `true` are ignored during the commit""",
-        allow_mutation=False,
+        frozen=True,
     )
     label: Optional[str] = Field(None, description="Label of the relation")
     kitem: Union[KItemCompactedModel, KItemLinkedModel, Any] = Field(

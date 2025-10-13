@@ -8,7 +8,6 @@ from typing import Callable, Optional, Set, Union
 
 import requests
 
-from pydantic_core.core_schema import ValidationInfo  # isort: skip
 from pydantic_settings import BaseSettings, SettingsConfigDict  # isort: skip
 
 
@@ -18,24 +17,30 @@ from pydantic import (  # isort: skip
     ConfigDict,
     Field,
     SecretStr,
+    model_validator,
     field_validator,
 )
 
-from .utils import get_callable  # isort: skip
+from dsms.core.utils import get_callable  # isort: skip
+from dsms.core.logging import handler  # isort: skip
 
 MODULE_REGEX = r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*:[a-zA-Z_][a-zA-Z0-9_]*$"
 DEFAULT_UNIT_SPARQL = "dsms.knowledge.semantics.units.sparql:UnitSparqlQuery"
 DEFAULT_REPO = "knowledge-items"
 
+logger = logging.getLogger(__name__)
+logger.addHandler(handler)
+logger.propagate = False
+
 
 class Loglevel(Enum):
     """Enum mapping for default log levels"""
 
-    DEBUG: logging.DEBUG
-    INFO: logging.INFO
-    ERROR: logging.ERROR
-    CRITICAL: logging.CRITICAL
-    WARNING: logging.WARNING
+    DEBUG = logging.DEBUG
+    INFO = logging.INFO
+    ERROR = logging.ERROR
+    CRITICAL = logging.CRITICAL
+    WARNING = logging.WARNING
 
 
 class Configuration(BaseSettings):
@@ -44,6 +49,48 @@ class Configuration(BaseSettings):
     host_url: AnyUrl = Field(
         ..., description="Url of the DSMS instance to connect."
     )
+
+    username: Optional[SecretStr] = Field(
+        None,
+        description="User name for connecting to the DSMS instance",
+    )
+    password: Optional[SecretStr] = Field(
+        None,
+        description="Password for connecting to the DSMS instance",
+    )
+
+    client_id: Optional[SecretStr] = Field(
+        None,
+        description="""If a service account is used to authenticate,
+        this will proviode the Client ID in Keycloak""",
+        validation_alias=AliasChoices(
+            "DSMS_CLIENT_ID", "KEYCLOAK_DSMS_CLIENT_ID", "KEYCLOAK_CLIENT_ID"
+        ),
+    )
+
+    client_secret: Optional[SecretStr] = Field(
+        None,
+        description="""If a service account is used to authenticate,
+        this will proviode the Client Secret in Keycloak""",
+        validation_alias=AliasChoices(
+            "DSMS_CLIENT_SECRET",
+            "KEYCLOAK_DSMS_CLIENT_SECRET",
+            "KEYCLOAK_CLIENT_SECRET",
+        ),
+    )
+
+    realm: Optional[SecretStr] = Field(
+        "dsms",
+        description="""When the Cliend ID and Client secret is used for authentication
+        with a service account, this is the realm name to be used""",
+        validation_alias=AliasChoices("DSMS_REALM", "KEYCLOAK_REALM_NAME"),
+    )
+
+    token: Optional[SecretStr] = Field(
+        None,
+        description="JWT bearer token for connecting to the DSMS instance",
+    )
+
     request_timeout: int = Field(
         120,
         description="Timeout in seconds until the request to the DSMS is timed out.",
@@ -59,19 +106,6 @@ class Configuration(BaseSettings):
         description="""Whether the validation of custom properties shall be strict.
         Disabling this might be helpful when e.g. the schema of a KType has been changed
         and the custom properties are not compatible anymore and should be updated accordingly.""",
-    )
-
-    username: Optional[SecretStr] = Field(
-        None,
-        description="User name for connecting to the DSMS instance",
-    )
-    password: Optional[SecretStr] = Field(
-        None,
-        description="Password for connecting to the DSMS instance",
-    )
-    token: Optional[SecretStr] = Field(
-        None,
-        description="JWT bearer token for connecting to the DSMS instance",
     )
 
     enable_auto_reauth: bool = Field(
@@ -139,6 +173,12 @@ class Configuration(BaseSettings):
         description="Repository of the triplestore for KItems in the DSMS",
     )
 
+    loglevel: Optional[Union[Loglevel, str]] = Field(
+        None,
+        description="Set level of logging messages",
+        alias=AliasChoices("loglevel", "log_level"),
+    )
+
     qudt_units: AnyUrl = Field(
         "http://qudt.org/2.1/vocab/unit",
         description="URI to QUDT Unit ontology for unit conversion",
@@ -162,12 +202,6 @@ class Configuration(BaseSettings):
         description="Properties to hide while printing, e.g {'external_links'}",
     )
 
-    loglevel: Optional[Union[Loglevel, str]] = Field(
-        None,
-        description="Set level of logging messages",
-        alias=AliasChoices("loglevel", "log_level"),
-    )
-
     model_config = ConfigDict(use_enum_values=True)
 
     @field_validator("loglevel")
@@ -177,6 +211,7 @@ class Configuration(BaseSettings):
         """Set log level for package"""
         if val:
             logging.getLogger().setLevel(val)
+            logger.setLevel(val)
         return val
 
     @field_validator("units_sparql_object")
@@ -212,30 +247,51 @@ class Configuration(BaseSettings):
             )
         return val
 
-    @field_validator("token")
-    def validate_auth(cls, val, info: ValidationInfo):
+    @model_validator(mode="after")
+    def validate_auth(self):
         """Validate the provided authentication/authorization secrets."""
-        username = info.data.get("username")
-        passwd = info.data.get("password")
-        host_url = info.data.get("host_url")
-        timeout = info.data.get("request_timeout")
-        verify = info.data.get("ssl_verify")
-        if username and passwd and val:
-            raise ValueError(
-                "Either `username` and `password` or `token` must be provided. Not both."
+        username = self.username
+        passwd = self.password
+        host_url = self.host_url
+        client_id = self.client_id
+        client_secret = self.client_secret
+        realm = self.realm
+        timeout = self.request_timeout
+        verify = self.ssl_verify
+        val = self.token
+
+        if client_id and client_secret:
+            token_url = urllib.parse.urljoin(
+                str(host_url),
+                f"/auth/realms/{realm.get_secret_value()}/protocol/openid-connect/token",  # pylint: disable=no-member
             )
-        if username and not passwd:
-            raise ValueError("`username` provided, but `password` not.")
-        if not username and passwd:
-            raise ValueError("`password` but not the `username` is defined.")
-        if not username and not passwd and not val:
-            warnings.warn(
-                """No authentication details provided. Either `username` and `password`
-                or `token` must be provided."""
+            headers = {"Content-Type": "application/x-www-form-urlencoded"}
+            data = {
+                "grant_type": "client_credentials",
+                "client_id": client_id.get_secret_value(),  # pylint: disable=no-member
+                "client_secret": client_secret.get_secret_value(),  # pylint: disable=no-member
+            }
+            logger.debug("Sending post request to %s", token_url)
+            response = requests.post(
+                token_url,
+                headers=headers,
+                data=data,
+                timeout=timeout,
+                verify=verify,
             )
-        if not val and username and passwd:
+            if not response.ok:
+                raise RuntimeError(
+                    f"Authentication with service account was not successful: {response.text}",
+                )
+            val = response.json().get("access_token")
+            logger.info(
+                "Authenticated with Client ID and Client Secret at %s",
+                host_url,
+            )
+        elif username and passwd:
             url = urllib.parse.urljoin(str(host_url), "api/users/token")
-            authorization = f"Basic {username.get_secret_value()}:{passwd.get_secret_value()}"
+            authorization = f"Basic {username.get_secret_value()}:{passwd.get_secret_value()}"  # pylint: disable=no-member
+            logger.debug("Sending get request to %s", url)
             response = requests.get(
                 url,
                 headers={"Authorization": authorization},
@@ -247,15 +303,46 @@ class Configuration(BaseSettings):
                     f"Something went wrong fetching the access token: {response.text}"
                 )
             val = response.json().get("token")
+            logger.info(
+                "Authenticated with User name and Password at %s", host_url
+            )
+        elif val:
+            logger.info(
+                "Authenticated using token copied from WebUI interface at %s",
+                host_url,
+            )
+        else:
+            provided = {
+                key: value is not None
+                for key, value in {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "username": username,
+                    "password": passwd,
+                    "token": val,
+                }.items()
+            }
+            warnings.warn(
+                f"""No authentication details provided - protected endpoints may be inaccessible.
+                The followings were provided: {provided}""",
+            )
+
         if isinstance(val, str):
             if "Bearer " not in val:
                 val = SecretStr(f"Bearer {val}")
             else:
                 val = SecretStr(val)
         elif isinstance(val, SecretStr):
-            if "Bearer " not in val.get_secret_value():
-                val = SecretStr(f"Bearer {val.get_secret_value()}")
+            if (
+                "Bearer "
+                not in val.get_secret_value()  # pylint: disable=no-member
+            ):
+                val = SecretStr(
+                    f"Bearer {val.get_secret_value()}"  # pylint: disable=no-member
+                )
 
-        return val
+        # Set the validated token value and return self
+        self.token = val
+        return self
 
     model_config = SettingsConfigDict(env_prefix="DSMS_")
