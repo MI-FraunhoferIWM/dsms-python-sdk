@@ -21,7 +21,7 @@ class Avatar(BaseModel):
         description="The file path to the image when setting a new avatar is set",
     )
     encode_qr: Optional[str] = Field(
-        False,
+        None,
         description="""String for e.g. a link with should be encoded
         into an QR code. This can be combined with an image file.""",
     )

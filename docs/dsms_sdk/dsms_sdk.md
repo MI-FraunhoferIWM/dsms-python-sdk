@@ -89,9 +89,10 @@ You need to authenticate yourself to connect with dsms using the `dsms-sdk` Pyth
 
    The following are the instances of the DSMS you could choose from:
 
-   - [StahlDigital](https://lnkd.in/gfwe9a36)
-   - [KupferDigital](https://lnkd.in/g8mvnM3K)
-   - [DiMAT](https://lnkd.in/g46baB6J)
+   - [StahlDigital](https://stahldigital.materials-data.space)
+   - [KupferDigital](https://kupferdigital.materials-data.space)
+   - [DiMAT](https://cmdb.materials-data.space)
+   - [ORCHESTER](https://cmdb.materials-data.space)
 
 2. **Authentication Options**
 
@@ -159,6 +160,10 @@ You need to authenticate yourself to connect with dsms using the `dsms-sdk` Pyth
       DSMS_HOST_URL = https://stahldigital.materials-data.space
       DSMS_TOKEN = {YOUR_COPIED_TOKEN}
       ```
+
+```{important}
+Please also note the [priority rules for authentication](dsms_config_schema.md#authentication-priority-rules).
+```
 
 Now you are ready to use dsms-sdk. Do check out the tutorials section to try out some basic examples on how to use dsms-sdk.
 
