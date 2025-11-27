@@ -1,6 +1,6 @@
 """KItem Access Property Module"""
 
-from enum import Enum
+from enum import Enum, auto
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -16,13 +16,13 @@ class OperationType(str, Enum):
     MANAGE = "manage"
 
 
-class Role(str, Enum):
+class Role(int, Enum):
     """Role Enum"""
 
-    OWNER = "owner"
-    USER = "user"
-    CONTRIBUTOR = "contributor"
-    ADMIN = "admin"
+    USER = auto()
+    CONTRIBUTOR = auto()
+    OWNER = auto()
+    ADMIN = auto()
 
 
 class RoleMapping(List[OperationType], Enum):
@@ -46,7 +46,7 @@ class RoleMapping(List[OperationType], Enum):
     @classmethod
     def get_operations(cls, role: Role) -> List[OperationType]:
         """Get operations for a role"""
-        return getattr(cls, role.value.upper())
+        return getattr(cls, role.name.upper())
 
 
 class BaseAccessProperty(BaseModel):
