@@ -24,8 +24,6 @@ from dsms.core.utils import _name_to_camel, _perform_request  # isort:skip
 
 from dsms.knowledge.search import SearchResult, KItemListModel  # isort:skip^
 
-from dsms.knowledge.groups import Group, User  # isort:skip
-
 from dsms.core.session import Session  # isort:skip
 
 if TYPE_CHECKING:
@@ -1468,6 +1466,7 @@ def generate_mapping(ktype_id: str, webform: dict):
 
 def _get_user_groups(dsms: "DSMS"):
     """Fetch all user groups from the DSMS backend."""
+    from dsms.knowledge.groups import Group, GroupList
 
     response = _perform_request(
         dsms,
@@ -1477,11 +1476,12 @@ def _get_user_groups(dsms: "DSMS"):
     if not response.ok:
         raise ConnectionError(f"Failed to fetch user groups: {response.text}")
     groups = response.json()
-    return [Group(**group) for group in groups]
+    return GroupList([Group(**group) for group in groups])
 
 
 def _get_user_list(dsms: "DSMS"):
     """Fetch all users from the DSMS backend."""
+    from dsms.knowledge.groups import User
 
     response = _perform_request(
         dsms,
