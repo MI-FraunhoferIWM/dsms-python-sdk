@@ -55,6 +55,7 @@ def test_access_level_owner():
         OperationType.MANAGE,
     ]
     assert prop.access_level == expected
+    assert prop.role.value == Role.OWNER.value
 
 
 def test_access_level_user():
@@ -62,6 +63,7 @@ def test_access_level_user():
     prop = BaseAccessProperty(role=Role.USER)
     expected = [OperationType.READ]
     assert prop.access_level == expected
+    assert prop.role.value == Role.USER.value
 
 
 def test_access_level_contributor():
@@ -69,6 +71,7 @@ def test_access_level_contributor():
     prop = BaseAccessProperty(role=Role.CONTRIBUTOR)
     expected = [OperationType.READ, OperationType.UPDATE]
     assert prop.access_level == expected
+    assert prop.role.value == Role.CONTRIBUTOR.value
 
 
 def test_access_level_admin():
@@ -81,6 +84,7 @@ def test_access_level_admin():
         OperationType.MANAGE,
     ]
     assert prop.access_level == expected
+    assert prop.role.value == Role.ADMIN.value
 
 
 @pytest.mark.usefixtures("access_properties")
@@ -96,6 +100,9 @@ def test_by_user_property(access_properties):
     assert result["user1"].role == Role.OWNER
     assert result["user2"].role == Role.USER
     assert result["user3"].role == Role.CONTRIBUTOR
+    assert result["user1"].role.value == Role.OWNER.value
+    assert result["user2"].role.value == Role.USER.value
+    assert result["user3"].role.value == Role.CONTRIBUTOR.value
 
 
 @pytest.mark.usefixtures("access_properties")
@@ -109,6 +116,8 @@ def test_by_group_property(access_properties):
 
     assert result["group1"].role == Role.ADMIN
     assert result["group2"].role == Role.USER
+    assert result["group1"].role.value == Role.ADMIN.value
+    assert result["group2"].role.value == Role.USER.value
 
 
 @pytest.mark.usefixtures("access_properties")
@@ -164,6 +173,24 @@ def test_operation_by_user_multiple_same_operation():
     assert set(result[OperationType.READ]) == {"user1", "user2", "user3"}
     # Only user3 (CONTRIBUTOR) should have UPDATE access
     assert result[OperationType.UPDATE] == ["user3"]
+
+
+def test_operation_by_group_from_int():
+    """Test operation_by_user with multiple users having same operations"""
+    user_access = [
+        UserAccessProperty(user_id="user1", role=1),
+        UserAccessProperty(user_id="user2", role=1),
+        UserAccessProperty(user_id="user3", role=2),
+    ]
+    props = KItemAccessProperties(user_access=user_access)
+    result = props.operation_by_user
+
+    # All users should have READ access
+    assert set(result[OperationType.READ]) == {"user1", "user2", "user3"}
+    # Only user3 (CONTRIBUTOR) should have UPDATE access
+    assert result[OperationType.UPDATE] == ["user3"]
+    assert props.by_user["user1"].role == Role.USER
+    assert props.by_user["user1"].role.value == Role.USER.value
 
 
 def test_operation_by_group_multiple_same_operation():
@@ -295,3 +322,6 @@ def test_case_sensitive_ids():
     props = KItemAccessProperties(user_access=user_access, group_access=[])
 
     assert len(props.user_access) == 3
+    assert props.by_user["User1"].role == Role.OWNER
+    assert props.by_user["user1"].role == Role.USER
+    assert props.by_user["USER1"].role == Role.CONTRIBUTOR
