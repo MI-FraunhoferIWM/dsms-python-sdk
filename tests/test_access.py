@@ -207,6 +207,8 @@ def test_operation_by_group_multiple_same_operation():
     assert set(result[OperationType.READ]) == {"group1", "group2", "group3"}
     # Only group3 (ADMIN) should have MANAGE access
     assert result[OperationType.MANAGE] == ["group3"]
+    assert props.group_by_role[Role.ADMIN] == ["group3"]
+    assert props.group_by_role[Role.USER] == ["group1", "group2"]
 
 
 def test_model_creation_with_defaults():
@@ -325,3 +327,6 @@ def test_case_sensitive_ids():
     assert props.by_user["User1"].role == Role.OWNER
     assert props.by_user["user1"].role == Role.USER
     assert props.by_user["USER1"].role == Role.CONTRIBUTOR
+    assert props.user_by_role[Role.OWNER] == ["User1"]
+    assert props.user_by_role[Role.USER] == ["user1"]
+    assert props.user_by_role[Role.CONTRIBUTOR] == ["USER1"]

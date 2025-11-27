@@ -147,3 +147,23 @@ class KItemAccessProperties(BaseModel):
                 if gap.group_id not in operation_dict[operation]:
                     operation_dict[operation].append(gap.group_id)
         return operation_dict
+
+    @property
+    def user_by_role(self) -> Dict[Role, List[str]]:
+        """Get users by role"""
+        role_dict: Dict[Role, List[str]] = {}
+        for uap in self.user_access:
+            if uap.role not in role_dict:
+                role_dict[uap.role] = []
+            role_dict[uap.role].append(uap.user_id)
+        return role_dict
+
+    @property
+    def group_by_role(self) -> Dict[Role, List[str]]:
+        """Get groups by role"""
+        role_dict: Dict[Role, List[str]] = {}
+        for gap in self.group_access:
+            if gap.role not in role_dict:
+                role_dict[gap.role] = []
+            role_dict[gap.role].append(gap.group_id)
+        return role_dict
