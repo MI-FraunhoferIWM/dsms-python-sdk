@@ -25,12 +25,15 @@ from dsms.knowledge.utils import (  # isort:skip
     _get_remote_ktypes,
     _get_process_schemas,
     _get_webform_schemas,
+    _get_user_groups,
+    _get_user_list,
 )
 
 if TYPE_CHECKING:
     from typing import Optional
 
     from dsms.core.session import Buffers
+    from dsms.knowledge.groups import Group, User
     from dsms.knowledge.search import KItemListModel, SearchResult
 
 
@@ -330,6 +333,16 @@ class DSMS:
     def session(self) -> "Session":
         """Return DSMS session"""
         return self._session
+
+    @property
+    def user_groups(self) -> "List[Group]":
+        """Return user groups of the DSMS session"""
+        return _get_user_groups(self)
+
+    @property
+    def users(self) -> "List[User]":
+        """Return user list of the DSMS session"""
+        return _get_user_list(self)
 
     @classmethod
     def __get_pydantic_core_schema__(cls):

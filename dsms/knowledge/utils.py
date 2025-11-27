@@ -24,7 +24,7 @@ from dsms.core.utils import _name_to_camel, _perform_request  # isort:skip
 
 from dsms.knowledge.search import SearchResult, KItemListModel  # isort:skip^
 
-from dsms.knowledge.groups import Group  # isort:skip
+from dsms.knowledge.groups import Group, User  # isort:skip
 
 from dsms.core.session import Session  # isort:skip
 
@@ -1478,3 +1478,17 @@ def _get_user_groups(dsms: "DSMS"):
         raise ConnectionError(f"Failed to fetch user groups: {response.text}")
     groups = response.json()
     return [Group(**group) for group in groups]
+
+
+def _get_user_list(dsms: "DSMS"):
+    """Fetch all users from the DSMS backend."""
+
+    response = _perform_request(
+        dsms,
+        "api/users/",
+        "get",
+    )
+    if not response.ok:
+        raise ConnectionError(f"Failed to fetch users: {response.text}")
+    users = response.json()
+    return [User(**user) for user in users]

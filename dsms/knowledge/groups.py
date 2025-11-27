@@ -6,6 +6,13 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class User(BaseModel):
+    """User Model"""
+
+    id: str = Field(..., description="The unique identifier of the user.")
+    username: str = Field(..., description="The username of the user.")
+
+
 class Group(BaseModel):
     """User Group Model"""
 
