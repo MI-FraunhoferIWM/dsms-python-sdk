@@ -11,6 +11,7 @@ from dsms.knowledge.properties.access import (
     KItemAccessProperties,
     OperationType,
     Role,
+    RoleMapping,
     UserAccessProperty,
 )
 
@@ -56,6 +57,35 @@ def test_access_level_owner():
     ]
     assert prop.access_level == expected
     assert prop.role.value == Role.OWNER.value
+
+
+def test_minimum_access_level():
+    """Test min_access_level method"""
+    assert RoleMapping.min_access_level(OperationType.READ) == Role.USER.value
+    assert (
+        RoleMapping.min_access_level(OperationType.UPDATE)
+        == Role.CONTRIBUTOR.value
+    )
+    assert (
+        RoleMapping.min_access_level(OperationType.DELETE) == Role.OWNER.value
+    )
+    assert (
+        RoleMapping.min_access_level(OperationType.MANAGE) == Role.OWNER.value
+    )
+
+
+def test_maximum_access_level():
+    """Test max_access_level method"""
+    assert RoleMapping.max_access_level(OperationType.READ) == Role.ADMIN.value
+    assert (
+        RoleMapping.max_access_level(OperationType.UPDATE) == Role.ADMIN.value
+    )
+    assert (
+        RoleMapping.max_access_level(OperationType.DELETE) == Role.ADMIN.value
+    )
+    assert (
+        RoleMapping.max_access_level(OperationType.MANAGE) == Role.ADMIN.value
+    )
 
 
 def test_access_level_user():
