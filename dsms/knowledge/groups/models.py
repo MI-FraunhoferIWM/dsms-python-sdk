@@ -15,11 +15,48 @@ class User(BaseModel):
     username: str = Field(..., description="The username of the user.")
 
 
-class Group(BaseModel):
+class UserList(list):
+    """List of Users with utility methods."""
+
+    def __repr__(self) -> str:
+        """String representation of the GroupList."""
+        return str(self)
+
+    def __str__(self):
+        """Pretty print the UserList"""
+        from dsms.knowledge.utils import dump_model
+
+        return yaml.dump(
+            [
+                dump_model(
+                    connection,
+                    exclude_extra=Session.dsms.config.hide_properties,
+                )
+                for connection in self
+            ]
+        )
+
+    @property
+    def by_id(self) -> dict[str, User]:
+        """Return a dictionary of users indexed by their ID."""
+        return {user.id: user for user in self}
+
+    @property
+    def by_username(self) -> dict[str, User]:
+        """Return a dictionary of users indexed by their username."""
+        return {user.username: user for user in self}
+
+
+class BaseGroup(BaseModel):
     """User Group Model"""
 
     id: str = Field(..., description="The unique identifier of the group.")
     name: str = Field(..., description="The name of the group.")
+
+
+class Group(BaseGroup):
+    """User Group Model with Subgroups"""
+
     subgroups: Optional[List["Group"]] = Field(
         None, description="A list of subgroups."
     )
@@ -33,7 +70,7 @@ class GroupListBase(list):
         return str(self)
 
     def __str__(self):
-        """Pretty print the LinkedKItemList"""
+        """Pretty print the GroupList"""
         from dsms.knowledge.utils import dump_model
 
         return yaml.dump(
@@ -58,13 +95,23 @@ class GroupList(list):
         def _flatten(groups: List[Group]):
             for group in groups:
                 flat_list.append(
-                    Group(**group.model_dump(exclude={"subgroups"}))
+                    BaseGroup(**group.model_dump(exclude={"subgroups"}))
                 )
                 if group.subgroups:
                     _flatten(group.subgroups)
 
         _flatten(self)
         return GroupListBase(flat_list)
+
+    @property
+    def by_id(self) -> dict[str, Group]:
+        """Return a dictionary of groups indexed by their ID."""
+        return {group.id: group for group in self.flat}
+
+    @property
+    def by_name(self) -> dict[str, Group]:
+        """Return a dictionary of groups indexed by their name."""
+        return {group.name: group for group in self.flat}
 
 
 Group.model_rebuild()

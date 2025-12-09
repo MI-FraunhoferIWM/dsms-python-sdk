@@ -1481,7 +1481,7 @@ def _get_user_groups(dsms: "DSMS"):
 
 def _get_user_list(dsms: "DSMS"):
     """Fetch all users from the DSMS backend."""
-    from dsms.knowledge.groups import User
+    from dsms.knowledge.groups import User, UserList
 
     response = _perform_request(
         dsms,
@@ -1491,4 +1491,4 @@ def _get_user_list(dsms: "DSMS"):
     if not response.ok:
         raise ConnectionError(f"Failed to fetch users: {response.text}")
     users = response.json()
-    return [User(**user) for user in users]
+    return UserList([User(**user) for user in users])
