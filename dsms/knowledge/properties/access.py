@@ -52,22 +52,18 @@ class RoleMapping(List[OperationType], Enum):
     def min_access_level(cls, operation: OperationType) -> Role:
         """Get minimum role required for an operation"""
         return min(
-            [
-                role.value
-                for role in Role
-                if operation in cls.get_operations(role)
-            ]
+            role.value
+            for role in Role
+            if operation in cls.get_operations(role)
         )
 
     @classmethod
     def max_access_level(cls, operation: OperationType) -> Role:
         """Get maximum role required for an operation"""
         return max(
-            [
-                role.value
-                for role in Role
-                if operation in cls.get_operations(role)
-            ]
+            role.value
+            for role in Role
+            if operation in cls.get_operations(role)
         )
 
 

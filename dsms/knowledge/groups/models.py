@@ -1,19 +1,11 @@
 """DSMS User Groups Module."""
 
-from enum import Enum
 from typing import List, Optional
 
 import yaml
 from pydantic import BaseModel, Field
 
 from dsms.core.session import Session
-
-
-class PublicGroupType(str, Enum):
-    """Enumeration for Public Group Types."""
-
-    INTERNAL = "dsms:internally-public"
-    EXTERNAL = "dsms:externally-public"
 
 
 class User(BaseModel):
@@ -76,3 +68,7 @@ class GroupList(list):
 
 
 Group.model_rebuild()
+interally_public = Group(id="dsms:internally_public", name="Internally Public")
+externally_public = Group(
+    id="dsms:externally_public", name="Externally Public"
+)

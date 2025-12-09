@@ -43,7 +43,33 @@ class Loglevel(Enum):
     WARNING = logging.WARNING
 
 
-class Configuration(BaseSettings):
+class BaseConfiguration(BaseSettings):
+    """Base Configuration for DSMS-SDK"""
+
+    label_internally_public: str = Field(
+        "Internally Public",
+        description="Label to use for KItems marked as `internally_public`.",
+    )
+
+    label_externally_public: str = Field(
+        "Externally Public",
+        description="Label to use for KItems marked as `externally_public`.",
+    )
+
+    id_internally_public: str = Field(
+        "dsms:internally-public",
+        description="ID to use for KItems marked as `internally_public`.",
+    )
+
+    id_externally_public: str = Field(
+        "dsms:externally-public",
+        description="ID to use for KItems marked as `externally_public`.",
+    )
+
+    model_config = ConfigDict(use_enum_values=True)
+
+
+class Configuration(BaseConfiguration):
     """General config for DSMS-SDK"""
 
     host_url: AnyUrl = Field(
