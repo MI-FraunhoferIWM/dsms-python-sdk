@@ -262,7 +262,9 @@ def _delete_ktype(ktype: "KType") -> None:
     _get_remote_ktypes(ktype.dsms)
 
 
-def _get_kitem_list(dsms: "DSMS", limit=10, offset=0) -> "KItemListModel":
+def _get_kitem_list(
+    dsms: "DSMS", user_id: Optional[str] = None, limit=10, offset=0
+) -> "KItemListModel":
     """Get all available KItems from the remote backend."""
     from dsms.knowledge.kitem import KItem  # isort:skip
 
@@ -271,6 +273,7 @@ def _get_kitem_list(dsms: "DSMS", limit=10, offset=0) -> "KItemListModel":
         "api/knowledge/kitems",
         "get",
         params={
+            "user_id": user_id,
             "limit": limit,
             "offset": offset,
         },
