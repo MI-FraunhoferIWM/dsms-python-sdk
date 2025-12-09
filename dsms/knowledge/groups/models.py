@@ -17,6 +17,20 @@ class User(BaseModel):
         None, description="A list of groups the user belongs to."
     )
 
+    def __repr__(self) -> str:
+        """String representation of the GroupList."""
+        return str(self)
+
+    def __str__(self):
+        """Pretty print the User"""
+        from dsms.knowledge.utils import print_model
+
+        return print_model(
+            self,
+            "user",
+            exclude_extra=Session.dsms.config.hide_properties,
+        )
+
 
 class UserList(list):
     """List of Users with utility methods."""
@@ -48,6 +62,11 @@ class UserList(list):
     def by_username(self) -> dict[str, User]:
         """Return a dictionary of users indexed by their username."""
         return {user.username: user for user in self}
+
+    def __getitem__(self, user_id: str) -> User:
+        """Get a user by ID"""
+
+        return self.by_id[user_id]
 
 
 class BaseGroup(BaseModel):

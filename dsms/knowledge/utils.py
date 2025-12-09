@@ -1492,3 +1492,16 @@ def _get_user_list(dsms: "DSMS"):
         raise ConnectionError(f"Failed to fetch users: {response.text}")
     users = response.json()
     return UserList([User(**user) for user in users])
+
+
+def get_user_by_id(user_id: str):
+    """Fetch a user by ID from the DSMS backend."""
+
+    response = _perform_request(
+        Session.dsms,
+        f"api/users/{user_id}",
+        "get",
+    )
+    if not response.ok:
+        raise ValueError(f"Failed to fetch user {user_id}: {response.text}")
+    return response.json()
