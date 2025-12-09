@@ -13,6 +13,9 @@ class User(BaseModel):
 
     id: str = Field(..., description="The unique identifier of the user.")
     username: str = Field(..., description="The username of the user.")
+    user_groups: Optional[List["BaseGroup"]] = Field(
+        None, description="A list of groups the user belongs to."
+    )
 
 
 class UserList(list):
