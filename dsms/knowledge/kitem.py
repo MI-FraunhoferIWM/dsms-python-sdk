@@ -44,9 +44,8 @@ from dsms.knowledge.properties import (  # isort:skip
     KItemRelationshipModel,
     LinkedKItemsList,
     Summary,
-    UserGroup,
+    KItemAccessProperties,
 )
-
 
 from dsms.knowledge.ktype import KType  # isort:skip
 
@@ -172,10 +171,6 @@ class KItem(KItemCompactedModel):
     summary: Optional[Union[str, Summary]] = Field(
         None, description="Human readable summary text of the KItem."
     )
-    user_groups: List[UserGroup] = Field(
-        [],
-        description="User groups able to access the KItem.",
-    )
     custom_properties: Optional[Union[KItemCustomPropertiesModel]] = Field(
         None, description="Custom properties associated to the KItem"
     )
@@ -190,6 +185,10 @@ class KItem(KItemCompactedModel):
 
     avatar: Optional[Avatar] = Field(
         default_factory=Avatar, description="KItem avatar interface"
+    )
+
+    access_properties: Optional[KItemAccessProperties] = Field(
+        None, description="Access properties of the KItem"
     )
 
     contexts: List[

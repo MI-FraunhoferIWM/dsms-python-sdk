@@ -51,7 +51,6 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         name="bar123",
     )
 
-    user_group = {"name": "private", "group_id": "private_123"}
     app = {"executable": "foo.exe", "title": "foo"}
 
     kitem_old = {
@@ -87,7 +86,6 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 },
             },
         ],
-        "user_groups": [user_group],
         "apps": [
             {
                 "id": get_mock_kitem_ids[0],
@@ -115,7 +113,6 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 }
             ],
             linked_kitems=[linked_kitem3],
-            user_groups=[user_group],
             apps=[app],
         )
 

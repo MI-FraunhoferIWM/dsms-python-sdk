@@ -114,7 +114,7 @@ class KItemAccessProperties(BaseModel):
         description="List of group access properties.",
     )
 
-    @field_validator("user_access", "group_access", mode="before")
+    @field_validator("user_access", "group_access", mode="after")
     @classmethod
     def check_duplicates(cls, v):
         """Ensure no duplicate user or group IDs"""
