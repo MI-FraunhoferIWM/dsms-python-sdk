@@ -360,3 +360,23 @@ def test_case_sensitive_ids():
     assert props.user_by_role[Role.OWNER] == ["User1"]
     assert props.user_by_role[Role.USER] == ["user1"]
     assert props.user_by_role[Role.CONTRIBUTOR] == ["USER1"]
+
+
+def test_case_sensitive_ids_dict():
+    """Test that IDs are case sensitive (no duplicates if different case)"""
+    user_access = [
+        {"user_id": "User1", "role": 3},
+        {"user_id": "user1", "role": 1},  # Different case
+        {"user_id": "USER1", "role": 2},  # Different case
+    ]
+
+    # Should not throw an exception
+    props = KItemAccessProperties(user_access=user_access, group_access=[])
+
+    assert len(props.user_access) == 3
+    assert props.by_user["User1"].role == Role.OWNER
+    assert props.by_user["user1"].role == Role.USER
+    assert props.by_user["USER1"].role == Role.CONTRIBUTOR
+    assert props.user_by_role[Role.OWNER] == ["User1"]
+    assert props.user_by_role[Role.USER] == ["user1"]
+    assert props.user_by_role[Role.CONTRIBUTOR] == ["USER1"]
