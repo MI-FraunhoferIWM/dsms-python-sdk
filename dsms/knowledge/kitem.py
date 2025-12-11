@@ -287,6 +287,17 @@ class KItem(KItemCompactedModel):
                 app.id = kitem_id
         return AppList(value)
 
+    @field_validator("avatar", mode="after")
+    @classmethod
+    def validate_avatar(cls, value: Avatar, info: ValidationInfo) -> Avatar:
+        """
+        Validate avatar Field
+        """
+        kitem_id = info.data.get("id")
+        if value:
+            value.id = kitem_id
+        return value
+
     @field_validator("linked_kitems", mode="before")
     @classmethod
     def validate_linked_kitems_list(

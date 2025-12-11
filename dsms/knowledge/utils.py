@@ -1092,9 +1092,9 @@ def _make_avatar(
     return avatar
 
 
-def _get_avatar(dsms: "DSMS", kitem_id: UUID) -> Image.Image:
+def _get_avatar(kitem_id: UUID) -> Image.Image:
     response = _perform_request(
-        dsms, f"api/knowledge/avatar/{kitem_id}", "get"
+        Session.dsms, f"api/knowledge/avatar/{kitem_id}", "get"
     )
     buffer = io.BytesIO(response.content)
     return Image.open(buffer)
