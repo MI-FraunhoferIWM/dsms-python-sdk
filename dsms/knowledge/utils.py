@@ -93,15 +93,9 @@ def dump_model(self, exclude_extra: set = set()) -> Dict[str, Any]:
         Dict[str, Any]: A dictionary of the model fields with specified exclusions.
     """
     exclude = self.model_config.get("exclude", set()) | exclude_extra
-    dumped = self.model_dump(
-        exclude_none=True,
-        exclude_unset=True,
-        exclude=exclude,
+    return self.model_dump(
+        exclude_none=True, exclude_unset=True, exclude=exclude, mode="json"
     )
-    return {
-        key: (str(value) if isinstance(value, UUID) else value)
-        for key, value in dumped.items()
-    }
 
 
 def print_ktype(self) -> str:

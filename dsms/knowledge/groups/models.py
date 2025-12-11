@@ -63,6 +63,11 @@ class UserList(list):
         """Return a dictionary of users indexed by their username."""
         return {user.username: user for user in self}
 
+    @property
+    def by_name(self) -> dict[str, User]:
+        """Return a dictionary of users indexed by their username."""
+        return self.by_username
+
     def __getitem__(self, user_id: str) -> User:
         """Get a user by ID"""
 

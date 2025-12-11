@@ -5,6 +5,8 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from dsms.knowledge.utils import dump_model
+
 
 class OperationType(str, Enum):
     """Operation Types Enum"""
@@ -80,6 +82,12 @@ class BaseAccessProperty(BaseModel):
     def access_level(self) -> List[OperationType]:
         """Set access level based on role"""
         return RoleMapping.get_operations(self.role)
+
+    def __str__(self) -> str:
+        return dump_model(self)
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class UserAccessProperty(BaseAccessProperty):
