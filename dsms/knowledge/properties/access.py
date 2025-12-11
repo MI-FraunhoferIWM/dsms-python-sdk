@@ -3,9 +3,10 @@
 from enum import Enum, auto
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
-from dsms.knowledge.utils import dump_model
+from dsms.core.session import Session
+from dsms.knowledge.utils import print_model
 
 
 class OperationType(str, Enum):
@@ -83,11 +84,14 @@ class BaseAccessProperty(BaseModel):
         """Set access level based on role"""
         return RoleMapping.get_operations(self.role)
 
-    def __str__(self) -> str:
-        return dump_model(self)
-
-    def __repr__(self) -> str:
-        return str(self)
+    @field_serializer("role")
+    def serialize_role_json(self, value: Role, _info):
+        """Serialize role to JSON"""
+        if _info.mode == "json":
+            response = value.name  # JSON mode: use name
+        else:
+            response = value.value  # Python mode: use value
+        return response
 
 
 class UserAccessProperty(BaseAccessProperty):
@@ -121,6 +125,17 @@ class KItemAccessProperties(BaseModel):
         [],
         description="List of group access properties.",
     )
+
+    def __str__(self) -> str:
+        """Pretty print the access properties fields"""
+        return print_model(
+            self,
+            "access_properties",
+            exclude_extra=Session.dsms.config.hide_properties,
+        )
+
+    def __repr__(self) -> str:
+        return str(self)
 
     @field_validator("user_access", "group_access", mode="after")
     @classmethod

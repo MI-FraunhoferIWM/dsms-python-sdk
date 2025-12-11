@@ -354,7 +354,6 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "rdf_exists",
             "in_backend",
             "avatar_exists",
-            "user_groups",
             "ktype_id",
             "attachments",
             "id",
@@ -592,11 +591,8 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     differences = {}
     attributes = [
         ("annotations", ("annotations", "link", "unlink")),
-        ("user_groups", ("user_groups", "add", "remove")),
     ]
-    to_compare = kitem_new.model_dump(
-        include={"annotations", "user_groups", "contexts"}
-    )
+    to_compare = kitem_new.model_dump(include={"annotations", "contexts"})
     for name, terms in attributes:
         to_add_name = terms[0] + "_to_" + terms[1]
         to_remove_name = terms[0] + "_to_" + terms[2]

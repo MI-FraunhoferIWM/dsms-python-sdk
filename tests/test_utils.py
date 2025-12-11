@@ -133,7 +133,6 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 "namespace": "example",
             }
         ],
-        "user_groups_to_add": [],
         "kitem_apps_to_update": [
             {
                 "executable": "foo.exe",
@@ -159,7 +158,6 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 "namespace": "example",
             }
         ],
-        "user_groups_to_remove": [],
         "kitem_apps_to_remove": [
             {
                 "executable": "bar.exe",
