@@ -364,7 +364,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "contexts",
         },
         exclude_defaults=True,
-        mode="json"
+        mode="json",
     )
     payload.update(
         **differences,
