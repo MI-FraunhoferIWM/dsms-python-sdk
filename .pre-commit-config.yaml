@@ -45,14 +45,11 @@ repos:
           - id: setup-cfg-fmt
 
     - repo: https://github.com/PyCQA/bandit
-      rev: 1.7.5
+      rev: 1.9.3
       hooks:
       - id: bandit
         args: ["-r"]
         files: ^(dsms)/.*
-        additional_dependencies:
-          - "pbr==2.0.0"
-          - setuptools
 
     - repo: local
       hooks:
