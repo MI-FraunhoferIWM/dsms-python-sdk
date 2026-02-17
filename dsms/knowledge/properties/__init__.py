@@ -7,6 +7,7 @@ from dsms.knowledge.properties.annotations import (  # isort:skip
     Annotation,
     AnnotationList,
 )
+from dsms.knowledge.properties.access import KItemAccessProperties
 from dsms.knowledge.properties.apps import App, AppList
 from dsms.knowledge.properties.authors import Author
 from dsms.knowledge.properties.contacts import ContactInfo
@@ -49,4 +50,5 @@ __all__ = [
     "DataFrameContainer",
     "Column",
     "KItemRelationshipModel",
+    "KItemAccessProperties",
 ]

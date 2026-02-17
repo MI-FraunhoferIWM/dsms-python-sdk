@@ -3,7 +3,7 @@
 import os
 import warnings
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from uuid import UUID
 
 from dotenv import load_dotenv
@@ -25,12 +25,13 @@ from dsms.knowledge.utils import (  # isort:skip
     _get_remote_ktypes,
     _get_process_schemas,
     _get_webform_schemas,
+    _get_user_groups,
+    _get_user_list,
 )
 
 if TYPE_CHECKING:
-    from typing import Optional
-
     from dsms.core.session import Buffers
+    from dsms.knowledge.groups import Group, User
     from dsms.knowledge.search import KItemListModel, SearchResult
 
 
@@ -302,7 +303,9 @@ class DSMS:
         warnings.warn(message, DeprecationWarning)
         return _get_kitem_list(self)
 
-    def get_kitems(self, limit=10, offset=0) -> "KItemListModel":
+    def get_kitems(
+        self, user_id: Optional[str] = None, limit=10, offset=0
+    ) -> "KItemListModel":
         """
         Get all available KItems from the remote backend.
 
@@ -311,7 +314,9 @@ class DSMS:
             offset (int): The offset in the list of KItems. Defaults to 0.
 
         """
-        return _get_kitem_list(self, limit=limit, offset=offset)
+        return _get_kitem_list(
+            self, user_id=user_id, limit=limit, offset=offset
+        )
 
     @property
     def app_configs(self) -> "List[AppConfig]":
@@ -330,6 +335,16 @@ class DSMS:
     def session(self) -> "Session":
         """Return DSMS session"""
         return self._session
+
+    @property
+    def user_groups(self) -> "List[Group]":
+        """Return user groups of the DSMS session"""
+        return _get_user_groups(self)
+
+    @property
+    def users(self) -> "List[User]":
+        """Return user list of the DSMS session"""
+        return _get_user_list(self)
 
     @classmethod
     def __get_pydantic_core_schema__(cls):
