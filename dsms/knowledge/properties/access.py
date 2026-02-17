@@ -87,7 +87,7 @@ class BaseAccessProperty(BaseModel):
     @field_serializer("role")
     def serialize_role_json(self, value: Role, _info):
         """Serialize role to JSON"""
-        if _info.mode == "json":
+        if _info.mode == "python":
             response = value.name  # JSON mode: use name
         else:
             response = value.value  # Python mode: use value

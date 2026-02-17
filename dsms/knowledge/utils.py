@@ -94,7 +94,7 @@ def dump_model(self, exclude_extra: set = set()) -> Dict[str, Any]:
     """
     exclude = self.model_config.get("exclude", set()) | exclude_extra
     return self.model_dump(
-        exclude_none=True, exclude_unset=True, exclude=exclude, mode="json"
+        exclude_none=True, exclude_unset=True, exclude=exclude, mode="python"
     )
 
 
