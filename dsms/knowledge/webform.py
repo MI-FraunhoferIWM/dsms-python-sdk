@@ -41,16 +41,24 @@ logger.propagate = False
 class Widget(Enum):
     """Enum for widgets"""
 
-    TEXT = "Text"
-    FILE = "File"
-    TEXTAREA = "Textarea"
-    NUMBER = "Number"
-    SLIDER = "Slider"
+    ARRAY_GROUP = "Array group"
     CHECKBOX = "Checkbox"
-    SELECT = "Select"
-    RADIO = "Radio"
+    DATE = "Date"
+    DATETIME = "Date-time"
+    FILE = "File"
+    KEY_VALUE_PAIRS = "Key-value pairs"
     KNOWLEDGE_ITEM = "Knowledge item"
+    LATEX = "LaTeX"
     MULTI_SELECT = "Multi-select"
+    NUMBER = "Number"
+    RADIO = "Radio"
+    SELECT = "Select"
+    SLIDER = "Slider"
+    STAR_RATING = "Star rating"
+    TEXT = "Text"
+    TEXTAREA = "Textarea"
+    URL = "URL"
+    VOCABULARY_SELECT = "Vocabulary select"
 
 
 class RelationMappingType(Enum):
