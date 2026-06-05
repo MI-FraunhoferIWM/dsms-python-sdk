@@ -1,4 +1,5 @@
 """DSMS knowledge utilities"""
+
 import base64
 import io
 import logging
@@ -31,6 +32,7 @@ if TYPE_CHECKING:
     from dsms.apps import AppConfig
     from dsms.core.session import Buffers
     from dsms.knowledge import KItem, KType, ProcessSchema, WebformSchema
+    from dsms.knowledge.groups import User
     from dsms.knowledge.properties import Attachment
 
 logger = logging.getLogger(__name__)
@@ -200,10 +202,8 @@ def _get_ktype(
 
     response = _perform_request(dsms, f"api/knowledge-type/{ktype_id}", "get")
     if response.status_code == 404 and raise_error:
-        raise ValueError(
-            f"""KType with the id `{ktype_id}` does not exist in
-            DSMS-instance `{dsms.config.host_url}`"""
-        )
+        raise ValueError(f"""KType with the id `{ktype_id}` does not exist in
+            DSMS-instance `{dsms.config.host_url}`""")
     if not response.ok and raise_error:
         raise ValueError(
             f"""An error occured fetching the KType with id `{ktype_id}`:
@@ -304,10 +304,8 @@ def _get_kitem(
 
     response = _perform_request(dsms, f"api/knowledge/kitems/{uuid}", "get")
     if response.status_code == 404 and raise_error:
-        raise ValueError(
-            f"""KItem with uuid `{uuid}` does not exist in
-            DSMS-instance `{dsms.config.host_url}`"""
-        )
+        raise ValueError(f"""KItem with uuid `{uuid}` does not exist in
+            DSMS-instance `{dsms.config.host_url}`""")
     if not response.ok and raise_error:
         raise ValueError(
             f"""An error occured fetching the KItem with uuid `{uuid}`:
@@ -439,10 +437,8 @@ def _upload_attachments(kitem: "KItem", attachment: "Attachment") -> None:
         elif isinstance(attachment.content, bytes):
             file = io.BytesIO(attachment.content)
         else:
-            raise TypeError(
-                f"""Invalid content type of attachment with name
-                `{attachment.name}`: {type(attachment.content)}"""
-            )
+            raise TypeError(f"""Invalid content type of attachment with name
+                `{attachment.name}`: {type(attachment.content)}""")
         file.name = attachment.name
         upload_file = {"dataFile": file}
         response = _perform_request(
@@ -930,9 +926,11 @@ def _search(
     return SearchResult(
         hits=[
             {
-                "kitem": KItemCompactedModel(**item.get("kitem"))
-                if compact
-                else KItem(**item.get("kitem")),
+                "kitem": (
+                    KItemCompactedModel(**item.get("kitem"))
+                    if compact
+                    else KItem(**item.get("kitem"))
+                ),
                 "fuzzy": item.get("fuzzy"),
             }
             for item in dumped.get("hits")
@@ -1164,7 +1162,7 @@ def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
 
 
 def _transform_from_flat_schema(
-    custom_properties: Dict[str, Any]
+    custom_properties: Dict[str, Any],
 ) -> Dict[str, Any]:
     return {"sections": [_make_misc_section(custom_properties)]}
 
@@ -1424,16 +1422,18 @@ def generate_mapping(ktype_id: str, webform: dict):
                                 "relation_type": relation_mapping_extra.get(
                                     "type"
                                 ),
-                                "object_type": {
-                                    "suffix": "max",
-                                    "iri": relation_mapping_extra.get(
-                                        "classIri"
-                                    ),
-                                    **unit,
-                                }
-                                if relation_mapping_extra.get("type")
-                                == "object_property"
-                                else object_type,
+                                "object_type": (
+                                    {
+                                        "suffix": "max",
+                                        "iri": relation_mapping_extra.get(
+                                            "classIri"
+                                        ),
+                                        **unit,
+                                    }
+                                    if relation_mapping_extra.get("type")
+                                    == "object_property"
+                                    else object_type
+                                ),
                             }
                         )
 

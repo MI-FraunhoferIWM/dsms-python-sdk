@@ -191,11 +191,11 @@ class KItem(KItemCompactedModel):
         None, description="Access properties of the KItem"
     )
 
-    contexts: List[
-        Union["KItem", KItemCompactedModel, KItemBaseModel]
-    ] = Field(
-        [],
-        description="Contextualized KItems related to this one.",
+    contexts: List[Union["KItem", KItemCompactedModel, KItemBaseModel]] = (
+        Field(
+            [],
+            description="Contextualized KItems related to this one.",
+        )
     )
 
     def __init__(self, **kwargs: "Any") -> None:
@@ -237,9 +237,11 @@ class KItem(KItemCompactedModel):
     ) -> List[Annotation]:
         """Validate annotations Field"""
         return [
-            Annotation(**_make_annotation_schema(annotation))
-            if isinstance(annotation, str)
-            else annotation
+            (
+                Annotation(**_make_annotation_schema(annotation))
+                if isinstance(annotation, str)
+                else annotation
+            )
             for annotation in value
         ]
 
@@ -258,9 +260,11 @@ class KItem(KItemCompactedModel):
     ) -> List[Attachment]:
         """Validate attachments Field"""
         return [
-            Attachment(name=attachment)
-            if isinstance(attachment, str)
-            else attachment
+            (
+                Attachment(name=attachment)
+                if isinstance(attachment, str)
+                else attachment
+            )
             for attachment in value
         ]
 
@@ -623,12 +627,8 @@ class KItem(KItemCompactedModel):
                 )
                 and entry.value is not None
             ):
-                error_message = (
-                    """Value `{}` is not a valid select option.
-                Valid options are: """
-                    + str(list(choices.keys()))
-                    + "\n"
-                )
+                error_message = """Value `{}` is not a valid select option.
+                Valid options are: """ + str(list(choices.keys())) + "\n"
                 if not select_options:
                     raise ValueError(
                         f"Widget of type `{entry.type}` does not have select options."
@@ -751,13 +751,11 @@ class KItem(KItemCompactedModel):
                 if is_updated:
                     entry.value = kitems
         else:
-            warnings.warn(
-                """
+            warnings.warn("""
                 Strict validation is disabled.
                 Will not strictly type check the custom properties.
                 This also will take place when values are re-assigned.
-                """
-            )
+                """)
 
         return entry
 

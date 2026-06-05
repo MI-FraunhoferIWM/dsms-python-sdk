@@ -1,4 +1,5 @@
 """Sparql interface utilities for the DSMS"""
+
 import io
 from typing import TYPE_CHECKING
 

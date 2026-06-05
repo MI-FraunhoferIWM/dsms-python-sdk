@@ -17,7 +17,6 @@ if TYPE_CHECKING:
 
 
 class SparqlInterface:
-
     """Sparql Interface for the DSMS."""
 
     def __init__(self, dsms):

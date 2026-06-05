@@ -32,7 +32,6 @@ from dsms.knowledge.semantics.units.utils import (  # isort:skip
 
 from dsms.core.logging import handler  # isort:skip
 
-
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.propagate = False
@@ -530,11 +529,9 @@ class CustomPropertiesSection(BaseWebformModel):
                     f"Section with name `{self.name}` has no attribute '{key}'"
                 )
             if len(target) > 1:
-                raise AttributeError(
-                    f"""Section with name `{self.name}`
+                raise AttributeError(f"""Section with name `{self.name}`
                     has multiple attributes '{key}'.
-                    Please specify the concrete entry via indexing !"""
-                )
+                    Please specify the concrete entry via indexing !""")
 
             target = target.pop()
         else:

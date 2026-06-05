@@ -98,12 +98,10 @@ class DSMS:
         elif config is None:
             self.config = Configuration(**kwargs)
         else:
-            raise ValueError(
-                """`config`-keyword is defined among others.
+            raise ValueError("""`config`-keyword is defined among others.
                 The `config`-keyword is reserved for passing a config-object directly.
                 Please specify kwargs for to be passed to the `Configuration`-object _OR_
-                an instance of this `Configuration`-object directly."""
-            )
+                an instance of this `Configuration`-object directly.""")
 
         from dsms.knowledge.groups.public import refresh_public_groups
 
@@ -393,10 +391,8 @@ class DSMS:
 def verify_connection(dsms: DSMS) -> None:
     """Check if DSMS is valid."""
     if not isinstance(dsms, DSMS):
-        raise TypeError(
-            f"""The passed object for the dsms-connection
-                is not of type {DSMS}."""
-        )
+        raise TypeError(f"""The passed object for the dsms-connection
+                is not of type {DSMS}.""")
     if dsms.config.ping_backend:
         try:
             response = _ping_backend(dsms)
