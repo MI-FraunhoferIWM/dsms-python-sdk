@@ -93,15 +93,9 @@ def dump_model(self, exclude_extra: set = set()) -> Dict[str, Any]:
         Dict[str, Any]: A dictionary of the model fields with specified exclusions.
     """
     exclude = self.model_config.get("exclude", set()) | exclude_extra
-    dumped = self.model_dump(
-        exclude_none=True,
-        exclude_unset=True,
-        exclude=exclude,
+    return self.model_dump(
+        exclude_none=True, exclude_unset=True, exclude=exclude, mode="python"
     )
-    return {
-        key: (str(value) if isinstance(value, UUID) else value)
-        for key, value in dumped.items()
-    }
 
 
 def print_ktype(self) -> str:
@@ -262,7 +256,9 @@ def _delete_ktype(ktype: "KType") -> None:
     _get_remote_ktypes(ktype.dsms)
 
 
-def _get_kitem_list(dsms: "DSMS", limit=10, offset=0) -> "KItemListModel":
+def _get_kitem_list(
+    dsms: "DSMS", user_id: Optional[str] = None, limit=10, offset=0
+) -> "KItemListModel":
     """Get all available KItems from the remote backend."""
     from dsms.knowledge.kitem import KItem  # isort:skip
 
@@ -271,6 +267,7 @@ def _get_kitem_list(dsms: "DSMS", limit=10, offset=0) -> "KItemListModel":
         "api/knowledge/kitems",
         "get",
         params={
+            "user_id": user_id,
             "limit": limit,
             "offset": offset,
         },
@@ -357,7 +354,6 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "rdf_exists",
             "in_backend",
             "avatar_exists",
-            "user_groups",
             "ktype_id",
             "attachments",
             "id",
@@ -368,6 +364,7 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "contexts",
         },
         exclude_defaults=True,
+        mode="json",
     )
     payload.update(
         **differences,
@@ -595,11 +592,8 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     differences = {}
     attributes = [
         ("annotations", ("annotations", "link", "unlink")),
-        ("user_groups", ("user_groups", "add", "remove")),
     ]
-    to_compare = kitem_new.model_dump(
-        include={"annotations", "user_groups", "contexts"}
-    )
+    to_compare = kitem_new.model_dump(include={"annotations", "contexts"})
     for name, terms in attributes:
         to_add_name = terms[0] + "_to_" + terms[1]
         to_remove_name = terms[0] + "_to_" + terms[2]
@@ -1089,9 +1083,9 @@ def _make_avatar(
     return avatar
 
 
-def _get_avatar(dsms: "DSMS", kitem_id: UUID) -> Image.Image:
+def _get_avatar(kitem_id: UUID) -> Image.Image:
     response = _perform_request(
-        dsms, f"api/knowledge/avatar/{kitem_id}", "get"
+        Session.dsms, f"api/knowledge/avatar/{kitem_id}", "get"
     )
     buffer = io.BytesIO(response.content)
     return Image.open(buffer)
@@ -1462,3 +1456,46 @@ def generate_mapping(ktype_id: str, webform: dict):
     else:
         mapping = mappings
     return mapping
+
+
+def _get_user_groups(dsms: "DSMS"):
+    """Fetch all user groups from the DSMS backend."""
+    from dsms.knowledge.groups import Group, GroupList
+
+    response = _perform_request(
+        dsms,
+        "api/users/groups",
+        "get",
+    )
+    if not response.ok:
+        raise ConnectionError(f"Failed to fetch user groups: {response.text}")
+    groups = response.json()
+    return GroupList([Group(**group) for group in groups])
+
+
+def _get_user_list(dsms: "DSMS"):
+    """Fetch all users from the DSMS backend."""
+    from dsms.knowledge.groups import User, UserList
+
+    response = _perform_request(
+        dsms,
+        "api/users/",
+        "get",
+    )
+    if not response.ok:
+        raise ConnectionError(f"Failed to fetch users: {response.text}")
+    users = response.json()
+    return UserList([User(**user) for user in users])
+
+
+def get_user_by_id(user_id: str):
+    """Fetch a user by ID from the DSMS backend."""
+
+    response = _perform_request(
+        Session.dsms,
+        f"api/users/{user_id}",
+        "get",
+    )
+    if not response.ok:
+        raise ValueError(f"Failed to fetch user {user_id}: {response.text}")
+    return response.json()
