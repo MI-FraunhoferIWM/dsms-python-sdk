@@ -41,4 +41,6 @@ def refresh_public_groups(config=None) -> None:
     constants stay in sync with the running configuration.
     """
     global INTERNALLY_PUBLIC_GROUP, EXTERNALLY_PUBLIC_GROUP
-    INTERNALLY_PUBLIC_GROUP, EXTERNALLY_PUBLIC_GROUP = _make_public_groups(config)
+    INTERNALLY_PUBLIC_GROUP, EXTERNALLY_PUBLIC_GROUP = _make_public_groups(
+        config
+    )

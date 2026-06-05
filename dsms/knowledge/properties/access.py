@@ -57,11 +57,20 @@ class RoleMapping(List[OperationType], Enum):
 
         Raises ValueError if no role grants the given operation (e.g. CREATE).
         """
-        candidates = [role.value for role in Role if operation in cls.get_operations(role)]
+        candidates = [
+            role.value
+            for role in Role
+            if operation in cls.get_operations(role)
+        ]
         if not candidates:
+            valid = [
+                op.value
+                for op in OperationType
+                if any(op in cls.get_operations(r) for r in Role)
+            ]
             raise ValueError(
                 f"No role grants the '{operation.value}' operation. "
-                f"Valid operations are: {[op.value for op in OperationType if any(op in cls.get_operations(r) for r in Role)]}"
+                f"Valid operations are: {valid}"
             )
         return Role(min(candidates))
 
@@ -71,11 +80,20 @@ class RoleMapping(List[OperationType], Enum):
 
         Raises ValueError if no role grants the given operation (e.g. CREATE).
         """
-        candidates = [role.value for role in Role if operation in cls.get_operations(role)]
+        candidates = [
+            role.value
+            for role in Role
+            if operation in cls.get_operations(role)
+        ]
         if not candidates:
+            valid = [
+                op.value
+                for op in OperationType
+                if any(op in cls.get_operations(r) for r in Role)
+            ]
             raise ValueError(
                 f"No role grants the '{operation.value}' operation. "
-                f"Valid operations are: {[op.value for op in OperationType if any(op in cls.get_operations(r) for r in Role)]}"
+                f"Valid operations are: {valid}"
             )
         return Role(max(candidates))
 

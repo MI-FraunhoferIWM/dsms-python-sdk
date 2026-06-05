@@ -1,14 +1,21 @@
 """Tests for groups models, public group constants, and DSMS user/group API."""
 
-import json
 from urllib.parse import urljoin
 
 import pytest
 import responses as responses_lib
 
-from dsms.knowledge.groups.models import BaseGroup, Group, GroupList, User, UserList
-from dsms.knowledge.groups.public import EXTERNALLY_PUBLIC_GROUP, INTERNALLY_PUBLIC_GROUP
-
+from dsms.knowledge.groups.models import (
+    BaseGroup,
+    Group,
+    GroupList,
+    User,
+    UserList,
+)
+from dsms.knowledge.groups.public import (
+    EXTERNALLY_PUBLIC_GROUP,
+    INTERNALLY_PUBLIC_GROUP,
+)
 
 # ---------------------------------------------------------------------------
 # Group model
@@ -118,13 +125,17 @@ def test_user_with_groups():
 
 
 def test_userlist_by_id():
-    ul = UserList([User(id="u1", username="alice"), User(id="u2", username="bob")])
+    ul = UserList(
+        [User(id="u1", username="alice"), User(id="u2", username="bob")]
+    )
     assert ul.by_id["u1"].username == "alice"
     assert ul.by_id["u2"].username == "bob"
 
 
 def test_userlist_by_username():
-    ul = UserList([User(id="u1", username="alice"), User(id="u2", username="bob")])
+    ul = UserList(
+        [User(id="u1", username="alice"), User(id="u2", username="bob")]
+    )
     assert ul.by_username["alice"].id == "u1"
 
 
@@ -191,7 +202,9 @@ def test_refresh_public_groups_uses_custom_config():
     assert pub.INTERNALLY_PUBLIC_GROUP.id == original_id
 
 
-def test_refresh_public_groups_without_arg_restores_defaults(reset_dsms_session):
+def test_refresh_public_groups_without_arg_restores_defaults(
+    reset_dsms_session,
+):
     """refresh_public_groups() with no argument should use env/defaults."""
     from dsms.knowledge.groups import public as pub
 
@@ -206,7 +219,11 @@ def test_refresh_public_groups_without_arg_restores_defaults(reset_dsms_session)
 
 MOCK_GROUPS = [
     {"id": "grp-1", "name": "Engineering", "subgroups": []},
-    {"id": "grp-2", "name": "Research", "subgroups": [{"id": "grp-3", "name": "ML", "subgroups": []}]},
+    {
+        "id": "grp-2",
+        "name": "Research",
+        "subgroups": [{"id": "grp-3", "name": "ML", "subgroups": []}],
+    },
 ]
 
 MOCK_USERS = [
@@ -228,7 +245,12 @@ def test_user_groups_returns_grouplist(custom_address):
 
     with pytest.warns(UserWarning):
         from dsms.core.dsms import DSMS
-        dsms = DSMS(host_url=custom_address, ping_backend=False, auto_fetch_ktypes=False)
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
 
     result = dsms.user_groups
     assert isinstance(result, GroupList)
@@ -248,12 +270,19 @@ def test_user_groups_is_cached(custom_address):
 
     with pytest.warns(UserWarning):
         from dsms.core.dsms import DSMS
-        dsms = DSMS(host_url=custom_address, ping_backend=False, auto_fetch_ktypes=False)
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
 
     _ = dsms.user_groups
     _ = dsms.user_groups
 
-    group_calls = [c for c in responses_lib.calls if "api/users/groups" in c.request.url]
+    group_calls = [
+        c for c in responses_lib.calls if "api/users/groups" in c.request.url
+    ]
     assert len(group_calls) == 1
 
 
@@ -275,13 +304,20 @@ def test_refresh_user_groups_re_fetches(custom_address):
 
     with pytest.warns(UserWarning):
         from dsms.core.dsms import DSMS
-        dsms = DSMS(host_url=custom_address, ping_backend=False, auto_fetch_ktypes=False)
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
 
     _ = dsms.user_groups
     dsms.refresh_user_groups()
 
     assert dsms.user_groups.by_id["grp-new"].name == "New Group"
-    group_calls = [c for c in responses_lib.calls if "api/users/groups" in c.request.url]
+    group_calls = [
+        c for c in responses_lib.calls if "api/users/groups" in c.request.url
+    ]
     assert len(group_calls) == 2
 
 
@@ -297,12 +333,19 @@ def test_users_is_cached(custom_address):
 
     with pytest.warns(UserWarning):
         from dsms.core.dsms import DSMS
-        dsms = DSMS(host_url=custom_address, ping_backend=False, auto_fetch_ktypes=False)
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
 
     _ = dsms.users
     _ = dsms.users
 
-    user_calls = [c for c in responses_lib.calls if "api/users/" in c.request.url]
+    user_calls = [
+        c for c in responses_lib.calls if "api/users/" in c.request.url
+    ]
     assert len(user_calls) == 1
 
 
@@ -323,7 +366,12 @@ def test_refresh_users_re_fetches(custom_address):
 
     with pytest.warns(UserWarning):
         from dsms.core.dsms import DSMS
-        dsms = DSMS(host_url=custom_address, ping_backend=False, auto_fetch_ktypes=False)
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
 
     _ = dsms.users
     dsms.refresh_users()
@@ -343,7 +391,12 @@ def test_get_user_returns_user_object(custom_address):
 
     with pytest.warns(UserWarning):
         from dsms.core.dsms import DSMS
-        dsms = DSMS(host_url=custom_address, ping_backend=False, auto_fetch_ktypes=False)
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
 
     user = dsms.get_user("u-1")
 
@@ -363,7 +416,12 @@ def test_get_user_raises_on_missing(custom_address):
 
     with pytest.warns(UserWarning):
         from dsms.core.dsms import DSMS
-        dsms = DSMS(host_url=custom_address, ping_backend=False, auto_fetch_ktypes=False)
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
 
     with pytest.raises(ValueError, match="nonexistent"):
         dsms.get_user("nonexistent")

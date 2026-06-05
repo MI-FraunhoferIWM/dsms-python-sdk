@@ -11,7 +11,6 @@ from dsms.knowledge.properties.access import (
     UserAccessProperty,
 )
 
-
 # ---------------------------------------------------------------------------
 # Role hierarchy
 # ---------------------------------------------------------------------------
@@ -97,7 +96,12 @@ def test_error_message_lists_valid_operations():
     with pytest.raises(ValueError) as exc_info:
         RoleMapping.min_access_level(OperationType.CREATE)
     msg = str(exc_info.value)
-    for op in (OperationType.READ, OperationType.UPDATE, OperationType.DELETE, OperationType.MANAGE):
+    for op in (
+        OperationType.READ,
+        OperationType.UPDATE,
+        OperationType.DELETE,
+        OperationType.MANAGE,
+    ):
         assert op.value in msg
 
 
@@ -168,7 +172,10 @@ def test_round_trip_from_backend_dict():
 
     # Serialise back and verify identity
     re_serialised = props.model_dump(mode="json")
-    assert re_serialised["user_access"][0] == {"user_id": "alice", "role": Role.OWNER.value}
+    assert re_serialised["user_access"][0] == {
+        "user_id": "alice",
+        "role": Role.OWNER.value,
+    }
     assert re_serialised["group_access"][0] == {
         "group_id": "dsms:internally-public",
         "role": Role.USER.value,

@@ -106,6 +106,7 @@ class DSMS:
             )
 
         from dsms.knowledge.groups.public import refresh_public_groups
+
         refresh_public_groups(self.config)
 
         self._sparql_interface = SparqlInterface(self)
