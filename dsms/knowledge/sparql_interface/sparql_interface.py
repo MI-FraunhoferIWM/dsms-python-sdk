@@ -6,7 +6,9 @@ from dsms.core.configuration import DEFAULT_REPO
 from dsms.knowledge.sparql_interface.subgraph import Subgraph
 from dsms.knowledge.sparql_interface.utils import (
     _add_rdf,
+    _graph_query_context,
     _sparql_query,
+    _sparql_query_context,
     _sparql_update,
 )
 
@@ -55,6 +57,14 @@ class SparqlInterface:
             self._dsms.config.encoding,
             repository,
         )
+
+    def query_context(self, context_id: str, query: str) -> "Dict[str, Any]":
+        """Perform a SPARQL query scoped to a context KItem."""
+        return _sparql_query_context(self._dsms, context_id, query)
+
+    def graph_context(self, context_id: str, query: str) -> "Dict[str, Any]":
+        """Perform a graph query scoped to a context KItem."""
+        return _graph_query_context(self._dsms, context_id, query)
 
     @property
     def subgraph(self) -> Subgraph:

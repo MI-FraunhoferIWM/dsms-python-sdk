@@ -31,6 +31,10 @@ from dsms.knowledge.properties.external_links import (  # isort:skip
 )
 
 from dsms.knowledge.properties.avatar import Avatar  # isort:skip
+from dsms.knowledge.properties.schema_data import (  # isort:skip
+    KItemSchemaData,
+    KItemSchemaDataList,
+)
 
 __all__ = [
     "Annotation",
@@ -51,4 +55,6 @@ __all__ = [
     "Column",
     "KItemRelationshipModel",
     "KItemAccessProperties",
+    "KItemSchemaData",
+    "KItemSchemaDataList",
 ]

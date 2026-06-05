@@ -42,6 +42,7 @@ from dsms.knowledge.properties import (  # isort:skip
     DataFrameContainer,
     Column,
     KItemRelationshipModel,
+    KItemSchemaData,
     LinkedKItemsList,
     Summary,
     KItemAccessProperties,
@@ -144,10 +145,9 @@ class KItem(KItemCompactedModel):
         description="Affiliations related to a KItem.",
     )
     authors: List[Union[Author, str]] = Field(
-        [], description="Authorship of the KItem."
-    )
-    avatar_exists: Optional[bool] = Field(
-        False, description="Whether the KItem holds an avatar or not."
+        [],
+        description="Authorship of the KItem. Deprecated: no longer populated by the backend.",
+        deprecated=True,
     )
     contacts: List[ContactInfo] = Field(
         [],
@@ -180,7 +180,12 @@ class KItem(KItemCompactedModel):
     ] = Field(None, description="DataFrame interface.")
 
     rdf_exists: bool = Field(
-        False, description="Whether the KItem holds an RDF Graph or not."
+        False,
+        description=(
+            "Whether the KItem holds an RDF Graph or not. "
+            "Deprecated: no longer populated by the backend."
+        ),
+        deprecated=True,
     )
 
     avatar: Optional[Avatar] = Field(
@@ -196,6 +201,11 @@ class KItem(KItemCompactedModel):
             [],
             description="Contextualized KItems related to this one.",
         )
+    )
+
+    schema_data: Optional[List[KItemSchemaData]] = Field(
+        None,
+        description="Semantic schema data entries associated with this KItem.",
     )
 
     def __init__(self, **kwargs: "Any") -> None:

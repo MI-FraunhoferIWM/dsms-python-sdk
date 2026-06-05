@@ -257,20 +257,23 @@ def _delete_ktype(ktype: "KType") -> None:
 
 
 def _get_kitem_list(
-    dsms: "DSMS", user_id: Optional[str] = None, limit=10, offset=0
+    dsms: "DSMS",
+    user_id: Optional[str] = None,
+    limit=10,
+    offset=0,
+    name: Optional[str] = None,
 ) -> "KItemListModel":
     """Get all available KItems from the remote backend."""
     from dsms.knowledge.kitem import KItem  # isort:skip
 
+    params = {"user_id": user_id, "limit": limit, "offset": offset}
+    if name is not None:
+        params["name"] = name
     response = _perform_request(
         dsms,
         "api/knowledge/kitems",
         "get",
-        params={
-            "user_id": user_id,
-            "limit": limit,
-            "offset": offset,
-        },
+        params=params,
     )
     if not response.ok:
         raise ValueError(
@@ -611,6 +614,15 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     context_kitems = _get_kitem_contexts(kitem_old, kitem_new)
     # same holds for kitem apps
     apps = _get_apps_diff(kitem_old, kitem_new)
+    # access_properties: include as full replacement when changed
+    old_access = kitem_old.get("access_properties")
+    new_access = (
+        kitem_new.access_properties.model_dump(mode="json")
+        if kitem_new.access_properties is not None
+        else None
+    )
+    if new_access != old_access and new_access is not None:
+        differences["access_properties"] = new_access
     # merge with previously found differences
     differences.update(**linked_kitems, **apps, **context_kitems)
     return differences
@@ -672,6 +684,8 @@ def _commit(buffers: "Buffers") -> None:
                 _delete_dataframe(obj.id)
             _update_kitem(obj, old_kitem)
             _update_attachments(obj, old_kitem)
+            if obj.schema_data is not None:
+                _update_schema_data(obj, old_kitem)
             if obj.avatar.file or obj.avatar.encode_qr:
                 _commit_avatar(obj)
         elif isinstance(obj, KType) or (
@@ -857,6 +871,162 @@ def _refresh_kitem(kitem: "KItem") -> None:
         kitem.dataframe = [{"id": kitem.id, **column} for column in dataframe]
 
 
+def _get_ktypes_by_parent(
+    dsms: "DSMS", parent_id: str
+) -> List[Dict[str, Any]]:
+    """Return KTypes whose spec.extends chain contains parent_id."""
+    response = _perform_request(
+        dsms, "api/knowledge-type/", "get", params={"parent": parent_id}
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to fetch ktypes by parent `{parent_id}`: {response.text}"
+        )
+    return response.json()
+
+
+# ---------------------------------------------------------------------------
+# KType v2 utilities  (api/knowledge-type/v2/ktypes/…)
+# ---------------------------------------------------------------------------
+
+_V2_BASE = "api/knowledge-type/v2/ktypes"
+
+
+def _v2_list_ktypes(dsms: "DSMS") -> List[Dict[str, Any]]:
+    """GET /v2/ktypes/ — list all v2 KTypes."""
+    response = _perform_request(dsms, f"{_V2_BASE}/", "get")
+    if not response.ok:
+        raise ValueError(f"Failed to list v2 ktypes: {response.text}")
+    return response.json()
+
+
+def _v2_get_ktype(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
+    """GET /v2/ktypes/{ktype_id} — fetch a single v2 KType."""
+    response = _perform_request(dsms, f"{_V2_BASE}/{ktype_id}", "get")
+    if not response.ok:
+        raise ValueError(
+            f"Failed to fetch v2 ktype `{ktype_id}`: {response.text}"
+        )
+    return response.json()
+
+
+def _v2_create_ktype(dsms: "DSMS", payload: Dict[str, Any]) -> Dict[str, Any]:
+    """POST /v2/ktypes/ — create or upgrade a v2 KType."""
+    response = _perform_request(dsms, f"{_V2_BASE}/", "post", json=payload)
+    if not response.ok:
+        raise ValueError(f"Failed to create v2 ktype: {response.text}")
+    return response.json()
+
+
+def _v2_import_ktype(dsms: "DSMS", url: str) -> Dict[str, Any]:
+    """POST /v2/ktypes/import — import a KType spec from a GitHub URL."""
+    response = _perform_request(
+        dsms, f"{_V2_BASE}/import", "post", json={"url": url}
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to import v2 ktype from `{url}`: {response.text}"
+        )
+    return response.json()
+
+
+def _v2_update_ktype(
+    dsms: "DSMS", ktype_id: str, payload: Dict[str, Any]
+) -> Dict[str, Any]:
+    """PUT /v2/ktypes/{ktype_id} — partial spec update."""
+    response = _perform_request(
+        dsms, f"{_V2_BASE}/{ktype_id}", "put", json=payload
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to update v2 ktype `{ktype_id}`: {response.text}"
+        )
+    return response.json()
+
+
+def _v2_delete_ktype(dsms: "DSMS", ktype_id: str) -> None:
+    """DELETE /v2/ktypes/{ktype_id} — delete a v2 KType."""
+    response = _perform_request(dsms, f"{_V2_BASE}/{ktype_id}", "delete")
+    if not response.ok:
+        raise ValueError(
+            f"Failed to delete v2 ktype `{ktype_id}`: {response.text}"
+        )
+
+
+def _v2_restore_stash(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
+    """POST /v2/ktypes/{ktype_id}/restore-stash — restore pre-import stash."""
+    response = _perform_request(
+        dsms, f"{_V2_BASE}/{ktype_id}/restore-stash", "post"
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to restore stash for v2 ktype `{ktype_id}`: {response.text}"
+        )
+    return response.json()
+
+
+def _v2_refresh_ktype(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
+    """POST /v2/ktypes/{ktype_id}/refresh — re-fetch spec from source URL."""
+    response = _perform_request(dsms, f"{_V2_BASE}/{ktype_id}/refresh", "post")
+    if not response.ok:
+        raise ValueError(
+            f"Failed to refresh v2 ktype `{ktype_id}`: {response.text}"
+        )
+    return response.json()
+
+
+def _v2_export_ktype(dsms: "DSMS", ktype_id: str) -> str:
+    """GET /v2/ktypes/{ktype_id}/export — download ktype.yaml as text."""
+    response = _perform_request(dsms, f"{_V2_BASE}/{ktype_id}/export", "get")
+    if not response.ok:
+        raise ValueError(
+            f"Failed to export v2 ktype `{ktype_id}`: {response.text}"
+        )
+    return response.text
+
+
+def _v2_list_remote_ktypes(dsms: "DSMS") -> List[Dict[str, Any]]:
+    """GET /v2/ktypes/remote — list KTypes available in the remote repo."""
+    response = _perform_request(dsms, f"{_V2_BASE}/remote", "get")
+    if not response.ok:
+        raise ValueError(f"Failed to list remote v2 ktypes: {response.text}")
+    return response.json()
+
+
+def _v2_list_remote_schemas(dsms: "DSMS") -> List[Dict[str, Any]]:
+    """GET /v2/ktypes/remote/schemas — list semantic schemas in the remote repo."""
+    response = _perform_request(dsms, f"{_V2_BASE}/remote/schemas", "get")
+    if not response.ok:
+        raise ValueError(f"Failed to list remote schemas: {response.text}")
+    return response.json()
+
+
+def _v2_list_remote_versions(
+    dsms: "DSMS", ktype_id: str
+) -> List[Dict[str, Any]]:
+    """GET /v2/ktypes/{ktype_id}/remote-versions — list GitHub tags for a KType."""
+    response = _perform_request(
+        dsms, f"{_V2_BASE}/{ktype_id}/remote-versions", "get"
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to list remote versions for v2 ktype `{ktype_id}`: {response.text}"
+        )
+    return response.json()
+
+
+def _v2_remote_diff(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
+    """GET /v2/ktypes/{ktype_id}/remote-diff — diff local vs latest remote spec."""
+    response = _perform_request(
+        dsms, f"{_V2_BASE}/{ktype_id}/remote-diff", "get"
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to get remote diff for v2 ktype `{ktype_id}`: {response.text}"
+        )
+    return response.json()
+
+
 def _refresh_ktype(ktype: "KType") -> None:
     """Refresh the KItem"""
     for key, value in _get_ktype(ktype.dsms, ktype.id, as_json=True).items():
@@ -891,6 +1061,8 @@ def _search(
     offset: "Optional[int]" = 0,
     allow_fuzzy: "Optional[bool]" = True,
     compact: "Optional[bool]" = False,
+    contexts: "Optional[List[str]]" = None,
+    attachment_extensions: "Optional[List[str]]" = None,
 ) -> "List[SearchResult]":
     """Search for KItems in the remote backend"""
     from dsms import KItem, KItemCompactedModel
@@ -906,12 +1078,17 @@ def _search(
         "offset": offset,
         "compact": compact,
     }
+    if contexts is not None:
+        payload["contexts"] = contexts
+    params = {"allow_fuzzy": allow_fuzzy}
+    if attachment_extensions is not None:
+        params["attachment_extensions"] = attachment_extensions
     response = _perform_request(
         dsms,
         "api/knowledge/kitems/search",
         "post",
         json=payload,
-        params={"allow_fuzzy": allow_fuzzy},
+        params=params,
     )
     if not response.ok:
         raise RuntimeError(
@@ -1508,3 +1685,65 @@ def get_user_by_id(dsms: "DSMS", user_id: str) -> "User":
     if not response.ok:
         raise ValueError(f"Failed to fetch user {user_id}: {response.text}")
     return User(**response.json())
+
+
+def _get_schema_data(dsms: "DSMS", kitem_id: str) -> List[Dict[str, Any]]:
+    """Fetch all schema-data entries for a KItem from the remote backend."""
+    response = _perform_request(
+        dsms, f"api/knowledge/kitems/{kitem_id}/schema-data", "get"
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to fetch schema data for kitem `{kitem_id}`: {response.text}"
+        )
+    return response.json()
+
+
+def _put_schema_data(
+    dsms: "DSMS",
+    kitem_id: str,
+    schema_id: str,
+    content: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Create or update a single schema-data entry for a KItem."""
+    response = _perform_request(
+        dsms,
+        f"api/knowledge/kitems/{kitem_id}/schema-data/{schema_id}",
+        "put",
+        json={"content": content},
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to put schema data `{schema_id}` for kitem `{kitem_id}`: {response.text}"
+        )
+    return response.json()
+
+
+def _delete_schema_data(dsms: "DSMS", kitem_id: str, schema_id: str) -> None:
+    """Delete a single schema-data entry for a KItem."""
+    response = _perform_request(
+        dsms,
+        f"api/knowledge/kitems/{kitem_id}/schema-data/{schema_id}",
+        "delete",
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to delete schema data `{schema_id}` for kitem `{kitem_id}`: {response.text}"
+        )
+
+
+def _update_schema_data(kitem: "KItem", old_kitem: Dict[str, Any]) -> None:
+    """Sync schema_data changes between local KItem state and the backend."""
+    old_entries = {
+        e["schema_id"]: e.get("content")
+        for e in old_kitem.get("schema_data", [])
+    }
+    new_entries = {e.schema_id: e.content for e in (kitem.schema_data or [])}
+
+    for schema_id, content in new_entries.items():
+        if schema_id not in old_entries or old_entries[schema_id] != content:
+            _put_schema_data(kitem.dsms, str(kitem.id), schema_id, content)
+
+    for schema_id in old_entries:
+        if schema_id not in new_entries:
+            _delete_schema_data(kitem.dsms, str(kitem.id), schema_id)
