@@ -27,6 +27,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _get_webform_schemas,
     _get_user_groups,
     _get_user_list,
+    get_user_by_id,
 )
 
 if TYPE_CHECKING:
@@ -81,6 +82,8 @@ class DSMS:
 
         self._config = None
         self._ktypes = None
+        self._user_groups = None
+        self._users = None
         self._session.dsms = self
 
         if env:
@@ -101,6 +104,9 @@ class DSMS:
                 Please specify kwargs for to be passed to the `Configuration`-object _OR_
                 an instance of this `Configuration`-object directly."""
             )
+
+        from dsms.knowledge.groups.public import refresh_public_groups
+        refresh_public_groups(self.config)
 
         self._sparql_interface = SparqlInterface(self)
         if self.config.auto_fetch_ktypes:
@@ -338,13 +344,44 @@ class DSMS:
 
     @property
     def user_groups(self) -> "List[Group]":
-        """Return user groups of the DSMS session"""
-        return _get_user_groups(self)
+        """Return user groups, fetching from the backend on first access.
+
+        Results are cached for the lifetime of this DSMS instance.
+        Call refresh_user_groups() to force a re-fetch.
+        """
+        if self._user_groups is None:
+            self._user_groups = _get_user_groups(self)
+        return self._user_groups
+
+    def refresh_user_groups(self) -> None:
+        """Re-fetch user groups from the backend and update the local cache."""
+        self._user_groups = _get_user_groups(self)
 
     @property
     def users(self) -> "List[User]":
-        """Return user list of the DSMS session"""
-        return _get_user_list(self)
+        """Return all users, fetching from the backend on first access.
+
+        Results are cached for the lifetime of this DSMS instance.
+        Call refresh_users() to force a re-fetch.
+        """
+        if self._users is None:
+            self._users = _get_user_list(self)
+        return self._users
+
+    def refresh_users(self) -> None:
+        """Re-fetch users from the backend and update the local cache."""
+        self._users = _get_user_list(self)
+
+    def get_user(self, user_id: str) -> "User":
+        """Fetch a single user by ID from the backend.
+
+        Args:
+            user_id: The unique identifier of the user.
+
+        Returns:
+            User object for the given ID.
+        """
+        return get_user_by_id(self, user_id)
 
     @classmethod
     def __get_pydantic_core_schema__(cls):

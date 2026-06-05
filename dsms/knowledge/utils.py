@@ -1488,14 +1488,23 @@ def _get_user_list(dsms: "DSMS"):
     return UserList([User(**user) for user in users])
 
 
-def get_user_by_id(user_id: str):
-    """Fetch a user by ID from the DSMS backend."""
+def get_user_by_id(dsms: "DSMS", user_id: str) -> "User":
+    """Fetch a single user by ID from the DSMS backend.
+
+    Args:
+        dsms: The DSMS instance to use for the request.
+        user_id: The unique identifier of the user.
+
+    Returns:
+        User object for the given ID.
+    """
+    from dsms.knowledge.groups import User
 
     response = _perform_request(
-        Session.dsms,
+        dsms,
         f"api/users/{user_id}",
         "get",
     )
     if not response.ok:
         raise ValueError(f"Failed to fetch user {user_id}: {response.text}")
-    return response.json()
+    return User(**response.json())

@@ -142,7 +142,3 @@ class GroupList(list):
 
 
 Group.model_rebuild()
-interally_public = Group(id="dsms:internally_public", name="Internally Public")
-externally_public = Group(
-    id="dsms:externally_public", name="Externally Public"
-)

@@ -5,11 +5,6 @@ from dsms.core.session import Session
 
 from .models import Group
 
-if not Session.dsms:
-    config = BaseConfiguration()
-else:
-    config = Session.dsms.config
-
 # The internally/externally public group objects will generally
 # be served by the user-service, but we define them here for uniquely
 # setting the ids and names in a common place.
@@ -19,13 +14,31 @@ else:
 # If the IDs and names of these public groups are only delivered in the user service,
 # we cannot distinguish them from the ones which come from keycloak
 # - indicating only organizational groups.
+#
+# NOTE: These constants are initialised at import time using whatever config is
+# available then (env-vars or defaults).  If a DSMS instance is later created
+# with a Configuration that overrides id_internally_public / id_externally_public,
+# call refresh_public_groups(config) to keep the constants in sync.
 
-INTERNALLY_PUBLIC_GROUP = Group(
-    id=config.id_internally_public,
-    name=config.label_internally_public,
-)
 
-EXTERNALLY_PUBLIC_GROUP = Group(
-    id=config.id_externally_public,
-    name=config.label_externally_public,
-)
+def _make_public_groups(cfg=None):
+    if cfg is None:
+        cfg = Session.dsms.config if Session.dsms else BaseConfiguration()
+    return (
+        Group(id=cfg.id_internally_public, name=cfg.label_internally_public),
+        Group(id=cfg.id_externally_public, name=cfg.label_externally_public),
+    )
+
+
+INTERNALLY_PUBLIC_GROUP, EXTERNALLY_PUBLIC_GROUP = _make_public_groups()
+
+
+def refresh_public_groups(config=None) -> None:
+    """Re-create the public group constants from the given (or current) config.
+
+    Call this after constructing a DSMS instance whose Configuration overrides
+    id_internally_public or id_externally_public so that the module-level
+    constants stay in sync with the running configuration.
+    """
+    global INTERNALLY_PUBLIC_GROUP, EXTERNALLY_PUBLIC_GROUP
+    INTERNALLY_PUBLIC_GROUP, EXTERNALLY_PUBLIC_GROUP = _make_public_groups(config)

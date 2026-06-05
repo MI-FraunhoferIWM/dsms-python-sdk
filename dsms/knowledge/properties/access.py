@@ -53,21 +53,31 @@ class RoleMapping(List[OperationType], Enum):
 
     @classmethod
     def min_access_level(cls, operation: OperationType) -> Role:
-        """Get minimum role required for an operation"""
-        return min(
-            role.value
-            for role in Role
-            if operation in cls.get_operations(role)
-        )
+        """Get minimum role required for an operation.
+
+        Raises ValueError if no role grants the given operation (e.g. CREATE).
+        """
+        candidates = [role.value for role in Role if operation in cls.get_operations(role)]
+        if not candidates:
+            raise ValueError(
+                f"No role grants the '{operation.value}' operation. "
+                f"Valid operations are: {[op.value for op in OperationType if any(op in cls.get_operations(r) for r in Role)]}"
+            )
+        return Role(min(candidates))
 
     @classmethod
     def max_access_level(cls, operation: OperationType) -> Role:
-        """Get maximum role required for an operation"""
-        return max(
-            role.value
-            for role in Role
-            if operation in cls.get_operations(role)
-        )
+        """Get maximum role required for an operation.
+
+        Raises ValueError if no role grants the given operation (e.g. CREATE).
+        """
+        candidates = [role.value for role in Role if operation in cls.get_operations(role)]
+        if not candidates:
+            raise ValueError(
+                f"No role grants the '{operation.value}' operation. "
+                f"Valid operations are: {[op.value for op in OperationType if any(op in cls.get_operations(r) for r in Role)]}"
+            )
+        return Role(max(candidates))
 
 
 class BaseAccessProperty(BaseModel):
@@ -88,9 +98,9 @@ class BaseAccessProperty(BaseModel):
     def serialize_role_json(self, value: Role, _info):
         """Serialize role to JSON"""
         if _info.mode == "python":
-            response = value.name  # JSON mode: use name
+            response = value.name  # Python mode: use human-readable name
         else:
-            response = value.value  # Python mode: use value
+            response = value.value  # JSON/wire mode: use integer value
         return response
 
 
