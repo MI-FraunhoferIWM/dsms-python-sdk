@@ -18,14 +18,14 @@ from dsms.knowledge.properties.access import (
 
 def test_role_ordering():
     """Role integer values must be strictly ascending: USER < CONTRIBUTOR < OWNER < ADMIN."""
-    assert Role.USER < Role.CONTRIBUTOR < Role.OWNER < Role.ADMIN
+    assert Role.MEMBER < Role.CONTRIBUTOR < Role.OWNER < Role.ADMIN
 
 
 def test_role_gte_comparison():
     """>=  on Role values must work correctly for threshold checks."""
     assert Role.OWNER >= Role.CONTRIBUTOR
     assert Role.ADMIN >= Role.OWNER
-    assert not (Role.USER >= Role.CONTRIBUTOR)
+    assert not (Role.MEMBER >= Role.CONTRIBUTOR)
 
 
 # ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ def test_min_access_level_returns_role_instance():
     """min_access_level must return a Role member, not a plain int."""
     result = RoleMapping.min_access_level(OperationType.READ)
     assert isinstance(result, Role)
-    assert result is Role.USER
+    assert result is Role.MEMBER
 
 
 def test_max_access_level_returns_role_instance():
@@ -50,7 +50,7 @@ def test_max_access_level_returns_role_instance():
 @pytest.mark.parametrize(
     "operation, expected_min",
     [
-        (OperationType.READ, Role.USER),
+        (OperationType.READ, Role.MEMBER),
         (OperationType.UPDATE, Role.CONTRIBUTOR),
         (OperationType.DELETE, Role.OWNER),
         (OperationType.MANAGE, Role.OWNER),
@@ -132,13 +132,13 @@ def test_model_dump_json_produces_integer_roles():
     """model_dump(mode='json') must produce integer role values for the wire format."""
     props = KItemAccessProperties(
         user_access=[UserAccessProperty(user_id="u1", role=Role.OWNER)],
-        group_access=[GroupAccessProperty(group_id="g1", role=Role.USER)],
+        group_access=[GroupAccessProperty(group_id="g1", role=Role.MEMBER)],
     )
     payload = props.model_dump(mode="json")
 
     assert payload["user_access"][0]["role"] == Role.OWNER.value
     assert isinstance(payload["user_access"][0]["role"], int)
-    assert payload["group_access"][0]["role"] == Role.USER.value
+    assert payload["group_access"][0]["role"] == Role.MEMBER.value
     assert isinstance(payload["group_access"][0]["role"], int)
 
 
@@ -157,18 +157,18 @@ def test_round_trip_from_backend_dict():
     backend_payload = {
         "user_access": [
             {"user_id": "alice", "role": Role.OWNER.value},
-            {"user_id": "bob", "role": Role.USER.value},
+            {"user_id": "bob", "role": Role.MEMBER.value},
         ],
         "group_access": [
-            {"group_id": "dsms:internally-public", "role": Role.USER.value},
+            {"group_id": "dsms:internally-public", "role": Role.MEMBER.value},
         ],
     }
 
     props = KItemAccessProperties(**backend_payload)
 
     assert props.by_user["alice"].role is Role.OWNER
-    assert props.by_user["bob"].role is Role.USER
-    assert props.by_group["dsms:internally-public"].role is Role.USER
+    assert props.by_user["bob"].role is Role.MEMBER
+    assert props.by_group["dsms:internally-public"].role is Role.MEMBER
 
     # Serialise back and verify identity
     re_serialised = props.model_dump(mode="json")
@@ -178,7 +178,7 @@ def test_round_trip_from_backend_dict():
     }
     assert re_serialised["group_access"][0] == {
         "group_id": "dsms:internally-public",
-        "role": Role.USER.value,
+        "role": Role.MEMBER.value,
     }
 
 
@@ -192,13 +192,13 @@ def test_user_by_role():
     props = KItemAccessProperties(
         user_access=[
             UserAccessProperty(user_id="alice", role=Role.OWNER),
-            UserAccessProperty(user_id="bob", role=Role.USER),
-            UserAccessProperty(user_id="carol", role=Role.USER),
+            UserAccessProperty(user_id="bob", role=Role.MEMBER),
+            UserAccessProperty(user_id="carol", role=Role.MEMBER),
         ]
     )
     by_role = props.user_by_role
     assert by_role[Role.OWNER] == ["alice"]
-    assert set(by_role[Role.USER]) == {"bob", "carol"}
+    assert set(by_role[Role.MEMBER]) == {"bob", "carol"}
     assert Role.CONTRIBUTOR not in by_role
 
 

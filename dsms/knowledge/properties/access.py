@@ -22,7 +22,7 @@ class OperationType(str, Enum):
 class Role(int, Enum):
     """Role Enum"""
 
-    USER = auto()
+    MEMBER = auto()
     CONTRIBUTOR = auto()
     OWNER = auto()
     ADMIN = auto()
@@ -37,7 +37,7 @@ class RoleMapping(List[OperationType], Enum):
         OperationType.DELETE,
         OperationType.MANAGE,
     ]
-    USER = [OperationType.READ]
+    MEMBER = [OperationType.READ]
     CONTRIBUTOR = [OperationType.READ, OperationType.UPDATE]
     ADMIN = [
         OperationType.READ,

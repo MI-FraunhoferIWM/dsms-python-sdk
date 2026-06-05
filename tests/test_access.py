@@ -21,7 +21,7 @@ def sample_user_access() -> List[UserAccessProperty]:
     """Create sample user access properties"""
     return [
         UserAccessProperty(user_id="user1", role=Role.OWNER),
-        UserAccessProperty(user_id="user2", role=Role.USER),
+        UserAccessProperty(user_id="user2", role=Role.MEMBER),
         UserAccessProperty(user_id="user3", role=Role.CONTRIBUTOR),
     ]
 
@@ -31,7 +31,7 @@ def sample_group_access() -> List[GroupAccessProperty]:
     """Create sample group access properties"""
     return [
         GroupAccessProperty(group_id="group1", role=Role.ADMIN),
-        GroupAccessProperty(group_id="group2", role=Role.USER),
+        GroupAccessProperty(group_id="group2", role=Role.MEMBER),
     ]
 
 
@@ -61,7 +61,9 @@ def test_access_level_owner():
 
 def test_minimum_access_level():
     """Test min_access_level method"""
-    assert RoleMapping.min_access_level(OperationType.READ) == Role.USER.value
+    assert (
+        RoleMapping.min_access_level(OperationType.READ) == Role.MEMBER.value
+    )
     assert (
         RoleMapping.min_access_level(OperationType.UPDATE)
         == Role.CONTRIBUTOR.value
@@ -90,10 +92,10 @@ def test_maximum_access_level():
 
 def test_access_level_user():
     """Test access_level property for USER role"""
-    prop = BaseAccessProperty(role=Role.USER)
+    prop = BaseAccessProperty(role=Role.MEMBER)
     expected = [OperationType.READ]
     assert prop.access_level == expected
-    assert prop.role.value == Role.USER.value
+    assert prop.role.value == Role.MEMBER.value
 
 
 def test_access_level_contributor():
@@ -128,10 +130,10 @@ def test_by_user_property(access_properties):
     assert "user3" in result
 
     assert result["user1"].role == Role.OWNER
-    assert result["user2"].role == Role.USER
+    assert result["user2"].role == Role.MEMBER
     assert result["user3"].role == Role.CONTRIBUTOR
     assert result["user1"].role.value == Role.OWNER.value
-    assert result["user2"].role.value == Role.USER.value
+    assert result["user2"].role.value == Role.MEMBER.value
     assert result["user3"].role.value == Role.CONTRIBUTOR.value
 
 
@@ -145,9 +147,9 @@ def test_by_group_property(access_properties):
     assert "group2" in result
 
     assert result["group1"].role == Role.ADMIN
-    assert result["group2"].role == Role.USER
+    assert result["group2"].role == Role.MEMBER
     assert result["group1"].role.value == Role.ADMIN.value
-    assert result["group2"].role.value == Role.USER.value
+    assert result["group2"].role.value == Role.MEMBER.value
 
 
 @pytest.mark.usefixtures("access_properties")
@@ -192,8 +194,8 @@ def test_operation_by_group_property(access_properties):
 def test_operation_by_user_multiple_same_operation():
     """Test operation_by_user with multiple users having same operations"""
     user_access = [
-        UserAccessProperty(user_id="user1", role=Role.USER),
-        UserAccessProperty(user_id="user2", role=Role.USER),
+        UserAccessProperty(user_id="user1", role=Role.MEMBER),
+        UserAccessProperty(user_id="user2", role=Role.MEMBER),
         UserAccessProperty(user_id="user3", role=Role.CONTRIBUTOR),
     ]
     props = KItemAccessProperties(user_access=user_access)
@@ -219,15 +221,15 @@ def test_operation_by_group_from_int():
     assert set(result[OperationType.READ]) == {"user1", "user2", "user3"}
     # Only user3 (CONTRIBUTOR) should have UPDATE access
     assert result[OperationType.UPDATE] == ["user3"]
-    assert props.by_user["user1"].role == Role.USER
-    assert props.by_user["user1"].role.value == Role.USER.value
+    assert props.by_user["user1"].role == Role.MEMBER
+    assert props.by_user["user1"].role.value == Role.MEMBER.value
 
 
 def test_operation_by_group_multiple_same_operation():
     """Test operation_by_group with multiple groups having same operations"""
     group_access = [
-        GroupAccessProperty(group_id="group1", role=Role.USER),
-        GroupAccessProperty(group_id="group2", role=Role.USER),
+        GroupAccessProperty(group_id="group1", role=Role.MEMBER),
+        GroupAccessProperty(group_id="group2", role=Role.MEMBER),
         GroupAccessProperty(group_id="group3", role=Role.ADMIN),
     ]
     props = KItemAccessProperties(group_access=group_access)
@@ -238,7 +240,7 @@ def test_operation_by_group_multiple_same_operation():
     # Only group3 (ADMIN) should have MANAGE access
     assert result[OperationType.MANAGE] == ["group3"]
     assert props.group_by_role[Role.ADMIN] == ["group3"]
-    assert props.group_by_role[Role.USER] == ["group1", "group2"]
+    assert props.group_by_role[Role.MEMBER] == ["group1", "group2"]
 
 
 def test_model_creation_with_defaults():
@@ -266,7 +268,7 @@ def test_duplicate_user_ids_raises_error():
     """Test that duplicate user IDs raise ValueError"""
     user_access = [
         UserAccessProperty(user_id="user1", role=Role.OWNER),
-        UserAccessProperty(user_id="user2", role=Role.USER),
+        UserAccessProperty(user_id="user2", role=Role.MEMBER),
         UserAccessProperty(
             user_id="user1", role=Role.CONTRIBUTOR
         ),  # Duplicate
@@ -288,7 +290,7 @@ def test_duplicate_group_ids_raises_error():
     """Test that duplicate group IDs raise ValueError"""
     group_access = [
         GroupAccessProperty(group_id="group1", role=Role.ADMIN),
-        GroupAccessProperty(group_id="group2", role=Role.USER),
+        GroupAccessProperty(group_id="group2", role=Role.MEMBER),
         GroupAccessProperty(
             group_id="group1", role=Role.CONTRIBUTOR
         ),  # Duplicate
@@ -309,11 +311,11 @@ def test_both_user_and_group_duplicates_raises_multiple_errors():
     """Test that duplicates in both user and group access raise multiple errors"""
     user_access = [
         UserAccessProperty(user_id="user1", role=Role.OWNER),
-        UserAccessProperty(user_id="user1", role=Role.USER),  # Duplicate
+        UserAccessProperty(user_id="user1", role=Role.MEMBER),  # Duplicate
     ]
     group_access = [
         GroupAccessProperty(group_id="group1", role=Role.ADMIN),
-        GroupAccessProperty(group_id="group1", role=Role.USER),  # Duplicate
+        GroupAccessProperty(group_id="group1", role=Role.MEMBER),  # Duplicate
     ]
 
     with pytest.raises(ValidationError) as exc_info:
@@ -344,7 +346,9 @@ def test_case_sensitive_ids():
     """Test that IDs are case sensitive (no duplicates if different case)"""
     user_access = [
         UserAccessProperty(user_id="User1", role=Role.OWNER),
-        UserAccessProperty(user_id="user1", role=Role.USER),  # Different case
+        UserAccessProperty(
+            user_id="user1", role=Role.MEMBER
+        ),  # Different case
         UserAccessProperty(
             user_id="USER1", role=Role.CONTRIBUTOR
         ),  # Different case
@@ -355,10 +359,10 @@ def test_case_sensitive_ids():
 
     assert len(props.user_access) == 3
     assert props.by_user["User1"].role == Role.OWNER
-    assert props.by_user["user1"].role == Role.USER
+    assert props.by_user["user1"].role == Role.MEMBER
     assert props.by_user["USER1"].role == Role.CONTRIBUTOR
     assert props.user_by_role[Role.OWNER] == ["User1"]
-    assert props.user_by_role[Role.USER] == ["user1"]
+    assert props.user_by_role[Role.MEMBER] == ["user1"]
     assert props.user_by_role[Role.CONTRIBUTOR] == ["USER1"]
 
 
@@ -375,8 +379,8 @@ def test_case_sensitive_ids_dict():
 
     assert len(props.user_access) == 3
     assert props.by_user["User1"].role == Role.OWNER
-    assert props.by_user["user1"].role == Role.USER
+    assert props.by_user["user1"].role == Role.MEMBER
     assert props.by_user["USER1"].role == Role.CONTRIBUTOR
     assert props.user_by_role[Role.OWNER] == ["User1"]
-    assert props.user_by_role[Role.USER] == ["user1"]
+    assert props.user_by_role[Role.MEMBER] == ["user1"]
     assert props.user_by_role[Role.CONTRIBUTOR] == ["USER1"]
