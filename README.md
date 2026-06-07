@@ -27,7 +27,7 @@ The SDK provides a general Python interface to a remote DSMS deployment, allowin
   - Semantic annotation of KItems
   - Attaching semantic schema data (ontology-class instance data) to KItems
 - Managing Knowledge Types (KTypes), including the v2 semantic-spec subsystem for defining ontology classes, relations, and schema references
-- Role-based access control (RBAC) per KItem: assign users and groups to `MEMBER`, `CONTRIBUTOR`, `OWNER`, or `ADMIN` roles
+- Role-based access control (RBAC) per KItem: assign users and groups to `MEMBER`, `CONTRIBUTOR`, or `OWNER` roles
 - Conduct free-text searches within the DSMS instance with filters (KType, annotation, context membership, attachment extension) as well as a full SPARQL interface (including context-scoped queries)
 - Linking KItems to other KItems, and grouping them via context KItems
 - Linking Apps to KItems, triggered, for example, during a file upload

@@ -30,7 +30,7 @@ def sample_user_access() -> List[UserAccessProperty]:
 def sample_group_access() -> List[GroupAccessProperty]:
     """Create sample group access properties"""
     return [
-        GroupAccessProperty(group_id="group1", role=Role.ADMIN),
+        GroupAccessProperty(group_id="group1", role=Role.OWNER),
         GroupAccessProperty(group_id="group2", role=Role.MEMBER),
     ]
 
@@ -78,15 +78,15 @@ def test_minimum_access_level():
 
 def test_maximum_access_level():
     """Test max_access_level method"""
-    assert RoleMapping.max_access_level(OperationType.READ) == Role.ADMIN.value
+    assert RoleMapping.max_access_level(OperationType.READ) == Role.OWNER.value
     assert (
-        RoleMapping.max_access_level(OperationType.UPDATE) == Role.ADMIN.value
+        RoleMapping.max_access_level(OperationType.UPDATE) == Role.OWNER.value
     )
     assert (
-        RoleMapping.max_access_level(OperationType.DELETE) == Role.ADMIN.value
+        RoleMapping.max_access_level(OperationType.DELETE) == Role.OWNER.value
     )
     assert (
-        RoleMapping.max_access_level(OperationType.MANAGE) == Role.ADMIN.value
+        RoleMapping.max_access_level(OperationType.MANAGE) == Role.OWNER.value
     )
 
 
@@ -104,19 +104,6 @@ def test_access_level_contributor():
     expected = [OperationType.READ, OperationType.UPDATE]
     assert prop.access_level == expected
     assert prop.role.value == Role.CONTRIBUTOR.value
-
-
-def test_access_level_admin():
-    """Test access_level property for ADMIN role"""
-    prop = BaseAccessProperty(role=Role.ADMIN)
-    expected = [
-        OperationType.READ,
-        OperationType.UPDATE,
-        OperationType.DELETE,
-        OperationType.MANAGE,
-    ]
-    assert prop.access_level == expected
-    assert prop.role.value == Role.ADMIN.value
 
 
 @pytest.mark.usefixtures("access_properties")
@@ -146,9 +133,9 @@ def test_by_group_property(access_properties):
     assert "group1" in result
     assert "group2" in result
 
-    assert result["group1"].role == Role.ADMIN
+    assert result["group1"].role == Role.OWNER
     assert result["group2"].role == Role.MEMBER
-    assert result["group1"].role.value == Role.ADMIN.value
+    assert result["group1"].role.value == Role.OWNER.value
     assert result["group2"].role.value == Role.MEMBER.value
 
 
@@ -177,8 +164,8 @@ def test_operation_by_group_property(access_properties):
     """Test operation_by_group property returns correct operation mapping"""
     result = access_properties.operation_by_group
 
-    # group1 (ADMIN): READ, UPDATE, DELETE, MANAGE
-    # group2 (USER): READ
+    # group1 (OWNER): READ, UPDATE, DELETE, MANAGE
+    # group2 (MEMBER): READ
 
     expected_read = ["group1", "group2"]
     expected_update = ["group1"]
@@ -230,16 +217,16 @@ def test_operation_by_group_multiple_same_operation():
     group_access = [
         GroupAccessProperty(group_id="group1", role=Role.MEMBER),
         GroupAccessProperty(group_id="group2", role=Role.MEMBER),
-        GroupAccessProperty(group_id="group3", role=Role.ADMIN),
+        GroupAccessProperty(group_id="group3", role=Role.OWNER),
     ]
     props = KItemAccessProperties(group_access=group_access)
     result = props.operation_by_group
 
     # All groups should have READ access
     assert set(result[OperationType.READ]) == {"group1", "group2", "group3"}
-    # Only group3 (ADMIN) should have MANAGE access
+    # Only group3 (OWNER) should have MANAGE access
     assert result[OperationType.MANAGE] == ["group3"]
-    assert props.group_by_role[Role.ADMIN] == ["group3"]
+    assert props.group_by_role[Role.OWNER] == ["group3"]
     assert props.group_by_role[Role.MEMBER] == ["group1", "group2"]
 
 
@@ -289,7 +276,7 @@ def test_duplicate_user_ids_raises_error():
 def test_duplicate_group_ids_raises_error():
     """Test that duplicate group IDs raise ValueError"""
     group_access = [
-        GroupAccessProperty(group_id="group1", role=Role.ADMIN),
+        GroupAccessProperty(group_id="group1", role=Role.OWNER),
         GroupAccessProperty(group_id="group2", role=Role.MEMBER),
         GroupAccessProperty(
             group_id="group1", role=Role.CONTRIBUTOR
@@ -314,7 +301,7 @@ def test_both_user_and_group_duplicates_raises_multiple_errors():
         UserAccessProperty(user_id="user1", role=Role.MEMBER),  # Duplicate
     ]
     group_access = [
-        GroupAccessProperty(group_id="group1", role=Role.ADMIN),
+        GroupAccessProperty(group_id="group1", role=Role.OWNER),
         GroupAccessProperty(group_id="group1", role=Role.MEMBER),  # Duplicate
     ]
 

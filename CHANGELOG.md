@@ -16,13 +16,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 **Access control (RBAC)**
 - `KItemAccessProperties` model with `user_access` and `group_access` lists for per-KItem role assignments.
-- `Role` enum (`MEMBER=1`, `CONTRIBUTOR=2`, `OWNER=3`, `ADMIN=4`) and `OperationType` enum (`create`, `read`, `update`, `delete`, `manage`).
+- `Role` enum (`MEMBER=1`, `CONTRIBUTOR=2`, `OWNER=3`) and `OperationType` enum (`create`, `read`, `update`, `delete`, `manage`). Roles serialize as lowercase strings on the wire (`"member"`, `"contributor"`, `"owner"`).
 - `RoleMapping` enum with `get_operations`, `min_access_level`, and `max_access_level` helpers.
 - `UserAccessProperty` and `GroupAccessProperty` sub-models.
 - `DSMS.user_groups` and `DSMS.users` cached properties with `refresh_user_groups()` / `refresh_users()` invalidation.
 - `DSMS.get_user(user_id)` convenience method.
 - `Group`, `User`, `GroupList`, `UserList` models (`dsms.knowledge.groups`).
-- `INTERNALLY_PUBLIC_GROUP` / `EXTERNALLY_PUBLIC_GROUP` constants, configurable via environment variables.
+- `INTERNAL_GROUP` / `PUBLIC_GROUP` constants (IDs `dsms:internal` / `dsms:public`), configurable via environment variables.
 - `refresh_public_groups(config)` to avoid import-time staleness when custom group IDs are used.
 
 **KType v2 semantic-spec subsystem**

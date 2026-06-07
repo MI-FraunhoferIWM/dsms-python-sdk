@@ -301,8 +301,6 @@ sample_kitem.user_groups = [
 | `MEMBER`      | 1             | READ                                          |
 | `CONTRIBUTOR` | 2             | READ, UPDATE                                  |
 | `OWNER`       | 3             | READ, UPDATE, DELETE, MANAGE                  |
-| `ADMIN`       | 4             | READ, UPDATE, DELETE, MANAGE                  |
-
 ### KItemAccessProperties Sub-fields
 
 | Field Name    | Description                              | Type                             | Default | Property Namespace | Required/Optional |

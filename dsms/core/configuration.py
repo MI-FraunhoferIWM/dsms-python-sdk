@@ -46,24 +46,24 @@ class Loglevel(Enum):
 class BaseConfiguration(BaseSettings):
     """Base Configuration for DSMS-SDK"""
 
-    label_internally_public: str = Field(
-        "Internally Public",
-        description="Label to use for KItems marked as `internally_public`.",
+    label_internal: str = Field(
+        "Internal",
+        description="Label to use for the internal visibility group.",
     )
 
-    label_externally_public: str = Field(
-        "Externally Public",
-        description="Label to use for KItems marked as `externally_public`.",
+    label_public: str = Field(
+        "Public",
+        description="Label to use for the public visibility group.",
     )
 
-    id_internally_public: str = Field(
-        "dsms:internally-public",
-        description="ID to use for KItems marked as `internally_public`.",
+    id_internal: str = Field(
+        "dsms:internal",
+        description="ID of the special group that grants read access to all authenticated users.",
     )
 
-    id_externally_public: str = Field(
-        "dsms:externally-public",
-        description="ID to use for KItems marked as `externally_public`.",
+    id_public: str = Field(
+        "dsms:public",
+        description="ID of the special group that grants read access to all users.",
     )
 
     model_config = ConfigDict(use_enum_values=True)

@@ -1,7 +1,7 @@
 """KItem Access Property Module"""
 
 from enum import Enum, auto
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
@@ -25,7 +25,6 @@ class Role(int, Enum):
     MEMBER = auto()
     CONTRIBUTOR = auto()
     OWNER = auto()
-    ADMIN = auto()
 
 
 class RoleMapping(List[OperationType], Enum):
@@ -39,12 +38,6 @@ class RoleMapping(List[OperationType], Enum):
     ]
     MEMBER = [OperationType.READ]
     CONTRIBUTOR = [OperationType.READ, OperationType.UPDATE]
-    ADMIN = [
-        OperationType.READ,
-        OperationType.UPDATE,
-        OperationType.DELETE,
-        OperationType.MANAGE,
-    ]
 
     @classmethod
     def get_operations(cls, role: Role) -> List[OperationType]:
@@ -107,6 +100,16 @@ class BaseAccessProperty(BaseModel):
         example=RoleMapping.OWNER,
     )
 
+    @field_validator("role", mode="before")
+    @classmethod
+    def parse_role(cls, v):
+        """Accept string names (e.g. 'owner') or legacy integer values."""
+        if isinstance(v, str):
+            return Role[v.upper()]
+        if isinstance(v, int):
+            return Role(v)
+        return v
+
     @property
     def access_level(self) -> List[OperationType]:
         """Set access level based on role"""
@@ -116,10 +119,10 @@ class BaseAccessProperty(BaseModel):
     def serialize_role_json(self, value: Role, _info):
         """Serialize role to JSON"""
         if _info.mode == "python":
-            response = value.name  # Python mode: use human-readable name
-        else:
-            response = value.value  # JSON/wire mode: use integer value
-        return response
+            return value.name  # Python mode: uppercase name
+        return (
+            value.name.lower()
+        )  # wire mode: "member", "contributor", "owner"
 
 
 class UserAccessProperty(BaseAccessProperty):
@@ -145,13 +148,20 @@ class GroupAccessProperty(BaseAccessProperty):
 class KItemAccessProperties(BaseModel):
     """KItem Access Properties Model"""
 
+    visibility: Literal["private", "internal", "public"] = Field(
+        "private",
+        description=(
+            "Visibility level: private (explicit access only), "
+            "internal (all authenticated users), public (everyone)."
+        ),
+    )
     user_access: Optional[List[UserAccessProperty]] = Field(
         [],
         description="List of user access properties.",
     )
     group_access: Optional[List[GroupAccessProperty]] = Field(
         [],
-        description="List of group access properties.",
+        description="List of group access properties (special visibility groups are excluded).",
     )
 
     def __str__(self) -> str:

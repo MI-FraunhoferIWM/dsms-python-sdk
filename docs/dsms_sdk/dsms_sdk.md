@@ -23,7 +23,7 @@ The SDK functionalities are listed below:
 3. Semantic annotation of KItems.
 4. Attaching semantic schema data (ontology-class instance data) to KItems.
 5. Managing Knowledge Types (KTypes), including the v2 semantic-spec subsystem.
-6. Role-based access control (RBAC) per KItem: assign users and groups to roles (`MEMBER`, `CONTRIBUTOR`, `OWNER`, `ADMIN`).
+6. Role-based access control (RBAC) per KItem: assign users and groups to roles (`MEMBER`, `CONTRIBUTOR`, `OWNER`).
 7. Free-text search with filters (KType, annotation, context membership, attachment extension) and a full SPARQL interface including context-scoped queries.
 8. Linking KItems to other KItems, and grouping them via context KItems.
 9. Linking Apps to KItems, triggered, for example, during a file upload.

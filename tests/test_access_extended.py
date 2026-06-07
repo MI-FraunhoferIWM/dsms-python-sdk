@@ -17,14 +17,13 @@ from dsms.knowledge.properties.access import (
 
 
 def test_role_ordering():
-    """Role integer values must be strictly ascending: USER < CONTRIBUTOR < OWNER < ADMIN."""
-    assert Role.MEMBER < Role.CONTRIBUTOR < Role.OWNER < Role.ADMIN
+    """Role integer values must be strictly ascending: MEMBER < CONTRIBUTOR < OWNER."""
+    assert Role.MEMBER < Role.CONTRIBUTOR < Role.OWNER
 
 
 def test_role_gte_comparison():
     """>=  on Role values must work correctly for threshold checks."""
     assert Role.OWNER >= Role.CONTRIBUTOR
-    assert Role.ADMIN >= Role.OWNER
     assert not (Role.MEMBER >= Role.CONTRIBUTOR)
 
 
@@ -44,7 +43,7 @@ def test_max_access_level_returns_role_instance():
     """max_access_level must return a Role member, not a plain int."""
     result = RoleMapping.max_access_level(OperationType.READ)
     assert isinstance(result, Role)
-    assert result is Role.ADMIN
+    assert result is Role.OWNER
 
 
 @pytest.mark.parametrize(
@@ -69,9 +68,9 @@ def test_min_access_level_correct_role(operation, expected_min):
         OperationType.MANAGE,
     ],
 )
-def test_max_access_level_is_admin(operation):
-    """ADMIN always holds the maximum access level for every mapped operation."""
-    assert RoleMapping.max_access_level(operation) is Role.ADMIN
+def test_max_access_level_is_owner(operation):
+    """OWNER always holds the maximum access level for every mapped operation."""
+    assert RoleMapping.max_access_level(operation) is Role.OWNER
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +110,7 @@ def test_error_message_lists_valid_operations():
 
 
 def test_serialize_role_json_mode():
-    """Python mode → name string; JSON/wire mode → integer value."""
+    """Python mode → uppercase name string; JSON/wire mode → lowercase name string."""
     prop = UserAccessProperty(user_id="u1", role=Role.OWNER)
 
     python_dump = prop.model_dump(mode="python")
@@ -119,8 +118,8 @@ def test_serialize_role_json_mode():
     assert isinstance(python_dump["role"], str)
 
     json_dump = prop.model_dump(mode="json")
-    assert json_dump["role"] == Role.OWNER.value
-    assert isinstance(json_dump["role"], int)
+    assert json_dump["role"] == "owner"
+    assert isinstance(json_dump["role"], str)
 
 
 # ---------------------------------------------------------------------------
@@ -128,18 +127,18 @@ def test_serialize_role_json_mode():
 # ---------------------------------------------------------------------------
 
 
-def test_model_dump_json_produces_integer_roles():
-    """model_dump(mode='json') must produce integer role values for the wire format."""
+def test_model_dump_json_produces_string_roles():
+    """model_dump(mode='json') must produce lowercase string role values for the wire format."""
     props = KItemAccessProperties(
         user_access=[UserAccessProperty(user_id="u1", role=Role.OWNER)],
         group_access=[GroupAccessProperty(group_id="g1", role=Role.MEMBER)],
     )
     payload = props.model_dump(mode="json")
 
-    assert payload["user_access"][0]["role"] == Role.OWNER.value
-    assert isinstance(payload["user_access"][0]["role"], int)
-    assert payload["group_access"][0]["role"] == Role.MEMBER.value
-    assert isinstance(payload["group_access"][0]["role"], int)
+    assert payload["user_access"][0]["role"] == "owner"
+    assert isinstance(payload["user_access"][0]["role"], str)
+    assert payload["group_access"][0]["role"] == "member"
+    assert isinstance(payload["group_access"][0]["role"], str)
 
 
 def test_model_dump_python_produces_string_roles():
@@ -153,14 +152,14 @@ def test_model_dump_python_produces_string_roles():
 
 
 def test_round_trip_from_backend_dict():
-    """A payload as returned by the backend (integer roles) must round-trip correctly."""
+    """A payload as returned by the backend (string roles) must round-trip correctly."""
     backend_payload = {
         "user_access": [
-            {"user_id": "alice", "role": Role.OWNER.value},
-            {"user_id": "bob", "role": Role.MEMBER.value},
+            {"user_id": "alice", "role": "owner"},
+            {"user_id": "bob", "role": "member"},
         ],
         "group_access": [
-            {"group_id": "dsms:internally-public", "role": Role.MEMBER.value},
+            {"group_id": "dsms:internal", "role": "member"},
         ],
     }
 
@@ -168,17 +167,17 @@ def test_round_trip_from_backend_dict():
 
     assert props.by_user["alice"].role is Role.OWNER
     assert props.by_user["bob"].role is Role.MEMBER
-    assert props.by_group["dsms:internally-public"].role is Role.MEMBER
+    assert props.by_group["dsms:internal"].role is Role.MEMBER
 
     # Serialise back and verify identity
     re_serialised = props.model_dump(mode="json")
     assert re_serialised["user_access"][0] == {
         "user_id": "alice",
-        "role": Role.OWNER.value,
+        "role": "owner",
     }
     assert re_serialised["group_access"][0] == {
-        "group_id": "dsms:internally-public",
-        "role": Role.MEMBER.value,
+        "group_id": "dsms:internal",
+        "role": "member",
     }
 
 
