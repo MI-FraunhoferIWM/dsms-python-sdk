@@ -292,7 +292,19 @@ sample_kitem.user_groups = [
 
 ## KItemAccessProperties Fields
 
-`KItemAccessProperties` controls who can read, update, delete and manage a KItem. It contains two lists: one for individual users and one for groups.
+`KItemAccessProperties` controls who can access a KItem. It has three orthogonal mechanisms:
+
+- **Visibility** — a single field that grants read access to broad audiences without requiring explicit role assignments.
+- **User access** — per-user role assignments for fine-grained control.
+- **Group access** — per-Keycloak-group role assignments.
+
+### Visibility Values
+
+| Value       | Who can read                                      |
+|:-----------:|:-------------------------------------------------:|
+| `private`   | Only users and groups listed in access properties |
+| `internal`  | All authenticated users                           |
+| `public`    | Everyone (no login required)                      |
 
 ### Role Values
 
@@ -301,35 +313,44 @@ sample_kitem.user_groups = [
 | `MEMBER`      | 1             | READ                                          |
 | `CONTRIBUTOR` | 2             | READ, UPDATE                                  |
 | `OWNER`       | 3             | READ, UPDATE, DELETE, MANAGE                  |
+
 ### KItemAccessProperties Sub-fields
 
-| Field Name    | Description                              | Type                             | Default | Property Namespace | Required/Optional |
-|:-------------:|:----------------------------------------:|:--------------------------------:|:-------:|:------------------:|:-----------------:|
-| User Access   | Per-user role assignments                | List[[UserAccessProperty](#useraccessproperty-fields)] | `[]` | `user_access` | Optional |
-| Group Access  | Per-group role assignments               | List[[GroupAccessProperty](#groupaccessproperty-fields)] | `[]` | `group_access` | Optional |
+| Field Name    | Description                                       | Type                             | Default     | Property Namespace | Required/Optional |
+|:-------------:|:-------------------------------------------------:|:--------------------------------:|:-----------:|:------------------:|:-----------------:|
+| Visibility    | Broad read-access level                           | `"private"` \| `"internal"` \| `"public"` | `"private"` | `visibility` | Optional |
+| User Access   | Per-user role assignments                         | List[[UserAccessProperty](#useraccessproperty-fields)] | `[]` | `user_access` | Optional |
+| Group Access  | Per-group role assignments (special visibility groups excluded) | List[[GroupAccessProperty](#groupaccessproperty-fields)] | `[]` | `group_access` | Optional |
 
 ### UserAccessProperty Fields
 
 | Field Name | Description             | Type   | Default        | Property Namespace | Required/Optional |
 |:----------:|:-----------------------:|:------:|:--------------:|:------------------:|:-----------------:|
 | User ID    | UUID of the user        | string | Not Applicable | `user_id`          | Required          |
-| Role       | Role assigned to user   | int (1–4) or Role name | Not Applicable | `role` | Required |
+| Role       | Role assigned to user   | int (1–3) or Role name | Not Applicable | `role` | Required |
 
 ### GroupAccessProperty Fields
 
 | Field Name | Description             | Type   | Default        | Property Namespace | Required/Optional |
 |:----------:|:-----------------------:|:------:|:--------------:|:------------------:|:-----------------:|
 | Group ID   | UUID of the group       | string | Not Applicable | `group_id`         | Required          |
-| Role       | Role assigned to group  | int (1–4) or Role name | Not Applicable | `role` | Required |
+| Role       | Role assigned to group  | int (1–3) or Role name | Not Applicable | `role` | Required |
 
 ### Example Usage
 ```python
 from dsms.knowledge.properties.access import KItemAccessProperties, Role
 
-# Assign a user as OWNER and a group as MEMBER
+# Make an item readable by all authenticated users, with one explicit owner
 item.access_properties = KItemAccessProperties(
+    visibility="internal",
     user_access=[{"user_id": "abc-123", "role": Role.OWNER}],
-    group_access=[{"group_id": "g-456", "role": Role.MEMBER}],
+)
+
+# Grant a specific group contributor access on a private item
+item.access_properties = KItemAccessProperties(
+    visibility="private",
+    user_access=[{"user_id": "abc-123", "role": Role.OWNER}],
+    group_access=[{"group_id": "g-456", "role": Role.CONTRIBUTOR}],
 )
 
 # Query which users can perform a given operation

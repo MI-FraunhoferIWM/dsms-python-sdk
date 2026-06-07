@@ -614,7 +614,9 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     context_kitems = _get_kitem_contexts(kitem_old, kitem_new)
     # same holds for kitem apps
     apps = _get_apps_diff(kitem_old, kitem_new)
-    # access_properties: include as full replacement when changed
+    # access_properties: include as full replacement when changed.
+    # visibility is a top-level field on the backend update model, so it must
+    # be sent separately rather than nested inside access_properties.
     old_access = kitem_old.get("access_properties")
     new_access = (
         kitem_new.access_properties.model_dump(mode="json")
@@ -622,6 +624,11 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
         else None
     )
     if new_access != old_access and new_access is not None:
+        visibility = new_access.pop("visibility", None)
+        if visibility is not None:
+            old_visibility = (old_access or {}).get("visibility")
+            if visibility != old_visibility:
+                differences["visibility"] = visibility
         differences["access_properties"] = new_access
     # merge with previously found differences
     differences.update(**linked_kitems, **apps, **context_kitems)
