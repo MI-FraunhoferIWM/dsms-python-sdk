@@ -1,14 +1,13 @@
-"""Extended tests for access.py — covering gaps identified in post-merge review."""
+"""Extended tests for access.py"""
 
 import pytest
 
 from dsms.knowledge.properties.access import (
-    GroupAccessProperty,
+    AccessGrant,
     KItemAccessProperties,
     OperationType,
     Role,
     RoleMapping,
-    UserAccessProperty,
 )
 
 # ---------------------------------------------------------------------------
@@ -110,14 +109,14 @@ def test_error_message_lists_valid_operations():
 
 
 def test_serialize_role_json_mode():
-    """Python mode → uppercase name string; JSON/wire mode → lowercase name string."""
-    prop = UserAccessProperty(user_id="u1", role=Role.OWNER)
+    """Python mode -> uppercase name string; JSON/wire mode -> lowercase name string."""
+    grant = AccessGrant(id="u1", type="user", role=Role.OWNER)
 
-    python_dump = prop.model_dump(mode="python")
+    python_dump = grant.model_dump(mode="python")
     assert python_dump["role"] == "OWNER"
     assert isinstance(python_dump["role"], str)
 
-    json_dump = prop.model_dump(mode="json")
+    json_dump = grant.model_dump(mode="json")
     assert json_dump["role"] == "owner"
     assert isinstance(json_dump["role"], str)
 
@@ -130,87 +129,92 @@ def test_serialize_role_json_mode():
 def test_model_dump_json_produces_string_roles():
     """model_dump(mode='json') must produce lowercase string role values for the wire format."""
     props = KItemAccessProperties(
-        user_access=[UserAccessProperty(user_id="u1", role=Role.OWNER)],
-        group_access=[GroupAccessProperty(group_id="g1", role=Role.MEMBER)],
+        grants=[
+            AccessGrant(id="u1", type="user", role=Role.OWNER),
+            AccessGrant(id="g1", type="group", role=Role.MEMBER),
+        ]
     )
     payload = props.model_dump(mode="json")
 
-    assert payload["user_access"][0]["role"] == "owner"
-    assert isinstance(payload["user_access"][0]["role"], str)
-    assert payload["group_access"][0]["role"] == "member"
-    assert isinstance(payload["group_access"][0]["role"], str)
+    user_grant = next(g for g in payload["grants"] if g["id"] == "u1")
+    group_grant = next(g for g in payload["grants"] if g["id"] == "g1")
+    assert user_grant["role"] == "owner"
+    assert isinstance(user_grant["role"], str)
+    assert group_grant["role"] == "member"
+    assert isinstance(group_grant["role"], str)
 
 
 def test_model_dump_python_produces_string_roles():
     """model_dump(mode='python') must produce string role names for display."""
     props = KItemAccessProperties(
-        user_access=[UserAccessProperty(user_id="u1", role=Role.CONTRIBUTOR)],
-        group_access=[],
+        grants=[AccessGrant(id="u1", type="user", role=Role.CONTRIBUTOR)]
     )
     payload = props.model_dump(mode="python")
-    assert payload["user_access"][0]["role"] == "CONTRIBUTOR"
+    assert payload["grants"][0]["role"] == "CONTRIBUTOR"
 
 
 def test_round_trip_from_backend_dict():
     """A payload as returned by the backend (string roles) must round-trip correctly."""
     backend_payload = {
-        "user_access": [
-            {"user_id": "alice", "role": "owner"},
-            {"user_id": "bob", "role": "member"},
-        ],
-        "group_access": [
-            {"group_id": "dsms:internal", "role": "member"},
+        "visibility": "internal",
+        "grants": [
+            {"id": "alice", "type": "user", "role": "owner"},
+            {"id": "bob", "type": "user", "role": "member"},
+            {"id": "dsms:internal", "type": "group", "role": "member"},
         ],
     }
 
     props = KItemAccessProperties(**backend_payload)
 
-    assert props.by_user["alice"].role is Role.OWNER
-    assert props.by_user["bob"].role is Role.MEMBER
-    assert props.by_group["dsms:internal"].role is Role.MEMBER
+    assert props.by_id["alice"].role is Role.OWNER
+    assert props.by_id["bob"].role is Role.MEMBER
+    assert props.by_id["dsms:internal"].role is Role.MEMBER
+    assert props.visibility == "internal"
 
-    # Serialise back and verify identity
     re_serialised = props.model_dump(mode="json")
-    assert re_serialised["user_access"][0] == {
-        "user_id": "alice",
+    assert re_serialised["grants"][0] == {
+        "id": "alice",
+        "type": "user",
         "role": "owner",
     }
-    assert re_serialised["group_access"][0] == {
-        "group_id": "dsms:internal",
+    assert re_serialised["grants"][2] == {
+        "id": "dsms:internal",
+        "type": "group",
         "role": "member",
     }
 
 
 # ---------------------------------------------------------------------------
-# user_by_role property (untested in original suite)
+# by_role property
 # ---------------------------------------------------------------------------
 
 
-def test_user_by_role():
-    """user_by_role must group user IDs by their Role."""
+def test_by_role():
+    """by_role must group principal IDs by their Role."""
     props = KItemAccessProperties(
-        user_access=[
-            UserAccessProperty(user_id="alice", role=Role.OWNER),
-            UserAccessProperty(user_id="bob", role=Role.MEMBER),
-            UserAccessProperty(user_id="carol", role=Role.MEMBER),
+        grants=[
+            AccessGrant(id="alice", type="user", role=Role.OWNER),
+            AccessGrant(id="bob", type="user", role=Role.MEMBER),
+            AccessGrant(id="carol", type="user", role=Role.MEMBER),
         ]
     )
-    by_role = props.user_by_role
+    by_role = props.by_role
     assert by_role[Role.OWNER] == ["alice"]
     assert set(by_role[Role.MEMBER]) == {"bob", "carol"}
     assert Role.CONTRIBUTOR not in by_role
 
 
-def test_user_by_role_empty():
-    assert KItemAccessProperties().user_by_role == {}
+def test_by_role_empty():
+    assert KItemAccessProperties().by_role == {}
 
 
 # ---------------------------------------------------------------------------
-# Validator: None inputs become empty lists
+# Default grants
 # ---------------------------------------------------------------------------
 
 
-def test_none_user_access_becomes_empty_list():
-    props = KItemAccessProperties(user_access=None, group_access=None)
-    assert props.user_access == []
-    assert props.group_access == []
+def test_empty_grants_default():
+    """Default grants must be an empty list."""
+    props = KItemAccessProperties()
+    assert props.grants == []
+    assert props.visibility == "private"
