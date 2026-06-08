@@ -117,8 +117,8 @@ class KItem(KItemCompactedModel):
         apps (List[App]): Apps related to the KItem.
         summary (Optional[Union[str, Summary]]):
             Human readable summary text of the KItem.
-        user_groups (List[UserGroup]):
-                User groups able to access the KItem.
+        access_properties (Optional[KItemAccessProperties]):
+                Access control configuration for the KItem.
         custom_properties (Optional[Any]):
             Custom properties associated with the KItem.
         dataframe (Optional[Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]]):

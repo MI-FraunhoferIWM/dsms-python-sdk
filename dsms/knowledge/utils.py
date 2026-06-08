@@ -331,6 +331,10 @@ def _create_new_kitem(kitem: "KItem") -> "Dict[str, Any]":
         "slug": kitem.slug,
         "ktype_id": kitem.ktype.id,
     }
+    if kitem.access_properties is not None:
+        access = kitem.access_properties.model_dump(mode="json")
+        payload["visibility"] = access.pop("visibility", "private")
+        payload["access_properties"] = access
     logger.debug("Create new KItem with payload: %s", payload)
     response = _perform_request(
         kitem.dsms, "api/knowledge/kitems", "post", json=payload
@@ -1655,6 +1659,102 @@ def _get_user_groups(dsms: "DSMS"):
         raise ConnectionError(f"Failed to fetch user groups: {response.text}")
     groups = response.json()
     return GroupList([Group(**group) for group in groups])
+
+
+def _get_group_members(dsms: "DSMS", group_id: str) -> List[Dict[str, Any]]:
+    """Fetch members of a specific group from the DSMS backend."""
+    from dsms.knowledge.groups import User
+
+    response = _perform_request(
+        dsms,
+        f"api/users/groups/{group_id}/members",
+        "get",
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to fetch members of group {group_id}: {response.text}"
+        )
+    return [User(**u) for u in response.json()]
+
+
+def _create_group(
+    dsms: "DSMS",
+    name: str,
+    description: str = "",
+    parent_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create a new group (top-level or subgroup) in the DSMS backend."""
+    from dsms.knowledge.groups import Group
+
+    if parent_id:
+        url = f"api/users/groups/{parent_id}/subgroups"
+    else:
+        url = "api/users/groups"
+    payload = {"name": name, "description": description}
+    response = _perform_request(dsms, url, "post", json=payload)
+    if not response.ok:
+        raise ValueError(f"Failed to create group '{name}': {response.text}")
+    return Group(**response.json())
+
+
+def _update_group(
+    dsms: "DSMS",
+    group_id: str,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Update name or description of an existing group."""
+    from dsms.knowledge.groups import Group
+
+    payload = {}
+    if name is not None:
+        payload["name"] = name
+    if description is not None:
+        payload["description"] = description
+    if not payload:
+        raise ValueError(
+            "At least one of name or description must be provided."
+        )
+    response = _perform_request(
+        dsms, f"api/users/groups/{group_id}", "put", json=payload
+    )
+    if not response.ok:
+        raise ValueError(f"Failed to update group {group_id}: {response.text}")
+    return Group(**response.json())
+
+
+def _delete_group(dsms: "DSMS", group_id: str) -> None:
+    """Delete a group from the DSMS backend."""
+    response = _perform_request(dsms, f"api/users/groups/{group_id}", "delete")
+    if not response.ok:
+        raise ValueError(f"Failed to delete group {group_id}: {response.text}")
+
+
+def _add_group_member(dsms: "DSMS", group_id: str, user_id: str) -> None:
+    """Add a user to a group."""
+    response = _perform_request(
+        dsms,
+        f"api/users/groups/{group_id}/members",
+        "post",
+        json={"user_id": user_id},
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to add user {user_id} to group {group_id}: {response.text}"
+        )
+
+
+def _remove_group_member(dsms: "DSMS", group_id: str, user_id: str) -> None:
+    """Remove a user from a group."""
+    response = _perform_request(
+        dsms,
+        f"api/users/groups/{group_id}/members/{user_id}",
+        "delete",
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to remove user {user_id} from group {group_id}: {response.text}"
+        )
 
 
 def _get_user_list(dsms: "DSMS"):

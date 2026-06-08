@@ -425,3 +425,367 @@ def test_get_user_raises_on_missing(custom_address):
 
     with pytest.raises(ValueError, match="nonexistent"):
         dsms.get_user("nonexistent")
+
+
+# ---------------------------------------------------------------------------
+# Group CRUD — get_group_members
+# ---------------------------------------------------------------------------
+
+MOCK_MEMBERS = [
+    {
+        "id": "u-1",
+        "username": "alice",
+        "firstName": "Alice",
+        "lastName": "A",
+        "email": "alice@example.com",
+    },
+    {
+        "id": "u-2",
+        "username": "bob",
+        "firstName": "Bob",
+        "lastName": "B",
+        "email": "bob@example.com",
+    },
+]
+
+
+@responses_lib.activate
+def test_get_group_members_returns_user_list(custom_address):
+    responses_lib.add(
+        responses_lib.GET,
+        urljoin(custom_address, "api/users/groups/grp-1/members"),
+        json=MOCK_MEMBERS,
+        status=200,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    members = dsms.get_group_members("grp-1")
+    assert len(members) == 2
+    assert all(isinstance(m, User) for m in members)
+    assert members[0].username == "alice"
+    assert members[1].username == "bob"
+
+
+@responses_lib.activate
+def test_get_group_members_raises_on_error(custom_address):
+    responses_lib.add(
+        responses_lib.GET,
+        urljoin(custom_address, "api/users/groups/bad-id/members"),
+        json={"detail": "Not found"},
+        status=404,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    with pytest.raises(ConnectionError, match="bad-id"):
+        dsms.get_group_members("bad-id")
+
+
+# ---------------------------------------------------------------------------
+# Group CRUD — create_group
+# ---------------------------------------------------------------------------
+
+MOCK_NEW_GROUP = {"id": "grp-new", "name": "New Group"}
+MOCK_NEW_SUBGROUP = {"id": "grp-sub", "name": "Sub Group"}
+
+
+@responses_lib.activate
+def test_create_group_top_level(custom_address):
+    responses_lib.add(
+        responses_lib.POST,
+        urljoin(custom_address, "api/users/groups"),
+        json=MOCK_NEW_GROUP,
+        status=201,
+    )
+    responses_lib.add(
+        responses_lib.GET,
+        urljoin(custom_address, "api/users/groups"),
+        json=[MOCK_NEW_GROUP],
+        status=200,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    group = dsms.create_group("New Group")
+    assert isinstance(group, Group)
+    assert group.id == "grp-new"
+    assert group.name == "New Group"
+    # cache must be invalidated
+    assert dsms._user_groups is None
+
+
+@responses_lib.activate
+def test_create_group_as_subgroup(custom_address):
+    responses_lib.add(
+        responses_lib.POST,
+        urljoin(custom_address, "api/users/groups/grp-1/subgroups"),
+        json=MOCK_NEW_SUBGROUP,
+        status=201,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    group = dsms.create_group("Sub Group", parent_id="grp-1")
+    assert isinstance(group, Group)
+    assert group.id == "grp-sub"
+
+    call = responses_lib.calls[0]
+    assert "grp-1/subgroups" in call.request.url
+
+
+@responses_lib.activate
+def test_create_group_raises_on_error(custom_address):
+    responses_lib.add(
+        responses_lib.POST,
+        urljoin(custom_address, "api/users/groups"),
+        json={"detail": "Bad request"},
+        status=400,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    with pytest.raises(ValueError, match="Failed to create group"):
+        dsms.create_group("Bad")
+
+
+# ---------------------------------------------------------------------------
+# Group CRUD — update_group
+# ---------------------------------------------------------------------------
+
+
+@responses_lib.activate
+def test_update_group_name(custom_address):
+    responses_lib.add(
+        responses_lib.PUT,
+        urljoin(custom_address, "api/users/groups/grp-1"),
+        json={"id": "grp-1", "name": "Renamed"},
+        status=200,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    updated = dsms.update_group("grp-1", name="Renamed")
+    assert isinstance(updated, Group)
+    assert updated.name == "Renamed"
+    assert dsms._user_groups is None
+
+
+@responses_lib.activate
+def test_update_group_raises_when_nothing_provided(custom_address):
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    with pytest.raises(ValueError, match="At least one"):
+        dsms.update_group("grp-1")
+
+
+# ---------------------------------------------------------------------------
+# Group CRUD — delete_group
+# ---------------------------------------------------------------------------
+
+
+@responses_lib.activate
+def test_delete_group(custom_address):
+    responses_lib.add(
+        responses_lib.DELETE,
+        urljoin(custom_address, "api/users/groups/grp-1"),
+        status=204,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    dsms.delete_group("grp-1")
+    assert dsms._user_groups is None
+    assert len(responses_lib.calls) == 1
+    assert "groups/grp-1" in responses_lib.calls[0].request.url
+
+
+@responses_lib.activate
+def test_delete_group_raises_on_error(custom_address):
+    responses_lib.add(
+        responses_lib.DELETE,
+        urljoin(custom_address, "api/users/groups/grp-missing"),
+        json={"detail": "Not found"},
+        status=404,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    with pytest.raises(ValueError, match="Failed to delete"):
+        dsms.delete_group("grp-missing")
+
+
+# ---------------------------------------------------------------------------
+# Group CRUD — add_group_member / remove_group_member
+# ---------------------------------------------------------------------------
+
+
+@responses_lib.activate
+def test_add_group_member(custom_address):
+    responses_lib.add(
+        responses_lib.POST,
+        urljoin(custom_address, "api/users/groups/grp-1/members"),
+        status=204,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    dsms.add_group_member("grp-1", "u-1")
+    call = responses_lib.calls[0]
+    assert "groups/grp-1/members" in call.request.url
+    import json as _json
+
+    body = _json.loads(call.request.body)
+    assert body["user_id"] == "u-1"
+
+
+@responses_lib.activate
+def test_add_group_member_raises_on_error(custom_address):
+    responses_lib.add(
+        responses_lib.POST,
+        urljoin(custom_address, "api/users/groups/grp-1/members"),
+        json={"detail": "User not found"},
+        status=404,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    with pytest.raises(ValueError, match="Failed to add user"):
+        dsms.add_group_member("grp-1", "bad-user")
+
+
+@responses_lib.activate
+def test_remove_group_member(custom_address):
+    responses_lib.add(
+        responses_lib.DELETE,
+        urljoin(custom_address, "api/users/groups/grp-1/members/u-1"),
+        status=204,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    dsms.remove_group_member("grp-1", "u-1")
+    call = responses_lib.calls[0]
+    assert "groups/grp-1/members/u-1" in call.request.url
+
+
+@responses_lib.activate
+def test_remove_group_member_raises_on_error(custom_address):
+    responses_lib.add(
+        responses_lib.DELETE,
+        urljoin(custom_address, "api/users/groups/grp-1/members/u-bad"),
+        json={"detail": "User not found"},
+        status=404,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    with pytest.raises(ValueError, match="Failed to remove user"):
+        dsms.remove_group_member("grp-1", "u-bad")
+
+
+# ---------------------------------------------------------------------------
+# GroupListBase removed — flat returns a plain list of BaseGroup
+# ---------------------------------------------------------------------------
+
+
+def test_grouplist_flat_is_plain_list():
+    """After removing GroupListBase, .flat must return a plain list."""
+    gl = GroupList(
+        [Group(id="a", name="A", subgroups=[Group(id="b", name="B")])]
+    )
+    result = gl.flat
+    assert isinstance(result, list)
+    assert not type(result).__name__ == "GroupListBase"
+    assert all(isinstance(g, BaseGroup) for g in result)

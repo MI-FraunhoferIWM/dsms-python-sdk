@@ -1,6 +1,6 @@
 """DSMS User Groups Module."""
 
-from .models import BaseGroup, Group, GroupList, GroupListBase, User, UserList
+from .models import BaseGroup, Group, GroupList, User, UserList
 from .public import (
     INTERNAL_GROUP,
     PUBLIC_GROUP,
@@ -10,7 +10,6 @@ from .public import (
 __all__ = [
     "Group",
     "GroupList",
-    "GroupListBase",
     "INTERNAL_GROUP",
     "PUBLIC_GROUP",
     "refresh_public_groups",

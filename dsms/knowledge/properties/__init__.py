@@ -13,7 +13,6 @@ from dsms.knowledge.properties.authors import Author
 from dsms.knowledge.properties.contacts import ContactInfo
 from dsms.knowledge.properties.dataframe import Column, DataFrameContainer
 from dsms.knowledge.properties.summary import Summary
-from dsms.knowledge.properties.user_groups import UserGroup
 
 from dsms.knowledge.properties.attachments import (  # isort:skip
     Attachment,
@@ -49,7 +48,6 @@ __all__ = [
     "ContactInfo",
     "ExternalLink",
     "Affiliation",
-    "UserGroup",
     "Summary",
     "DataFrameContainer",
     "Column",

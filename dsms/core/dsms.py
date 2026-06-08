@@ -30,7 +30,11 @@ from dsms.knowledge.sparql_interface import SparqlInterface
 from dsms.knowledge.utils import _search
 
 from dsms.knowledge.utils import (  # isort:skip
+    _add_group_member,
     _commit,
+    _create_group,
+    _delete_group,
+    _get_group_members,
     _get_kitem,
     _get_kitem_list,
     _get_ktypes_by_parent,
@@ -40,6 +44,8 @@ from dsms.knowledge.utils import (  # isort:skip
     _get_schema_data,
     _get_user_groups,
     _get_user_list,
+    _remove_group_member,
+    _update_group,
     _v2_create_ktype,
     _v2_delete_ktype,
     _v2_export_ktype,
@@ -418,6 +424,88 @@ class DSMS:
             User object for the given ID.
         """
         return get_user_by_id(self, user_id)
+
+    def get_group_members(self, group_id: str) -> "List[User]":
+        """Fetch the members of a group (including subgroup members).
+
+        Args:
+            group_id: The unique identifier of the group.
+
+        Returns:
+            List of User objects belonging to the group.
+        """
+        return _get_group_members(self, group_id)
+
+    def create_group(
+        self,
+        name: str,
+        description: str = "",
+        parent_id: Optional[str] = None,
+    ) -> "Group":
+        """Create a new group.
+
+        Args:
+            name: Name of the group.
+            description: Optional description.
+            parent_id: ID of the parent group. If None, creates a top-level group.
+
+        Returns:
+            The created Group object.
+        """
+        from dsms.knowledge.groups import Group  # noqa: F401
+
+        group = _create_group(self, name, description, parent_id)
+        self._user_groups = None  # invalidate cache
+        return group
+
+    def update_group(
+        self,
+        group_id: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> "Group":
+        """Update the name or description of an existing group.
+
+        Args:
+            group_id: The unique identifier of the group.
+            name: New name. Pass None to leave unchanged.
+            description: New description. Pass None to leave unchanged.
+
+        Returns:
+            The updated Group object.
+        """
+        from dsms.knowledge.groups import Group  # noqa: F401
+
+        group = _update_group(self, group_id, name, description)
+        self._user_groups = None  # invalidate cache
+        return group
+
+    def delete_group(self, group_id: str) -> None:
+        """Delete a group.
+
+        Args:
+            group_id: The unique identifier of the group to delete.
+        """
+        _delete_group(self, group_id)
+        self._user_groups = None  # invalidate cache
+
+    def add_group_member(self, group_id: str, user_id: str) -> None:
+        """Add a user to a group.
+
+        Args:
+            group_id: The unique identifier of the group.
+            user_id: The unique identifier of the user to add.
+        """
+        _add_group_member(self, group_id, user_id)
+
+    def remove_group_member(self, group_id: str, user_id: str) -> None:
+        """Remove a user from a group.
+
+        Args:
+            group_id: The unique identifier of the group.
+            user_id: The unique identifier of the user to remove.
+        """
+        _remove_group_member(self, group_id, user_id)
 
     def get_schema_data(self, kitem_id: str) -> "List[KItemSchemaData]":
         """Fetch all schema-data entries for a KItem from the remote backend.
