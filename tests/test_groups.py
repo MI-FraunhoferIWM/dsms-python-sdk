@@ -1,4 +1,4 @@
-"""Tests for groups models, public group constants, and DSMS user/group API."""
+"""Tests for groups models and DSMS user/group API."""
 
 from urllib.parse import urljoin
 
@@ -11,10 +11,6 @@ from dsms.knowledge.groups.models import (
     GroupList,
     User,
     UserList,
-)
-from dsms.knowledge.groups.public import (
-    INTERNAL_GROUP,
-    PUBLIC_GROUP,
 )
 
 # ---------------------------------------------------------------------------
@@ -154,63 +150,6 @@ def test_userlist_getitem_missing_raises():
     ul = UserList([User(id="u1", username="alice")])
     with pytest.raises(KeyError):
         _ = ul["nonexistent"]
-
-
-# ---------------------------------------------------------------------------
-# Public group constants
-# ---------------------------------------------------------------------------
-
-
-def test_internal_group_id():
-    """INTERNAL_GROUP.id must match the BaseConfiguration default."""
-    assert INTERNAL_GROUP.id == "dsms:internal"
-
-
-def test_public_group_id():
-    assert PUBLIC_GROUP.id == "dsms:public"
-
-
-def test_internal_group_has_name():
-    assert INTERNAL_GROUP.name != ""
-
-
-def test_public_group_has_name():
-    assert PUBLIC_GROUP.name != ""
-
-
-def test_refresh_public_groups_uses_custom_config():
-    """refresh_public_groups(config) must update the module-level constants."""
-    from dsms.core.configuration import BaseConfiguration
-    from dsms.knowledge.groups import public as pub
-
-    original_id = pub.INTERNAL_GROUP.id
-
-    custom_cfg = BaseConfiguration(
-        id_internal="custom:internal",
-        id_public="custom:external",
-        label_internal="Custom Internal",
-        label_public="Custom External",
-    )
-    pub.refresh_public_groups(custom_cfg)
-
-    assert pub.INTERNAL_GROUP.id == "custom:internal"
-    assert pub.PUBLIC_GROUP.id == "custom:external"
-    assert pub.INTERNAL_GROUP.name == "Custom Internal"
-
-    # Restore defaults so other tests are not affected
-    pub.refresh_public_groups()
-    assert pub.INTERNAL_GROUP.id == original_id
-
-
-def test_refresh_public_groups_without_arg_restores_defaults(
-    reset_dsms_session,
-):
-    """refresh_public_groups() with no argument should use env/defaults."""
-    from dsms.knowledge.groups import public as pub
-
-    pub.refresh_public_groups()
-    assert pub.INTERNAL_GROUP.id == "dsms:internal"
-    assert pub.PUBLIC_GROUP.id == "dsms:public"
 
 
 # ---------------------------------------------------------------------------
