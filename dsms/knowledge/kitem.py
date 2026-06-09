@@ -637,12 +637,12 @@ class KItem(KItemCompactedModel):
                 )
                 and entry.value is not None
             ):
-                error_message = """Value `{}` is not a valid select option.
-                Valid options are: """ + str(list(choices.keys())) + "\n"
                 if not select_options:
                     raise ValueError(
                         f"Widget of type `{entry.type}` does not have select options."
                     )
+                error_message = """Value `{}` is not a valid select option.
+                Valid options are: """ + str(list(choices.keys())) + "\n"
                 if isinstance(entry.value, str):
                     if entry.value not in choices:
                         raise ValueError(error_message.format(entry.value))
