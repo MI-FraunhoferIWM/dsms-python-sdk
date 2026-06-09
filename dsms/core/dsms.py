@@ -139,10 +139,6 @@ class DSMS:
                 Please specify kwargs for to be passed to the `Configuration`-object _OR_
                 an instance of this `Configuration`-object directly.""")
 
-        from dsms.knowledge.groups.public import refresh_public_groups
-
-        refresh_public_groups(self.config)
-
         self._sparql_interface = SparqlInterface(self)
         if self.config.auto_fetch_ktypes:
             _get_remote_ktypes(self)

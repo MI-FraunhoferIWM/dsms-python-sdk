@@ -46,26 +46,6 @@ class Loglevel(Enum):
 class BaseConfiguration(BaseSettings):
     """Base Configuration for DSMS-SDK"""
 
-    label_internal: str = Field(
-        "Internal",
-        description="Label to use for the internal visibility group.",
-    )
-
-    label_public: str = Field(
-        "Public",
-        description="Label to use for the public visibility group.",
-    )
-
-    id_internal: str = Field(
-        "dsms:internal",
-        description="ID of the special group that grants read access to all authenticated users.",
-    )
-
-    id_public: str = Field(
-        "dsms:public",
-        description="ID of the special group that grants read access to all users.",
-    )
-
     model_config = ConfigDict(use_enum_values=True)
 
 
