@@ -776,6 +776,170 @@ def test_remove_group_member_raises_on_error(custom_address):
 
 
 # ---------------------------------------------------------------------------
+# Group-in-group: get_group_subgroups / add_group_to_group / remove_group_from_group
+# ---------------------------------------------------------------------------
+
+MOCK_SUBGROUPS = [
+    {"id": "grp-child-1", "name": "Child A"},
+    {"id": "grp-child-2", "name": "Child B"},
+]
+
+
+@responses_lib.activate
+def test_get_group_subgroups_returns_grouplist(custom_address):
+    responses_lib.add(
+        responses_lib.GET,
+        urljoin(custom_address, "api/users/groups/grp-1/subgroups"),
+        json=MOCK_SUBGROUPS,
+        status=200,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    subs = dsms.get_group_subgroups("grp-1")
+    assert isinstance(subs, GroupList)
+    assert len(subs) == 2
+    assert subs.by_id["grp-child-1"].name == "Child A"
+    assert subs.by_id["grp-child-2"].name == "Child B"
+
+
+@responses_lib.activate
+def test_get_group_subgroups_raises_on_error(custom_address):
+    responses_lib.add(
+        responses_lib.GET,
+        urljoin(custom_address, "api/users/groups/bad-id/subgroups"),
+        json={"detail": "Not found"},
+        status=404,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    with pytest.raises(ConnectionError, match="bad-id"):
+        dsms.get_group_subgroups("bad-id")
+
+
+@responses_lib.activate
+def test_add_group_to_group(custom_address):
+    responses_lib.add(
+        responses_lib.POST,
+        urljoin(
+            custom_address, "api/users/groups/grp-parent/subgroups/grp-child"
+        ),
+        status=204,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    dsms.add_group_to_group("grp-parent", "grp-child")
+
+    assert len(responses_lib.calls) == 1
+    assert (
+        "groups/grp-parent/subgroups/grp-child"
+        in responses_lib.calls[0].request.url
+    )
+    # cache must be invalidated
+    assert dsms._user_groups is None
+
+
+@responses_lib.activate
+def test_add_group_to_group_raises_on_error(custom_address):
+    responses_lib.add(
+        responses_lib.POST,
+        urljoin(
+            custom_address, "api/users/groups/grp-parent/subgroups/bad-child"
+        ),
+        json={"detail": "Group not found"},
+        status=404,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    with pytest.raises(ValueError, match="bad-child"):
+        dsms.add_group_to_group("grp-parent", "bad-child")
+
+
+@responses_lib.activate
+def test_remove_group_from_group(custom_address):
+    responses_lib.add(
+        responses_lib.DELETE,
+        urljoin(
+            custom_address, "api/users/groups/grp-parent/subgroups/grp-child"
+        ),
+        status=204,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    dsms.remove_group_from_group("grp-parent", "grp-child")
+
+    assert len(responses_lib.calls) == 1
+    assert (
+        "groups/grp-parent/subgroups/grp-child"
+        in responses_lib.calls[0].request.url
+    )
+    assert dsms._user_groups is None
+
+
+@responses_lib.activate
+def test_remove_group_from_group_raises_on_error(custom_address):
+    responses_lib.add(
+        responses_lib.DELETE,
+        urljoin(
+            custom_address, "api/users/groups/grp-parent/subgroups/bad-child"
+        ),
+        json={"detail": "Group not found"},
+        status=404,
+    )
+
+    with pytest.warns(UserWarning):
+        from dsms.core.dsms import DSMS
+
+        dsms = DSMS(
+            host_url=custom_address,
+            ping_backend=False,
+            auto_fetch_ktypes=False,
+        )
+
+    with pytest.raises(ValueError, match="bad-child"):
+        dsms.remove_group_from_group("grp-parent", "bad-child")
+
+
+# ---------------------------------------------------------------------------
 # GroupListBase removed — flat returns a plain list of BaseGroup
 # ---------------------------------------------------------------------------
 

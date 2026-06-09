@@ -1757,6 +1757,50 @@ def _remove_group_member(dsms: "DSMS", group_id: str, user_id: str) -> None:
         )
 
 
+def _get_group_subgroups(dsms: "DSMS", group_id: str) -> List[Any]:
+    """Fetch the direct child groups of a group."""
+    from dsms.knowledge.groups import Group, GroupList
+
+    response = _perform_request(
+        dsms,
+        f"api/users/groups/{group_id}/subgroups",
+        "get",
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to fetch subgroups of group {group_id}: {response.text}"
+        )
+    return GroupList([Group(**g) for g in response.json()])
+
+
+def _add_group_to_group(dsms: "DSMS", parent_id: str, child_id: str) -> None:
+    """Link an existing group as a subgroup of another group."""
+    response = _perform_request(
+        dsms,
+        f"api/users/groups/{parent_id}/subgroups/{child_id}",
+        "post",
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to link group {child_id} under group {parent_id}: {response.text}"
+        )
+
+
+def _remove_group_from_group(
+    dsms: "DSMS", parent_id: str, child_id: str
+) -> None:
+    """Detach a child group from its parent, promoting it back to top-level."""
+    response = _perform_request(
+        dsms,
+        f"api/users/groups/{parent_id}/subgroups/{child_id}",
+        "delete",
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to unlink group {child_id} from group {parent_id}: {response.text}"
+        )
+
+
 def _get_user_list(dsms: "DSMS"):
     """Fetch all users from the DSMS backend."""
     from dsms.knowledge.groups import User, UserList

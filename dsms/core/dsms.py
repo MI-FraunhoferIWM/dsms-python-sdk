@@ -31,10 +31,12 @@ from dsms.knowledge.utils import _search
 
 from dsms.knowledge.utils import (  # isort:skip
     _add_group_member,
+    _add_group_to_group,
     _commit,
     _create_group,
     _delete_group,
     _get_group_members,
+    _get_group_subgroups,
     _get_kitem,
     _get_kitem_list,
     _get_ktypes_by_parent,
@@ -44,6 +46,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _get_schema_data,
     _get_user_groups,
     _get_user_list,
+    _remove_group_from_group,
     _remove_group_member,
     _update_group,
     _v2_create_ktype,
@@ -64,7 +67,7 @@ from dsms.knowledge.utils import (  # isort:skip
 
 if TYPE_CHECKING:
     from dsms.core.session import Buffers
-    from dsms.knowledge.groups import Group, User
+    from dsms.knowledge.groups import Group, GroupList, User
     from dsms.knowledge.properties.schema_data import KItemSchemaData
     from dsms.knowledge.search import KItemListModel, SearchResult
 
@@ -500,12 +503,46 @@ class DSMS:
 
     def remove_group_member(self, group_id: str, user_id: str) -> None:
         """Remove a user from a group.
-
         Args:
             group_id: The unique identifier of the group.
             user_id: The unique identifier of the user to remove.
         """
         _remove_group_member(self, group_id, user_id)
+
+    def get_group_subgroups(self, group_id: str) -> "GroupList":
+        """Return the direct child groups of a group.
+
+        Args:
+            group_id: The unique identifier of the parent group.
+
+        Returns:
+            GroupList of direct child groups.
+        """
+        return _get_group_subgroups(self, group_id)
+
+    def add_group_to_group(self, parent_id: str, child_id: str) -> None:
+        """Link an existing group as a direct child of another group.
+
+        The child group is moved in the hierarchy; its members and any of its
+        own subgroups are preserved. Members of the child group are resolved
+        recursively when listing the parent group's members.
+
+        Args:
+            parent_id: The unique identifier of the parent group.
+            child_id: The unique identifier of the group to nest as a child.
+        """
+        _add_group_to_group(self, parent_id, child_id)
+        self._user_groups = None
+
+    def remove_group_from_group(self, parent_id: str, child_id: str) -> None:
+        """Detach a child group from its parent and promote it back to top-level.
+
+        Args:
+            parent_id: The unique identifier of the parent group.
+            child_id: The unique identifier of the child group to detach.
+        """
+        _remove_group_from_group(self, parent_id, child_id)
+        self._user_groups = None
 
     def get_schema_data(self, kitem_id: str) -> "List[KItemSchemaData]":
         """Fetch all schema-data entries for a KItem from the remote backend.
