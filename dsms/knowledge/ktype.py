@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, List, Literal, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -47,6 +47,21 @@ class ProcessSchemaSpec(BaseWebformModel):
     children: List[Optional["ProcessSchemaSpec"]] = Field(
         [], description="Nested child ProcessSchemaSpecs"
     )
+    description: Optional[str] = Field(
+        None, description="Description of what this step means — shown to users as guidance"
+    )
+    required: bool = Field(
+        False, description="Whether this step is mandatory"
+    )
+    prefer_existing: bool = Field(
+        False, description="If True, the UI defaults to selecting an existing KItem rather than creating new"
+    )
+    icon: Optional[str] = Field(
+        None, description="Material icon name for this step"
+    )
+    cardinality: Literal["one", "many"] = Field(
+        "one", description="'one' = at most one KItem per step; 'many' = unlimited KItems per step"
+    )
 
     @field_validator("id")
     @classmethod
@@ -69,6 +84,12 @@ class ProcessSchema(BaseModel):
     )
     updated_at: Optional[datetime] = Field(
         None, description="Time and date when the process schema was updated."
+    )
+    layout_mode: str = Field(
+        "graph", description="UI layout mode: 'graph' for flow/production use cases, 'stepper' for sequential document-style workflows"
+    )
+    description: Optional[str] = Field(
+        None, description="Overall description of this process schema"
     )
 
     def refresh(self) -> None:
