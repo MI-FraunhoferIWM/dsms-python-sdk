@@ -53,9 +53,6 @@ class ProcessSchemaSpec(BaseWebformModel):
     required: bool = Field(
         False, description="Whether this step is mandatory"
     )
-    prefer_existing: bool = Field(
-        False, description="If True, the UI defaults to selecting an existing KItem rather than creating new"
-    )
     icon: Optional[str] = Field(
         None, description="Material icon name for this step"
     )
