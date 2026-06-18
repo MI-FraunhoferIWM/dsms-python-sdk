@@ -47,9 +47,6 @@ class ProcessSchemaSpec(BaseWebformModel):
     children: List[Optional["ProcessSchemaSpec"]] = Field(
         [], description="Nested child ProcessSchemaSpecs"
     )
-    description: Optional[str] = Field(
-        None, description="Description of what this step means — shown to users as guidance"
-    )
     required: bool = Field(
         False, description="Whether this step is mandatory"
     )
