@@ -53,9 +53,6 @@ class ProcessSchemaSpec(BaseWebformModel):
     required: bool = Field(
         False, description="Whether this step is mandatory"
     )
-    icon: Optional[str] = Field(
-        None, description="Material icon name for this step"
-    )
     cardinality: Literal["one", "many"] = Field(
         "one", description="'one' = at most one KItem per step; 'many' = unlimited KItems per step"
     )
@@ -82,13 +79,6 @@ class ProcessSchema(BaseModel):
     updated_at: Optional[datetime] = Field(
         None, description="Time and date when the process schema was updated."
     )
-    layout_mode: str = Field(
-        "graph", description="UI layout mode: 'graph' for flow/production use cases, 'stepper' for sequential document-style workflows"
-    )
-    description: Optional[str] = Field(
-        None, description="Overall description of this process schema"
-    )
-
     def refresh(self) -> None:
         """Refresh the process schema"""
         new = self.session.dsms.process_schemas.get(self.id)
