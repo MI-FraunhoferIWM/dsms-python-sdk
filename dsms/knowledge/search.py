@@ -17,10 +17,11 @@ class KItemSearchResult(BaseModel):
     kitem: Union["KItem", "KItemCompactedModel"] = Field(
         ..., description="KItem returned by the search"
     )
-    fuzzy: Union[bool, float] = Field(
+    fuzzy: Union[bool, float, str] = Field(
         ...,
         description="""Whether the KItem was found through a similarity hit.
-        If not a bool, a float indicates the distance from search term""",
+        If not a bool, a float indicates the distance from search term.
+        The string 'id' indicates the KItem was found by exact UUID lookup.""",
     )
 
     def __str__(self):

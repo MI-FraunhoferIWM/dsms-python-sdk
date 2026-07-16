@@ -42,11 +42,11 @@ from dsms.knowledge.properties import (  # isort:skip
     DataFrameContainer,
     Column,
     KItemRelationshipModel,
+    KItemSchemaData,
     LinkedKItemsList,
     Summary,
-    UserGroup,
+    KItemAccessProperties,
 )
-
 
 from dsms.knowledge.ktype import KType  # isort:skip
 
@@ -117,8 +117,8 @@ class KItem(KItemCompactedModel):
         apps (List[App]): Apps related to the KItem.
         summary (Optional[Union[str, Summary]]):
             Human readable summary text of the KItem.
-        user_groups (List[UserGroup]):
-                User groups able to access the KItem.
+        access_properties (Optional[KItemAccessProperties]):
+                Access control configuration for the KItem.
         custom_properties (Optional[Any]):
             Custom properties associated with the KItem.
         dataframe (Optional[Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]]):
@@ -145,10 +145,9 @@ class KItem(KItemCompactedModel):
         description="Affiliations related to a KItem.",
     )
     authors: List[Union[Author, str]] = Field(
-        [], description="Authorship of the KItem."
-    )
-    avatar_exists: Optional[bool] = Field(
-        False, description="Whether the KItem holds an avatar or not."
+        [],
+        description="Authorship of the KItem. Deprecated: no longer populated by the backend.",
+        deprecated=True,
     )
     contacts: List[ContactInfo] = Field(
         [],
@@ -172,10 +171,6 @@ class KItem(KItemCompactedModel):
     summary: Optional[Union[str, Summary]] = Field(
         None, description="Human readable summary text of the KItem."
     )
-    user_groups: List[UserGroup] = Field(
-        [],
-        description="User groups able to access the KItem.",
-    )
     custom_properties: Optional[Union[KItemCustomPropertiesModel]] = Field(
         None, description="Custom properties associated to the KItem"
     )
@@ -185,18 +180,32 @@ class KItem(KItemCompactedModel):
     ] = Field(None, description="DataFrame interface.")
 
     rdf_exists: bool = Field(
-        False, description="Whether the KItem holds an RDF Graph or not."
+        False,
+        description=(
+            "Whether the KItem holds an RDF Graph or not. "
+            "Deprecated: no longer populated by the backend."
+        ),
+        deprecated=True,
     )
 
     avatar: Optional[Avatar] = Field(
         default_factory=Avatar, description="KItem avatar interface"
     )
 
-    contexts: List[
-        Union["KItem", KItemCompactedModel, KItemBaseModel]
-    ] = Field(
-        [],
-        description="Contextualized KItems related to this one.",
+    access_properties: Optional[KItemAccessProperties] = Field(
+        None, description="Access properties of the KItem"
+    )
+
+    contexts: List[Union["KItem", KItemCompactedModel, KItemBaseModel]] = (
+        Field(
+            [],
+            description="Contextualized KItems related to this one.",
+        )
+    )
+
+    schema_data: Optional[List[KItemSchemaData]] = Field(
+        None,
+        description="Semantic schema data entries associated with this KItem.",
     )
 
     def __init__(self, **kwargs: "Any") -> None:
@@ -238,9 +247,11 @@ class KItem(KItemCompactedModel):
     ) -> List[Annotation]:
         """Validate annotations Field"""
         return [
-            Annotation(**_make_annotation_schema(annotation))
-            if isinstance(annotation, str)
-            else annotation
+            (
+                Annotation(**_make_annotation_schema(annotation))
+                if isinstance(annotation, str)
+                else annotation
+            )
             for annotation in value
         ]
 
@@ -259,9 +270,11 @@ class KItem(KItemCompactedModel):
     ) -> List[Attachment]:
         """Validate attachments Field"""
         return [
-            Attachment(name=attachment)
-            if isinstance(attachment, str)
-            else attachment
+            (
+                Attachment(name=attachment)
+                if isinstance(attachment, str)
+                else attachment
+            )
             for attachment in value
         ]
 
@@ -286,6 +299,17 @@ class KItem(KItemCompactedModel):
             for app in value:
                 app.id = kitem_id
         return AppList(value)
+
+    @field_validator("avatar", mode="after")
+    @classmethod
+    def validate_avatar(cls, value: Avatar, info: ValidationInfo) -> Avatar:
+        """
+        Validate avatar Field
+        """
+        kitem_id = info.data.get("id")
+        if value:
+            value.id = kitem_id
+        return value
 
     @field_validator("linked_kitems", mode="before")
     @classmethod
@@ -613,12 +637,8 @@ class KItem(KItemCompactedModel):
                 )
                 and entry.value is not None
             ):
-                error_message = (
-                    """Value `{}` is not a valid select option.
-                Valid options are: """
-                    + str(list(choices.keys()))
-                    + "\n"
-                )
+                error_message = """Value `{}` is not a valid select option.
+                Valid options are: """ + str(list(choices.keys())) + "\n"
                 if not select_options:
                     raise ValueError(
                         f"Widget of type `{entry.type}` does not have select options."
@@ -741,13 +761,11 @@ class KItem(KItemCompactedModel):
                 if is_updated:
                     entry.value = kitems
         else:
-            warnings.warn(
-                """
+            warnings.warn("""
                 Strict validation is disabled.
                 Will not strictly type check the custom properties.
                 This also will take place when values are re-assigned.
-                """
-            )
+                """)
 
         return entry
 

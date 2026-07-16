@@ -51,7 +51,6 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
         name="bar123",
     )
 
-    user_group = {"name": "private", "group_id": "private_123"}
     app = {"executable": "foo.exe", "title": "foo"}
 
     kitem_old = {
@@ -87,7 +86,6 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 },
             },
         ],
-        "user_groups": [user_group],
         "apps": [
             {
                 "id": get_mock_kitem_ids[0],
@@ -115,7 +113,6 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 }
             ],
             linked_kitems=[linked_kitem3],
-            user_groups=[user_group],
             apps=[app],
         )
 
@@ -136,7 +133,6 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 "namespace": "example",
             }
         ],
-        "user_groups_to_add": [],
         "kitem_apps_to_update": [
             {
                 "executable": "foo.exe",
@@ -162,7 +158,6 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
                 "namespace": "example",
             }
         ],
-        "user_groups_to_remove": [],
         "kitem_apps_to_remove": [
             {
                 "executable": "bar.exe",
@@ -181,6 +176,102 @@ def test_kitem_diffs(get_mock_kitem_ids, custom_address):
     for key, value in diffs.items():
         assert value == expected.pop(key)
     assert len(expected) == 0
+
+
+@responses.activate
+def test_kitem_diffs_access_properties(get_mock_kitem_ids, custom_address):
+    """visibility must be promoted to a top-level key; must not appear inside access_properties."""
+    import pytest
+
+    from dsms.core.dsms import DSMS
+    from dsms.knowledge.kitem import KItem
+    from dsms.knowledge.properties.access import KItemAccessProperties, Role
+    from dsms.knowledge.utils import _get_kitems_diffs
+
+    with pytest.warns(UserWarning, match="No authentication details"):
+        dsms = DSMS(host_url=custom_address)
+
+    user_id = "abc-123"
+
+    kitem_old = {
+        "id": get_mock_kitem_ids[0],
+        "name": "foo",
+        "ktype_id": dsms.ktypes.Organization.value,
+        "annotations": [],
+        "linked_kitems": [],
+        "apps": [],
+        "access_properties": {
+            "visibility": "private",
+            "user_access": [{"user_id": user_id, "role": "owner"}],
+            "group_access": [],
+        },
+    }
+
+    kitem_new = KItem(
+        id=get_mock_kitem_ids[0],
+        name="foo-item",
+        slug="foo-item",
+        ktype_id=dsms.ktypes.Organization,
+        access_properties=KItemAccessProperties(
+            visibility="internal",
+            user_access=[{"user_id": user_id, "role": Role.OWNER}],
+        ),
+    )
+
+    diffs = _get_kitems_diffs(kitem_old, kitem_new)
+
+    assert diffs["visibility"] == "internal"
+    assert "visibility" not in diffs["access_properties"]
+
+
+@responses.activate
+def test_kitem_diffs_visibility_unchanged(get_mock_kitem_ids, custom_address):
+    """When visibility hasn't changed it should not appear in the diff."""
+    import pytest
+
+    from dsms.core.dsms import DSMS
+    from dsms.knowledge.kitem import KItem
+    from dsms.knowledge.properties.access import KItemAccessProperties, Role
+    from dsms.knowledge.utils import _get_kitems_diffs
+
+    with pytest.warns(UserWarning, match="No authentication details"):
+        dsms = DSMS(host_url=custom_address)
+
+    user_id = "abc-123"
+    other_user_id = "def-456"
+
+    kitem_old = {
+        "id": get_mock_kitem_ids[0],
+        "name": "foo",
+        "ktype_id": dsms.ktypes.Organization.value,
+        "annotations": [],
+        "linked_kitems": [],
+        "apps": [],
+        "access_properties": {
+            "visibility": "internal",
+            "user_access": [{"user_id": user_id, "role": "owner"}],
+            "group_access": [],
+        },
+    }
+
+    kitem_new = KItem(
+        id=get_mock_kitem_ids[0],
+        name="foo-item",
+        slug="foo-item",
+        ktype_id=dsms.ktypes.Organization,
+        access_properties=KItemAccessProperties(
+            visibility="internal",
+            user_access=[
+                {"user_id": user_id, "role": Role.OWNER},
+                {"user_id": other_user_id, "role": Role.MEMBER},
+            ],
+        ),
+    )
+
+    diffs = _get_kitems_diffs(kitem_old, kitem_new)
+
+    assert "visibility" not in diffs
+    assert "visibility" not in diffs["access_properties"]
 
 
 @responses.activate

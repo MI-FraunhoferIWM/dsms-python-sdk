@@ -72,6 +72,7 @@ disable= no-name-in-module,
     cyclic-import,
     import-outside-toplevel,
     too-many-arguments,
+    too-many-positional-arguments,
     too-many-nested-blocks,
     dangerous-default-value,
     too-many-public-methods,
@@ -80,6 +81,7 @@ disable= no-name-in-module,
     too-many-branches,
     too-many-lines,
     too-many-statements,
+    global-statement,
 
 
 
@@ -245,7 +247,7 @@ ignored-classes=optparse.Values,thread._local,_thread._local
 # (useful for modules/projects where namespaces are manipulated during runtime
 # and thus existing member attributes cannot be deduced by static analysis). It
 # supports qualified module names, as well as Unix pattern matching.
-ignored-modules=
+ignored-modules=dotenv,pydantic,pydantic_settings,yaml,oyaml,requests,click,pandas,rdflib,PIL,segno
 
 # Show a hint with possible names when a member name was not found. The aspect
 # of finding the hint is based on edit distance.
