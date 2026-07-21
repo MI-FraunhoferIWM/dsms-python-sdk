@@ -43,7 +43,13 @@ class Loglevel(Enum):
     WARNING = logging.WARNING
 
 
-class Configuration(BaseSettings):
+class BaseConfiguration(BaseSettings):
+    """Base Configuration for DSMS-SDK"""
+
+    model_config = ConfigDict(use_enum_values=True)
+
+
+class Configuration(BaseConfiguration):
     """General config for DSMS-SDK"""
 
     host_url: AnyUrl = Field(

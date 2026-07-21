@@ -125,9 +125,9 @@ class App(BaseModel):
         """
         kwargs["kitem_id"] = str(self.id)
         if expose_sdk_config:
-            kwargs[
-                "access_token"
-            ] = Session.dsms.config.token.get_secret_value()
+            kwargs["access_token"] = (
+                Session.dsms.config.token.get_secret_value()
+            )
 
         response = _perform_request(
             Session.dsms,

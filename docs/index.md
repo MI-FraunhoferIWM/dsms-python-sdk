@@ -60,6 +60,7 @@ The Data Space Management System<dsms>
 dsms_sdk/dsms_sdk
 dsms_sdk/dsms_config_schema
 dsms_sdk/dsms_kitem_schema
+release-checklist
 
 ```
 
