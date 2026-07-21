@@ -57,7 +57,7 @@ repos:
         name: pylint
         entry: pylint
         args: ["--rcfile=.pylintrc", "--extension-pkg-whitelist=pydantic"]
-        language: python
+        language: system
         types: [python]
         require_serial: true
         files: ^(dsms)/.*
