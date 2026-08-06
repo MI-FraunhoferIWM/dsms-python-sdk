@@ -897,14 +897,14 @@ def _get_ktypes_by_parent(
 
 
 # ---------------------------------------------------------------------------
-# KType v2 utilities  (api/knowledge-type/v2/ktypes/…)
+# KType utilities  (api/knowledge-type/…)
 # ---------------------------------------------------------------------------
 
-_V2_BASE = "api/knowledge-type/v2/ktypes"
+_V2_BASE = "api/knowledge-type"
 
 
 def _v2_list_ktypes(dsms: "DSMS") -> List[Dict[str, Any]]:
-    """GET /v2/ktypes/ — list all v2 KTypes."""
+    """GET /api/knowledge-type/ — list all v2 KTypes."""
     response = _perform_request(dsms, f"{_V2_BASE}/", "get")
     if not response.ok:
         raise ValueError(f"Failed to list v2 ktypes: {response.text}")
@@ -912,7 +912,7 @@ def _v2_list_ktypes(dsms: "DSMS") -> List[Dict[str, Any]]:
 
 
 def _v2_get_ktype(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
-    """GET /v2/ktypes/{ktype_id} — fetch a single v2 KType."""
+    """GET /api/knowledge-type/{ktype_id} — fetch a single v2 KType."""
     response = _perform_request(dsms, f"{_V2_BASE}/{ktype_id}", "get")
     if not response.ok:
         raise ValueError(
@@ -922,7 +922,7 @@ def _v2_get_ktype(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
 
 
 def _v2_create_ktype(dsms: "DSMS", payload: Dict[str, Any]) -> Dict[str, Any]:
-    """POST /v2/ktypes/ — create or upgrade a v2 KType."""
+    """POST /api/knowledge-type/ — create or upgrade a v2 KType."""
     response = _perform_request(dsms, f"{_V2_BASE}/", "post", json=payload)
     if not response.ok:
         raise ValueError(f"Failed to create v2 ktype: {response.text}")
@@ -930,7 +930,7 @@ def _v2_create_ktype(dsms: "DSMS", payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _v2_import_ktype(dsms: "DSMS", url: str) -> Dict[str, Any]:
-    """POST /v2/ktypes/import — import a KType spec from a GitHub URL."""
+    """POST /api/knowledge-type/import — import a KType spec from a GitHub URL."""
     response = _perform_request(
         dsms, f"{_V2_BASE}/import", "post", json={"url": url}
     )
@@ -944,7 +944,7 @@ def _v2_import_ktype(dsms: "DSMS", url: str) -> Dict[str, Any]:
 def _v2_update_ktype(
     dsms: "DSMS", ktype_id: str, payload: Dict[str, Any]
 ) -> Dict[str, Any]:
-    """PUT /v2/ktypes/{ktype_id} — partial spec update."""
+    """PUT /api/knowledge-type/{ktype_id} — partial spec update."""
     response = _perform_request(
         dsms, f"{_V2_BASE}/{ktype_id}", "put", json=payload
     )
@@ -956,7 +956,7 @@ def _v2_update_ktype(
 
 
 def _v2_delete_ktype(dsms: "DSMS", ktype_id: str) -> None:
-    """DELETE /v2/ktypes/{ktype_id} — delete a v2 KType."""
+    """DELETE /api/knowledge-type/{ktype_id} — delete a v2 KType."""
     response = _perform_request(dsms, f"{_V2_BASE}/{ktype_id}", "delete")
     if not response.ok:
         raise ValueError(
@@ -965,7 +965,7 @@ def _v2_delete_ktype(dsms: "DSMS", ktype_id: str) -> None:
 
 
 def _v2_restore_stash(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
-    """POST /v2/ktypes/{ktype_id}/restore-stash — restore pre-import stash."""
+    """POST /api/knowledge-type/{ktype_id}/restore-stash — restore pre-import stash."""
     response = _perform_request(
         dsms, f"{_V2_BASE}/{ktype_id}/restore-stash", "post"
     )
@@ -977,7 +977,7 @@ def _v2_restore_stash(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
 
 
 def _v2_refresh_ktype(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
-    """POST /v2/ktypes/{ktype_id}/refresh — re-fetch spec from source URL."""
+    """POST /api/knowledge-type/{ktype_id}/refresh — re-fetch spec from source URL."""
     response = _perform_request(dsms, f"{_V2_BASE}/{ktype_id}/refresh", "post")
     if not response.ok:
         raise ValueError(
@@ -987,7 +987,7 @@ def _v2_refresh_ktype(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
 
 
 def _v2_export_ktype(dsms: "DSMS", ktype_id: str) -> str:
-    """GET /v2/ktypes/{ktype_id}/export — download ktype.yaml as text."""
+    """GET /api/knowledge-type/{ktype_id}/export — download ktype.yaml as text."""
     response = _perform_request(dsms, f"{_V2_BASE}/{ktype_id}/export", "get")
     if not response.ok:
         raise ValueError(
@@ -997,7 +997,7 @@ def _v2_export_ktype(dsms: "DSMS", ktype_id: str) -> str:
 
 
 def _v2_list_remote_ktypes(dsms: "DSMS") -> List[Dict[str, Any]]:
-    """GET /v2/ktypes/remote — list KTypes available in the remote repo."""
+    """GET /api/knowledge-type/remote — list KTypes available in the remote repo."""
     response = _perform_request(dsms, f"{_V2_BASE}/remote", "get")
     if not response.ok:
         raise ValueError(f"Failed to list remote v2 ktypes: {response.text}")
@@ -1005,7 +1005,7 @@ def _v2_list_remote_ktypes(dsms: "DSMS") -> List[Dict[str, Any]]:
 
 
 def _v2_list_remote_schemas(dsms: "DSMS") -> List[Dict[str, Any]]:
-    """GET /v2/ktypes/remote/schemas — list semantic schemas in the remote repo."""
+    """GET /api/knowledge-type/remote/schemas — list semantic schemas in the remote repo."""
     response = _perform_request(dsms, f"{_V2_BASE}/remote/schemas", "get")
     if not response.ok:
         raise ValueError(f"Failed to list remote schemas: {response.text}")
@@ -1015,7 +1015,7 @@ def _v2_list_remote_schemas(dsms: "DSMS") -> List[Dict[str, Any]]:
 def _v2_list_remote_versions(
     dsms: "DSMS", ktype_id: str
 ) -> List[Dict[str, Any]]:
-    """GET /v2/ktypes/{ktype_id}/remote-versions — list GitHub tags for a KType."""
+    """GET /api/knowledge-type/{ktype_id}/remote-versions — list GitHub tags for a KType."""
     response = _perform_request(
         dsms, f"{_V2_BASE}/{ktype_id}/remote-versions", "get"
     )
@@ -1027,7 +1027,7 @@ def _v2_list_remote_versions(
 
 
 def _v2_remote_diff(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
-    """GET /v2/ktypes/{ktype_id}/remote-diff — diff local vs latest remote spec."""
+    """GET /api/knowledge-type/{ktype_id}/remote-diff — diff local vs latest remote spec."""
     response = _perform_request(
         dsms, f"{_V2_BASE}/{ktype_id}/remote-diff", "get"
     )

@@ -312,7 +312,7 @@ class KTypeV2(KType):
 
 
 class CreateKTypeRequest(BaseModel):
-    """Request body for POST /v2/ktypes/ — create or upgrade a KType."""
+    """Request body for POST /api/knowledge-type/ — create or upgrade a KType."""
 
     id: str = Field(
         ...,
@@ -338,13 +338,13 @@ class CreateKTypeRequest(BaseModel):
 
 
 class ImportFromUrlRequest(BaseModel):
-    """Request body for POST /v2/ktypes/import — import a spec from a GitHub URL."""
+    """Request body for POST /api/knowledge-type/import — import a spec from a GitHub URL."""
 
     url: str = Field(..., description="URL to the raw ktype.yaml on GitHub.")
 
 
 class KTypeSpecPayload(BaseModel):
-    """Request body for PUT /v2/ktypes/{ktype_id} — partial spec update."""
+    """Request body for PUT /api/knowledge-type/{ktype_id} — partial spec update."""
 
     name: Optional[str] = Field(None, min_length=2, max_length=100)
     version: Optional[str] = Field(None)
