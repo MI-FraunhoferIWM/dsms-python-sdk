@@ -583,7 +583,7 @@ class KItem(KItemCompactedModel):
 
         choices = {
             choice.label: choice.model_dump() for choice in select_options
-        } or None
+        }
         logger.debug("Entry choices: %s", choices)
 
         # if the widget not is guessed from the data type,
