@@ -18,7 +18,6 @@ from dsms.knowledge.ktype import (
     RemoteSchemaVersionInfo,
     SemanticSchemaRef,
     SpecDiffField,
-    WebformSchema,
 )
 from dsms.knowledge.properties.schema_data import (
     KItemSchemaData,
@@ -46,5 +45,4 @@ __all__ = [
     "RemoteSchemaVersionInfo",
     "SemanticSchemaRef",
     "SpecDiffField",
-    "WebformSchema",
 ]

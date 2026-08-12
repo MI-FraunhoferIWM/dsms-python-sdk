@@ -432,7 +432,7 @@ class KItem(KItemCompactedModel):
                     Will be transformed into `KItemCustomPropertiesModel`."""
                 )
                 value = _transform_custom_properties_schema(
-                    value, ktype.webform_schema
+                    value, ktype.custom_properties
                 )
             value = KItemCustomPropertiesModel(**value)
         elif not isinstance(value, (KItemCustomPropertiesModel, type(None))):
@@ -515,21 +515,17 @@ class KItem(KItemCompactedModel):
                         specification or if the entry's value is invalid.
         """
 
-        spec: "List[Input]" = []
-        if ktype.webform_schema:  # pylint: disable=no-member
-            for (
-                section
-            ) in (
-                ktype.webform_schema.spec.sections
-            ):  # pylint: disable=no-member
-                for inp in section.inputs:
-                    if inp.id == entry.id:
+        spec: list = []
+        if ktype.custom_properties:  # pylint: disable=no-member
+            for section in ktype.custom_properties.get("sections", []):  # pylint: disable=no-member
+                for inp in section.get("inputs", []):
+                    if inp.get("id") == entry.id:
                         spec.append(inp)
 
         logger.debug("Entry label: %s", entry.label)
         logger.debug("Entry value: %s", entry.value)
 
-        # in this case we assume that a webform was defined for
+        # in this case we assume that custom_properties was defined for
         # the knowledge type for this specific entry
         if spec:
             logger.debug("Found input spec for entry: %s", entry.label)
@@ -542,15 +538,12 @@ class KItem(KItemCompactedModel):
                     f"Found multiple input specs for entry {entry.label}"
                 )
             spec = spec.pop()
-            entry.type = spec.widget
-            default_value = spec.value
-            select_options = spec.select_options
-            range_options = spec.range_options
-            knowledge_type = spec.knowledge_type
-            if range_options:
-                is_list = range_options.range
-            else:
-                is_list = False
+            entry.type = spec.get("widget")
+            default_value = None
+            select_options = []
+            range_options = None
+            knowledge_type = None
+            is_list = False
             dtype = None
             logger.debug("Widget type from spec: %s", entry.type)
         # in this case we assume that a webform was not defined

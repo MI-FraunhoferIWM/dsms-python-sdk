@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 from dsms.core.logging import handler
 from dsms.core.session import Session
 from dsms.knowledge.utils import _refresh_ktype, print_ktype, print_model
-from dsms.knowledge.webform import BaseWebformModel, Webform
+from dsms.knowledge.webform import BaseWebformModel
 
 if TYPE_CHECKING:
     from dsms import DSMS
@@ -117,25 +117,6 @@ class ProcessSchema(BaseModel):
         return str(value)
 
 
-class WebformSchema(BaseWebformModel):
-    """Schema for a webform."""
-
-    id: Union[str, UUID] = Field(..., description="ID of the Webform.")
-    name: str = Field(..., description="Name of the Webform.")
-    spec: Webform = Field(..., description="Specification of the Webform.")
-    created_at: Optional[Union[str, datetime]] = Field(
-        None, description="Time and date when the Webform was created."
-    )
-    updated_at: Optional[Union[str, datetime]] = Field(
-        None, description="Time and date when the Webform was updated."
-    )
-
-    @field_validator("id")
-    @classmethod
-    def _validate_uuid(cls, value: Union[str, UUID]) -> str:
-        return str(value)
-
-
 class KType(BaseModel):
     """Knowledge type of the knowledge item."""
 
@@ -145,12 +126,8 @@ class KType(BaseModel):
     name: Optional[str] = Field(
         None, description="Human readable name of the KType.", max_length=50
     )
-    webform_schema_id: Optional[str] = Field(
-        None,
-        description="ID of the webform schema that is used to create a form for this KType.",
-    )
-    webform_schema: Optional[WebformSchema] = Field(
-        None, description="Form data of the KType."
+    custom_properties: Optional[Dict[str, Any]] = Field(
+        None, description="Custom properties spec (camelCase dict) for this KType."
     )
     process_schema_id: Optional[str] = Field(
         None,
@@ -277,8 +254,8 @@ class KTypeSpec(BaseModel):
         description="Semantic schema references including inherited entries.",
     )
     relations: Optional[List[RelationSpec]] = Field(None)
-    dynamic_properties: Optional[Dict[str, Any]] = Field(
-        None, description="Raw webform spec dict (camelCase)."
+    custom_properties: Optional[Dict[str, Any]] = Field(
+        None, description="Custom properties spec dict (camelCase)."
     )
     tags: Optional[List[str]] = Field(None)
     source_url: Optional[str] = Field(
@@ -333,7 +310,7 @@ class CreateKTypeRequest(BaseModel):
     ontology_classes: Optional[List[OntologyClassSpec]] = Field(None)
     semantic_schemas: Optional[List[SemanticSchemaRef]] = Field(None)
     relations: Optional[List[RelationSpec]] = Field(None)
-    dynamic_properties: Optional[Dict[str, Any]] = Field(None)
+    custom_properties: Optional[Dict[str, Any]] = Field(None)
     tags: Optional[List[str]] = Field(None)
 
 
@@ -357,7 +334,7 @@ class KTypeSpecPayload(BaseModel):
     ontology_classes: Optional[List[OntologyClassSpec]] = Field(None)
     semantic_schemas: Optional[List[SemanticSchemaRef]] = Field(None)
     relations: Optional[List[RelationSpec]] = Field(None)
-    dynamic_properties: Optional[Dict[str, Any]] = Field(None)
+    custom_properties: Optional[Dict[str, Any]] = Field(None)
     tags: Optional[List[str]] = Field(None)
 
 

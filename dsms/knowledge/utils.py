@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from dsms import DSMS
     from dsms.apps import AppConfig
     from dsms.core.session import Buffers
-    from dsms.knowledge import KItem, KType, ProcessSchema, WebformSchema
+    from dsms.knowledge import KItem, KType, ProcessSchema
     from dsms.knowledge.groups import User
     from dsms.knowledge.properties import Attachment
 
@@ -226,7 +226,6 @@ def _update_ktype(dsms: "DSMS", ktype: "KType") -> Response:
         exclude={
             "created_at",
             "updated_at",
-            "webform_schema",
             "process_schema",
         },
     )
@@ -662,7 +661,7 @@ def _get_kitem_contexts(
 def _commit(buffers: "Buffers") -> None:
     """Commit the buffers for the
     created, updated and deleted buffers"""
-    from dsms import AppConfig, KItem, KType, ProcessSchema, WebformSchema
+    from dsms import AppConfig, KItem, KType, ProcessSchema
 
     logger.debug("Committing KItems in buffers. Current buffers:")
     logger.debug("Current Added-buffer: %s", buffers.added)
@@ -702,11 +701,6 @@ def _commit(buffers: "Buffers") -> None:
         elif isinstance(obj, KType) or (
             isinstance(obj, Enum) and isinstance(obj.value, KType)
         ):
-            if obj.webform_schema:
-                if obj.webform_schema_id not in obj.dsms.webform_schemas:
-                    _create_webform_schema(obj.dsms, obj.webform_schema)
-                else:
-                    _update_webform_schema(obj.dsms, obj.webform_schema)
             if obj.process_schema:
                 if obj.process_schema_id not in obj.dsms.process_schemas:
                     _create_process_schema(obj.dsms, obj.process_schema)
@@ -728,11 +722,6 @@ def _commit(buffers: "Buffers") -> None:
             else:
                 _update_process_schema(obj.dsms, obj)
 
-        elif isinstance(obj, WebformSchema):
-            if obj.id not in obj.dsms.webform_schemas:
-                _create_webform_schema(obj.dsms, obj)
-            else:
-                _update_webform_schema(obj.dsms, obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed."
@@ -752,8 +741,6 @@ def _commit(buffers: "Buffers") -> None:
             had_ktypes = True
         elif isinstance(obj, ProcessSchema):
             _delete_process_schema(obj)
-        elif isinstance(obj, WebformSchema):
-            _delete_webform_schema(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed or deleted."
@@ -761,75 +748,6 @@ def _commit(buffers: "Buffers") -> None:
     if Session.dsms.config.auto_refresh and had_ktypes:
         Session.dsms.refresh_ktypes()
     logger.debug("Committing successful, clearing buffers.")
-
-
-def _create_webform_schema(
-    dsms: "DSMS", webform_schema: "WebformSchema"
-) -> None:
-    """Create a new webform schema in the remote backend"""
-    response = _perform_request(
-        dsms,
-        "api/knowledge-type/webform-schemas/",
-        "post",
-        json=webform_schema.model_dump(
-            include={"name", "id", "spec"}, by_alias=True
-        ),
-    )
-    if not response.ok:
-        raise ConnectionError(
-            f"Failed to create process schema: {response.text}"
-        )
-    for key, value in response.json().items():
-        setattr(webform_schema, key, value)
-
-
-def _update_webform_schema(
-    dsms: "DSMS", webform_schema: "WebformSchema"
-) -> None:
-    """Update an existing webform schema in the remote backend"""
-    response = _perform_request(
-        dsms,
-        f"api/knowledge-type/webform-schemas/{webform_schema.id}",
-        "put",
-        json=webform_schema.model_dump(include={"name", "spec"}),
-    )
-    if not response.ok:
-        raise ConnectionError(
-            f"Failed to update webform schema: {response.text}"
-        )
-    for key, value in response.json().items():
-        setattr(webform_schema, key, value)
-
-
-def _get_webform_schemas(dsms: "DSMS"):
-    from dsms.knowledge.ktype import WebformSchema
-
-    response = _perform_request(
-        dsms,
-        "api/knowledge-type/webform-schemas/",
-        "get",
-    )
-    if not response.ok:
-        raise ConnectionError(
-            f"Failed to fetch webform schemas: {response.text}"
-        )
-    schemas = {
-        schema["id"]: WebformSchema(**schema) for schema in response.json()
-    }
-    return schemas
-
-
-def _delete_webform_schema(dsms: "DSMS", webform_schema_id: str) -> None:
-    """Delete an existing webform schema in the remote backend"""
-    response = _perform_request(
-        dsms,
-        f"api/knowledge-type/webform-schemas/{webform_schema_id}",
-        "delete",
-    )
-    if not response.ok:
-        raise ConnectionError(
-            f"Failed to delete webform schema: {response.text}"
-        )
 
 
 def _create_process_schema(
@@ -1306,38 +1224,32 @@ def _delete_app_spec(obj: "AppConfig") -> None:
     return response.text
 
 
-def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
-    if webform:
+def _transform_custom_properties_schema(custom_properties: Any, ktype_custom_properties: Any):
+    if ktype_custom_properties and isinstance(ktype_custom_properties, dict):
         copy_properties = custom_properties.copy()
         transformed_sections = {}
-        for section_def in webform.spec.sections:
-            for input_def in section_def.inputs:
-                if input_def.label in copy_properties:
-                    if input_def.measurement_unit:
-                        measurement_unit = (
-                            input_def.measurement_unit.model_dump()
-                        )
-                    else:
-                        measurement_unit = None
+        for section_def in ktype_custom_properties.get("sections", []):
+            for input_def in section_def.get("inputs", []):
+                label = input_def.get("label")
+                if label in copy_properties:
                     entry = {
-                        "id": input_def.id,
-                        "label": input_def.label,
-                        "value": copy_properties.pop(input_def.label),
-                        "measurement_unit": measurement_unit,
-                        "type": input_def.widget,
+                        "id": input_def.get("id"),
+                        "label": label,
+                        "value": copy_properties.pop(label),
+                        "measurement_unit": None,
+                        "type": input_def.get("widget"),
                     }
-                    section_name = section_def.name
+                    section_name = section_def.get("name")
                     if section_name not in transformed_sections:
-                        section = {
-                            "id": section_def.id,
+                        transformed_sections[section_name] = {
+                            "id": section_def.get("id"),
                             "name": section_name,
                             "entries": [],
                         }
-                        transformed_sections[section_name] = section
                     transformed_sections[section_name]["entries"].append(entry)
         if copy_properties:
             logger.info(
-                "Some custom properties were not found in the webform: %s",
+                "Some custom properties were not found in the ktype spec: %s",
                 copy_properties,
             )
             transformed_sections["General"] = _make_misc_section(

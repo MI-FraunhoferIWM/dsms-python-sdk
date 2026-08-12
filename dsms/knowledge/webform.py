@@ -59,6 +59,13 @@ class Widget(Enum):
     URL = "URL"
     VOCABULARY_SELECT = "Vocabulary select"
 
+    @classmethod
+    def _missing_(cls, value):
+        _aliases = {
+            "Datetime": cls.DATETIME,
+        }
+        return _aliases.get(value)
+
 
 class RelationMappingType(Enum):
     """
