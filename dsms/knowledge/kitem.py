@@ -2,7 +2,7 @@
 
 import logging
 import warnings
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
 
@@ -593,6 +593,10 @@ class KItem(KItemCompactedModel):
                 dtype = (int, float)
             elif entry.type == Widget.CHECKBOX.value:
                 dtype = bool
+            elif entry.type == Widget.DATE.value:
+                dtype = (str, date)
+            elif entry.type == Widget.DATETIME.value:
+                dtype = (str, datetime)
             elif entry.type in (
                 Widget.SELECT.value,
                 Widget.RADIO.value,
