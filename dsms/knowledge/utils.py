@@ -1238,6 +1238,7 @@ def _transform_custom_properties_schema(custom_properties: Any, ktype_custom_pro
                         "value": copy_properties.pop(label),
                         "measurement_unit": None,
                         "type": input_def.get("widget"),
+                        "relationMapping": input_def.get("relationMapping"),
                     }
                     section_name = section_def.get("name")
                     if section_name not in transformed_sections:
