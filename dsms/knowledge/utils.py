@@ -1443,12 +1443,12 @@ def _delete_process_schema(
 
 def to_kebab_case(name: str):
     """
-    Converts a multi word string into single string representation.
+    Converts a label string into a JSONPath-safe identifier.
 
-    :param name: the string representing multi values.
-    :return: ID representation of the given string.
+    Replaces all non-alphanumeric characters with underscores so the result
+    can be used as a JSON key and JSONPath dot-notation path segment.
     """
-    sentence = name.lower().replace(" ", "-")
+    sentence = re.sub(r'[^a-z0-9]+', '_', name.lower()).strip('_')
     return sentence
 
 
