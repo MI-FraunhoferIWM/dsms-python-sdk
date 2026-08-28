@@ -883,7 +883,7 @@ class KItem(KItemCompactedModel):
                 the k-type has no v2 spec.
             RuntimeError: If the schema cannot be fetched or the transform fails.
         """
-        from dsms.knowledge.semantics import schema_to_oold
+        from dsms.knowledge.semantics import schema_to_webform
 
         ktype_v2 = self.dsms.get_ktype(str(self.ktype_id))
         if not ktype_v2 or not ktype_v2.spec:
@@ -905,7 +905,7 @@ class KItem(KItemCompactedModel):
                 f"'{self.ktype_id}'. Available schema IDs: {valid}"
             )
 
-        oold_doc = schema_to_oold(schema_ref.url, input_data)
+        oold_doc = schema_to_webform(schema_ref.url, input_data)
 
         new_entry = KItemSchemaData(schema_id=schema_id, content=oold_doc)
 
