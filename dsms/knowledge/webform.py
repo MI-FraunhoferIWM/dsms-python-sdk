@@ -32,7 +32,6 @@ from dsms.knowledge.semantics.units.utils import (  # isort:skip
 
 from dsms.core.logging import handler  # isort:skip
 
-
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.propagate = False
@@ -41,16 +40,31 @@ logger.propagate = False
 class Widget(Enum):
     """Enum for widgets"""
 
-    TEXT = "Text"
-    FILE = "File"
-    TEXTAREA = "Textarea"
-    NUMBER = "Number"
-    SLIDER = "Slider"
+    ARRAY_GROUP = "Array group"
     CHECKBOX = "Checkbox"
-    SELECT = "Select"
-    RADIO = "Radio"
+    DATE = "Date"
+    DATETIME = "Date-time"
+    FILE = "File"
+    KEY_VALUE_PAIRS = "Key-value pairs"
     KNOWLEDGE_ITEM = "Knowledge item"
+    LATEX = "LaTeX"
     MULTI_SELECT = "Multi-select"
+    NUMBER = "Number"
+    RADIO = "Radio"
+    SELECT = "Select"
+    SLIDER = "Slider"
+    STAR_RATING = "Star rating"
+    TEXT = "Text"
+    TEXTAREA = "Textarea"
+    URL = "URL"
+    VOCABULARY_SELECT = "Vocabulary select"
+
+    @classmethod
+    def _missing_(cls, value):
+        _aliases = {
+            "Datetime": cls.DATETIME,
+        }
+        return _aliases.get(value)
 
 
 class RelationMappingType(Enum):
@@ -522,11 +536,9 @@ class CustomPropertiesSection(BaseWebformModel):
                     f"Section with name `{self.name}` has no attribute '{key}'"
                 )
             if len(target) > 1:
-                raise AttributeError(
-                    f"""Section with name `{self.name}`
+                raise AttributeError(f"""Section with name `{self.name}`
                     has multiple attributes '{key}'.
-                    Please specify the concrete entry via indexing !"""
-                )
+                    Please specify the concrete entry via indexing !""")
 
             target = target.pop()
         else:

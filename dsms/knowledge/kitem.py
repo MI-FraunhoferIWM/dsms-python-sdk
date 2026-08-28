@@ -2,7 +2,7 @@
 
 import logging
 import warnings
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
 
@@ -16,6 +16,7 @@ from pydantic import (  # isort:skip
     ValidationInfo,
     field_validator,
     field_serializer,
+    model_validator,
 )
 
 from dsms.core.logging import handler  # isort:skip
@@ -42,11 +43,11 @@ from dsms.knowledge.properties import (  # isort:skip
     DataFrameContainer,
     Column,
     KItemRelationshipModel,
+    KItemSchemaData,
     LinkedKItemsList,
     Summary,
-    UserGroup,
+    KItemAccessProperties,
 )
-
 
 from dsms.knowledge.ktype import KType  # isort:skip
 
@@ -117,8 +118,8 @@ class KItem(KItemCompactedModel):
         apps (List[App]): Apps related to the KItem.
         summary (Optional[Union[str, Summary]]):
             Human readable summary text of the KItem.
-        user_groups (List[UserGroup]):
-                User groups able to access the KItem.
+        access_properties (Optional[KItemAccessProperties]):
+                Access control configuration for the KItem.
         custom_properties (Optional[Any]):
             Custom properties associated with the KItem.
         dataframe (Optional[Union[List[Column], pd.DataFrame, Dict[str, Union[List, Dict]]]]):
@@ -145,10 +146,9 @@ class KItem(KItemCompactedModel):
         description="Affiliations related to a KItem.",
     )
     authors: List[Union[Author, str]] = Field(
-        [], description="Authorship of the KItem."
-    )
-    avatar_exists: Optional[bool] = Field(
-        False, description="Whether the KItem holds an avatar or not."
+        [],
+        description="Authorship of the KItem. Deprecated: no longer populated by the backend.",
+        deprecated=True,
     )
     contacts: List[ContactInfo] = Field(
         [],
@@ -172,10 +172,6 @@ class KItem(KItemCompactedModel):
     summary: Optional[Union[str, Summary]] = Field(
         None, description="Human readable summary text of the KItem."
     )
-    user_groups: List[UserGroup] = Field(
-        [],
-        description="User groups able to access the KItem.",
-    )
     custom_properties: Optional[Union[KItemCustomPropertiesModel]] = Field(
         None, description="Custom properties associated to the KItem"
     )
@@ -185,18 +181,32 @@ class KItem(KItemCompactedModel):
     ] = Field(None, description="DataFrame interface.")
 
     rdf_exists: bool = Field(
-        False, description="Whether the KItem holds an RDF Graph or not."
+        False,
+        description=(
+            "Whether the KItem holds an RDF Graph or not. "
+            "Deprecated: no longer populated by the backend."
+        ),
+        deprecated=True,
     )
 
     avatar: Optional[Avatar] = Field(
         default_factory=Avatar, description="KItem avatar interface"
     )
 
-    contexts: List[
-        Union["KItem", KItemCompactedModel, KItemBaseModel]
-    ] = Field(
-        [],
-        description="Contextualized KItems related to this one.",
+    access_properties: Optional[KItemAccessProperties] = Field(
+        None, description="Access properties of the KItem"
+    )
+
+    contexts: List[Union["KItem", KItemCompactedModel, KItemBaseModel]] = (
+        Field(
+            [],
+            description="Contextualized KItems related to this one.",
+        )
+    )
+
+    schema_data: Optional[List[KItemSchemaData]] = Field(
+        None,
+        description="Semantic schema data entries associated with this KItem.",
     )
 
     def __init__(self, **kwargs: "Any") -> None:
@@ -238,9 +248,11 @@ class KItem(KItemCompactedModel):
     ) -> List[Annotation]:
         """Validate annotations Field"""
         return [
-            Annotation(**_make_annotation_schema(annotation))
-            if isinstance(annotation, str)
-            else annotation
+            (
+                Annotation(**_make_annotation_schema(annotation))
+                if isinstance(annotation, str)
+                else annotation
+            )
             for annotation in value
         ]
 
@@ -259,9 +271,11 @@ class KItem(KItemCompactedModel):
     ) -> List[Attachment]:
         """Validate attachments Field"""
         return [
-            Attachment(name=attachment)
-            if isinstance(attachment, str)
-            else attachment
+            (
+                Attachment(name=attachment)
+                if isinstance(attachment, str)
+                else attachment
+            )
             for attachment in value
         ]
 
@@ -286,6 +300,17 @@ class KItem(KItemCompactedModel):
             for app in value:
                 app.id = kitem_id
         return AppList(value)
+
+    @field_validator("avatar", mode="after")
+    @classmethod
+    def validate_avatar(cls, value: Avatar, info: ValidationInfo) -> Avatar:
+        """
+        Validate avatar Field
+        """
+        kitem_id = info.data.get("id")
+        if value:
+            value.id = kitem_id
+        return value
 
     @field_validator("linked_kitems", mode="before")
     @classmethod
@@ -408,7 +433,7 @@ class KItem(KItemCompactedModel):
                     Will be transformed into `KItemCustomPropertiesModel`."""
                 )
                 value = _transform_custom_properties_schema(
-                    value, ktype.webform_schema
+                    value, ktype.custom_properties
                 )
             value = KItemCustomPropertiesModel(**value)
         elif not isinstance(value, (KItemCustomPropertiesModel, type(None))):
@@ -429,6 +454,42 @@ class KItem(KItemCompactedModel):
                     entry.kitem_id = kitem_id
                     cls.validate_custom_property_entry(entry, ktype)
         return value
+
+    @field_validator("schema_data", mode="before")
+    @classmethod
+    def _coerce_schema_data(
+        cls,
+        value: "Optional[Any]",
+    ) -> "Optional[Any]":
+        """Accept a plain dict ``{schema_id: simplified_input}`` as shorthand."""
+        if isinstance(value, dict):
+            return [
+                {"schema_id": sid, "content": {"__simplified__": data}}
+                for sid, data in value.items()
+            ]
+        return value
+
+    @model_validator(mode="after")
+    def _resolve_schema_data_shorthands(self) -> "KItem":
+        """Immediately resolve any ``{schema_id: simplified_input}`` shorthands.
+
+        After all field validators have run, the DSMS session is available via
+        :attr:`dsms`.  Any ``schema_data`` entry whose content carries the
+        ``__simplified__`` sentinel is transformed to OO-LD here, so that
+        ``schema_data`` always contains valid OO-LD by the time the caller
+        receives the constructed object.
+        """
+        if not self.schema_data:
+            return self
+        pending = [
+            (entry.schema_id, entry.content["__simplified__"])
+            for entry in self.schema_data
+            if isinstance(entry.content, dict)
+            and "__simplified__" in entry.content
+        ]
+        for schema_id, input_data in pending:
+            self.populate_schema(schema_id, input_data)
+        return self
 
     @field_validator("contexts")
     def _validate_contexts(
@@ -491,21 +552,17 @@ class KItem(KItemCompactedModel):
                         specification or if the entry's value is invalid.
         """
 
-        spec: "List[Input]" = []
-        if ktype.webform_schema:  # pylint: disable=no-member
-            for (
-                section
-            ) in (
-                ktype.webform_schema.spec.sections
-            ):  # pylint: disable=no-member
-                for inp in section.inputs:
-                    if inp.id == entry.id:
+        spec: list = []
+        if ktype.custom_properties:  # pylint: disable=no-member
+            for section in ktype.custom_properties.get("sections", []):  # pylint: disable=no-member
+                for inp in section.get("inputs", []):
+                    if inp.get("id") == entry.id:
                         spec.append(inp)
 
         logger.debug("Entry label: %s", entry.label)
         logger.debug("Entry value: %s", entry.value)
 
-        # in this case we assume that a webform was defined for
+        # in this case we assume that custom_properties was defined for
         # the knowledge type for this specific entry
         if spec:
             logger.debug("Found input spec for entry: %s", entry.label)
@@ -518,15 +575,12 @@ class KItem(KItemCompactedModel):
                     f"Found multiple input specs for entry {entry.label}"
                 )
             spec = spec.pop()
-            entry.type = spec.widget
-            default_value = spec.value
-            select_options = spec.select_options
-            range_options = spec.range_options
-            knowledge_type = spec.knowledge_type
-            if range_options:
-                is_list = range_options.range
-            else:
-                is_list = False
+            entry.type = spec.get("widget")
+            default_value = None
+            select_options = []
+            range_options = None
+            knowledge_type = None
+            is_list = False
             dtype = None
             logger.debug("Widget type from spec: %s", entry.type)
         # in this case we assume that a webform was not defined
@@ -559,7 +613,7 @@ class KItem(KItemCompactedModel):
 
         choices = {
             choice.label: choice.model_dump() for choice in select_options
-        } or None
+        }
         logger.debug("Entry choices: %s", choices)
 
         # if the widget not is guessed from the data type,
@@ -576,6 +630,10 @@ class KItem(KItemCompactedModel):
                 dtype = (int, float)
             elif entry.type == Widget.CHECKBOX.value:
                 dtype = bool
+            elif entry.type == Widget.DATE.value:
+                dtype = (str, date)
+            elif entry.type == Widget.DATETIME.value:
+                dtype = (str, datetime)
             elif entry.type in (
                 Widget.SELECT.value,
                 Widget.RADIO.value,
@@ -613,16 +671,12 @@ class KItem(KItemCompactedModel):
                 )
                 and entry.value is not None
             ):
-                error_message = (
-                    """Value `{}` is not a valid select option.
-                Valid options are: """
-                    + str(list(choices.keys()))
-                    + "\n"
-                )
                 if not select_options:
                     raise ValueError(
                         f"Widget of type `{entry.type}` does not have select options."
                     )
+                error_message = """Value `{}` is not a valid select option.
+                Valid options are: """ + str(list(choices.keys())) + "\n"
                 if isinstance(entry.value, str):
                     if entry.value not in choices:
                         raise ValueError(error_message.format(entry.value))
@@ -741,13 +795,11 @@ class KItem(KItemCompactedModel):
                 if is_updated:
                     entry.value = kitems
         else:
-            warnings.warn(
-                """
+            warnings.warn("""
                 Strict validation is disabled.
                 Will not strictly type check the custom properties.
                 This also will take place when values are re-assigned.
-                """
-            )
+                """)
 
         return entry
 
@@ -795,3 +847,77 @@ class KItem(KItemCompactedModel):
     def refresh(self) -> None:
         """Refresh the KItem"""
         _refresh_kitem(self)
+
+    def populate_schema(
+        self, schema_id: str, input_data: "Dict[str, Any]"
+    ) -> "KItem":
+        """Populate a semantic schema instance on this KItem.
+
+        Looks up *schema_id* in the k-type spec's ``resolved_semantic_schemas``
+        list, fetches the schema's ``transform.simplified.jsonata`` file (if it
+        exists), applies the transform to *input_data* to produce an OO-LD
+        document, and stores the result in :attr:`schema_data`.
+
+        For schemas **with** a ``transform.simplified.jsonata``, pass the
+        schema's simplified input format in *input_data* (e.g. ``test_name``,
+        ``specimen_iri``, ``results`` for ``characterization/tensile-test/TTO``).
+
+        For schemas **without** a transform (e.g. ``dataset/generic/DCAT``),
+        pass OO-LD directly.
+
+        Call :meth:`DSMS.add` and :meth:`DSMS.commit` afterwards to persist
+        the schema data to the platform.
+
+        Args:
+            schema_id: Schema identifier exactly matching the ``id`` field in
+                the k-type spec's ``semantic_schemas`` list, e.g.
+                ``"characterization/tensile-test/TTO"``.
+            input_data: Simplified input dict (schemas with transform) or OO-LD
+                dict (schemas without transform).
+
+        Returns:
+            ``self`` to allow method chaining.
+
+        Raises:
+            ValueError: If *schema_id* is not listed in the k-type spec, or if
+                the k-type has no v2 spec.
+            RuntimeError: If the schema cannot be fetched or the transform fails.
+        """
+        from dsms.knowledge.semantics import schema_to_webform
+
+        ktype_v2 = self.dsms.get_ktype(str(self.ktype_id))
+        if not ktype_v2 or not ktype_v2.spec:
+            raise ValueError(
+                f"K-type '{self.ktype_id}' has no v2 spec. "
+                "Import or create the k-type spec before calling populate_schema()."
+            )
+
+        schemas = (
+            ktype_v2.spec.resolved_semantic_schemas
+            or ktype_v2.spec.semantic_schemas
+            or []
+        )
+        schema_ref = next((s for s in schemas if s.id == schema_id), None)
+        if schema_ref is None:
+            valid = [s.id for s in schemas]
+            raise ValueError(
+                f"Schema ID '{schema_id}' is not listed in the k-type spec for "
+                f"'{self.ktype_id}'. Available schema IDs: {valid}"
+            )
+
+        oold_doc = schema_to_webform(schema_ref.url, input_data)
+
+        new_entry = KItemSchemaData(schema_id=schema_id, content=oold_doc)
+
+        if self.schema_data is None:
+            self.schema_data = [new_entry]
+        else:
+            updated = list(self.schema_data)
+            existing_ids = [sd.schema_id for sd in updated]
+            if schema_id in existing_ids:
+                updated[existing_ids.index(schema_id)] = new_entry
+            else:
+                updated.append(new_entry)
+            self.schema_data = updated
+
+        return self

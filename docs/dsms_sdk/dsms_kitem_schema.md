@@ -9,6 +9,8 @@ The schema contains complex types and references, indicating an advanced usage s
 
 ![kitem_schema_uml](../assets/images/UML_KItem_schema.jpg)
 
+`KItem` inherits the compacted base fields listed in [KItemCompactedModel fields](#kitemcompactedmodel-fields) below, and adds the following full-detail fields:
+
 | Field Name        | Description                                                                                              | Type                                              | Default  | Property Namespace | Required / Optional |
 |:-----------------:|:--------------------------------------------------------------------------------------------------------:|:-------------------------------------------------:|:--------:|:------------------:|:-----------------:|
 | Name              | Human-readable name of the KItem.                                                                       | string                                               | Not Applicable | `name`             | Required          |
@@ -18,7 +20,6 @@ The schema contains complex types and references, indicating an advanced usage s
 | Created At        | Timestamp of when the KItem was created.                                                                | Union[string, datetime]                              | `None`   | `created_at`       | Automatically generated          |
 | Updated At        | Timestamp of when the KItem was updated.                                                                | Union[string, datetime]                              | `None`   | `updated_at`       | Automatically generated          |
 | Avatar | The avatar of the KItem. | Union[[Avatar](#avatar-fields), Dict[str, Any]] | `None`   | `avatar`           | Optional          |
-| Avatar Exists     | Whether the KItem holds an avatar or not.                                                               | boolean                                              | `False`  | `avatar_exists`    | Automatically generated          |
 | [KItemCustomPropertiesModel](#kitemcustompropertiesmodel) | A set of custom properties related to the KItem.                                                        | Any                                               | `None`     | `custom_properties`| Optional          |
 | Summary           | A brief human-readable summary of the KItem                                                             | string                              | `None`   | `summary`          | Optional          |
 | Apps        | A list of applications associated with the KItem                                                        | List[[App](#app-fields)]                                         | `[ ]`    | `apps`       | Optional          |
@@ -26,14 +27,32 @@ The schema contains complex types and references, indicating an advanced usage s
 | Affiliations      | A list of affiliations associated with the KItem                                                        | List[[Affiliation](#affiliation-fields)]                                 | `[ ]`    | `affiliations`     | Optional          |
 | Contacts          | Contact information related to the KItem                                                                | List[[ContactInfo](#contactinfo-fields)]                                 | `[ ]`    | `contacts`         | Optional          |
 | External Links    | A list of external links related to the KItem                                                           | List[[ExternalLink](#externallink-fields)]                                | `[ ]`    | `external_links`   | Optional          |
-| Attachments       | A list of file attachments associated with the KItem                                                    | List [Union [[Attachment](#attachment-fields)], string]                      | `[ ]`    | `attachments`      | Optional          |
+| Attachments       | A list of file attachments associated with the KItem                                                    | List[Union[[Attachment](#attachment-fields), string]]                      | `[ ]`    | `attachments`      | Optional          |
 | Dataframe             | Dataframe associated with the KItem, e.g. a time series                                                           | Union[List[[Column](#column-fields)], pd.DataFrame, Dictionary[string, Union[List, Dictionary]]] | `None`   | `dataframe`             | Optional          |
 | Linked KItems     | List of other KItems linked to this KItem                                                               | List[Union[[LinkedKItem](#linkedkitem-fields), "KItem"]]                 | `[ ]` | `linked_kitems`    | Optional          |
-| User Groups       | User groups with access to this KItem                                                                   | List[[UserGroup](#usergroup-fields)]                                   | `[ ]`    | `user_groups`      | Optional          |
+| Contexts          | Context KItems this KItem belongs to                                                                    | List[Union[KItem, KItemCompactedModel]]                                  | `[ ]`    | `contexts`         | Optional          |
+| Access Properties | Role-based access control entries for users and groups                                                  | [KItemAccessProperties](#kitemaccesrproperties-fields)                  | `None`   | `access_properties`| Optional          |
+| Schema Data       | Semantic schema data entries (ontology-class instance data) associated with this KItem                  | List[[KItemSchemaData](#kitemschemeadata-fields)]                        | `None`   | `schema_data`      | Optional          |
+| User Groups       | *(Legacy)* User groups with access to this KItem. Prefer `access_properties` for new code.             | List[[UserGroup](#usergroup-fields)]                                   | `[ ]`    | `user_groups`      | Optional          |
+| Authors           | *(Deprecated)* Authorship list. No longer populated by the server; use `access_properties` instead.   | List[Author]                                                            | `[ ]`    | `authors`          | Deprecated        |
+| RDF Exists        | *(Deprecated)* Whether the KItem holds an RDF graph. No longer populated by the server.               | boolean                                                                 | `False`  | `rdf_exists`       | Deprecated        |
+
+## KItemCompactedModel Fields
+
+`KItemCompactedModel` is the lightweight representation returned by the search endpoint. `KItem` extends it with all the full-detail fields listed above.
+
+| Field Name             | Description                                                              | Type                  | Default | Property Namespace       | Required / Optional          |
+|:----------------------:|:------------------------------------------------------------------------:|:---------------------:|:-------:|:------------------------:|:----------------------------:|
+| Name                   | Human-readable name of the KItem.                                        | string                | —       | `name`                   | Required                     |
+| ID                     | ID of the KItem.                                                         | UUID                  | auto    | `id`                     | Optional                     |
+| Ktype ID               | The type ID of the KItem.                                                | Union[Enum, string]   | —       | `ktype_id`               | Required                     |
+| Slug                   | A unique slug identifier, minimum 4 characters.                          | string                | `None`  | `slug`                   | Optional                     |
+| Avatar Exists          | Whether the KItem holds an avatar or not.                                | boolean               | `False` | `avatar_exists`          | Automatically generated      |
+| Has Contexts           | Whether the KItem belongs to at least one context.                       | boolean               | `False` | `has_contexts`           | Automatically generated      |
+| Attachment Extensions  | Unique file extensions present in this KItem's attachments.              | List[string]          | `None`  | `attachment_extensions`  | Automatically generated      |
 
 ### Example Usage
 ```python
-
 item = KItem(
     name="Glass Bending machine 01",
     slug="1234",
@@ -41,25 +60,25 @@ item = KItem(
     custom_properties={"location": "Room01", "max_force": "100Pa"},
     summary="This is a summary",
     apps=[
-        {"executable": "my_analysis_file",
-        "title": "Analysis",
-        "description": "Analysis the tensile strength from machine data"}
+        {
+            "executable": "my_analysis_file",
+            "title": "Analysis",
+            "description": "Analyse the tensile strength from machine data",
+        }
     ],
     annotations=["http://example.org/sample_kitem/annotation"],
-    affiliations=[
-        {"name": "Institute ABC"}
-    ],
-    contacts=[
-        {"name": "John Doe", "email": "john.doe@example.com"}
-    ],
-    external_links=[
-        {"label": "Project Website", "url": "https://example.com"}
-    ],
+    affiliations=[{"name": "Institute ABC"}],
+    contacts=[{"name": "John Doe", "email": "john.doe@example.com"}],
+    external_links=[{"label": "Project Website", "url": "https://example.com"}],
     attachments=["research_data.csv"],
     linked_kitems=[another_kitem],
-    user_groups=[
-        {"group_id": "33305", "name": "DigiMaterials"}
-    ]
+    access_properties={
+        "user_access": [{"user_id": "abc-123", "role": 3}],
+        "group_access": [{"group_id": "g-456", "role": 1}],
+    },
+    schema_data=[
+        {"schema_id": "https://example.org/ontology/MyClass", "content": {"key": "value"}}
+    ],
 )
 ```
 
@@ -271,6 +290,102 @@ sample_kitem.user_groups = [
 ]
 ```
 
+## KItemAccessProperties Fields
+
+`KItemAccessProperties` controls who can access a KItem. It has three orthogonal mechanisms:
+
+- **Visibility** — a single field that grants read access to broad audiences without requiring explicit role assignments.
+- **User access** — per-user role assignments for fine-grained control.
+- **Group access** — per-Keycloak-group role assignments.
+
+### Visibility Values
+
+| Value       | Who can read                                      |
+|:-----------:|:-------------------------------------------------:|
+| `private`   | Only users and groups listed in access properties |
+| `internal`  | All authenticated users                           |
+| `public`    | Everyone (no login required)                      |
+
+### Role Values
+
+| Role name     | Integer value | Permitted operations                          |
+|:-------------:|:-------------:|:---------------------------------------------:|
+| `MEMBER`      | 1             | READ                                          |
+| `CONTRIBUTOR` | 2             | READ, UPDATE                                  |
+| `OWNER`       | 3             | READ, UPDATE, DELETE, MANAGE                  |
+
+### KItemAccessProperties Sub-fields
+
+| Field Name    | Description                                       | Type                             | Default     | Property Namespace | Required/Optional |
+|:-------------:|:-------------------------------------------------:|:--------------------------------:|:-----------:|:------------------:|:-----------------:|
+| Visibility    | Broad read-access level                           | `"private"` \| `"internal"` \| `"public"` | `"private"` | `visibility` | Optional |
+| User Access   | Per-user role assignments                         | List[[UserAccessProperty](#useraccessproperty-fields)] | `[]` | `user_access` | Optional |
+| Group Access  | Per-group role assignments (special visibility groups excluded) | List[[GroupAccessProperty](#groupaccessproperty-fields)] | `[]` | `group_access` | Optional |
+
+### UserAccessProperty Fields
+
+| Field Name | Description             | Type   | Default        | Property Namespace | Required/Optional |
+|:----------:|:-----------------------:|:------:|:--------------:|:------------------:|:-----------------:|
+| User ID    | UUID of the user        | string | Not Applicable | `user_id`          | Required          |
+| Role       | Role assigned to user   | int (1–3) or Role name | Not Applicable | `role` | Required |
+
+### GroupAccessProperty Fields
+
+| Field Name | Description             | Type   | Default        | Property Namespace | Required/Optional |
+|:----------:|:-----------------------:|:------:|:--------------:|:------------------:|:-----------------:|
+| Group ID   | UUID of the group       | string | Not Applicable | `group_id`         | Required          |
+| Role       | Role assigned to group  | int (1–3) or Role name | Not Applicable | `role` | Required |
+
+### Example Usage
+```python
+from dsms.knowledge.properties.access import KItemAccessProperties, Role
+
+# Make an item readable by all authenticated users, with one explicit owner
+item.access_properties = KItemAccessProperties(
+    visibility="internal",
+    user_access=[{"user_id": "abc-123", "role": Role.OWNER}],
+)
+
+# Grant a specific group contributor access on a private item
+item.access_properties = KItemAccessProperties(
+    visibility="private",
+    user_access=[{"user_id": "abc-123", "role": Role.OWNER}],
+    group_access=[{"group_id": "g-456", "role": Role.CONTRIBUTOR}],
+)
+
+# Query which users can perform a given operation
+from dsms.knowledge.properties.access import OperationType
+print(item.access_properties.operation_by_user[OperationType.UPDATE])
+
+# Look up the minimum role required to delete
+from dsms.knowledge.properties.access import RoleMapping
+print(RoleMapping.min_access_level(OperationType.DELETE))  # Role.OWNER
+```
+
+## KItemSchemaData Fields
+
+`KItemSchemaData` stores a single semantic schema instance attached to a KItem. Each entry maps an ontology-class IRI (the `schema_id`) to a free-form content dictionary.
+
+| Field Name | Description                                     | Type                  | Default        | Property Namespace | Required/Optional |
+|:----------:|:-----------------------------------------------:|:---------------------:|:--------------:|:------------------:|:-----------------:|
+| Schema ID  | Ontology class IRI that identifies the schema   | string                | Not Applicable | `schema_id`        | Required          |
+| Content    | Free-form instance data for that schema         | Dict[string, Any]     | `None`         | `content`          | Optional          |
+
+### Example Usage
+```python
+item.schema_data = [
+    {
+        "schema_id": "https://example.org/ontology/TensileTest",
+        "content": {"strain_rate": 0.001, "temperature_K": 293},
+    }
+]
+
+# Access by schema ID
+from dsms.knowledge.properties.schema_data import KItemSchemaDataList
+entries = KItemSchemaDataList(item.schema_data)
+test_entry = entries.by_schema_id["https://example.org/ontology/TensileTest"]
+```
+
 ## KItemCustomPropertiesModel
 
 | Sub-Property Name | Description                       | Type     | Default | Property Namespace | Required/Optional |
@@ -328,15 +443,23 @@ sample_kitem.user_groups = [
 
 ## Widget Fields
 
-| Value           | Description                      |
-|:---------------:|:--------------------------------:|
-| `Text`          | Text input widget                |
-| `File`          | File input widget                |
-| `Textarea`      | Multiline text input widget      |
-| `Number`        | Numeric input widget             |
-| `Slider`        | Slider input widget              |
-| `Checkbox`      | Checkbox input widget            |
-| `Select`        | Dropdown select widget           |
-| `Radio`         | Radio button widget              |
-| `Knowledge item`| Knowledge item selector widget   |
-| `Multi-select`  | Multi-select widget              |
+| Value              | Description                                  |
+|:------------------:|:--------------------------------------------:|
+| `Array group`      | Repeating group of fields                    |
+| `Checkbox`         | Boolean checkbox widget                      |
+| `Date`             | Date picker widget                           |
+| `Date-time`        | Date and time picker widget                  |
+| `File`             | File upload widget                           |
+| `Key-value pairs`  | Free-form key/value map widget               |
+| `Knowledge item`   | Knowledge item selector widget               |
+| `LaTeX`            | LaTeX-rendered text widget                   |
+| `Multi-select`     | Multi-select dropdown widget                 |
+| `Number`           | Numeric input widget                         |
+| `Radio`            | Radio button widget                          |
+| `Select`           | Dropdown select widget                       |
+| `Slider`           | Slider input widget                          |
+| `Star rating`      | Star-rating widget                           |
+| `Text`             | Single-line text input widget                |
+| `Textarea`         | Multi-line text input widget                 |
+| `URL`              | URL input widget                             |
+| `Vocabulary select`| Controlled-vocabulary term selector widget   |

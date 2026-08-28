@@ -1,6 +1,5 @@
 """Contacts  property of a KItem"""
 
-
 from typing import Optional
 from uuid import UUID
 

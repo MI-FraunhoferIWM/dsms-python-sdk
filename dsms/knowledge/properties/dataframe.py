@@ -1,4 +1,5 @@
 """DataFrame property of a KItem"""
+
 import logging
 from typing import TYPE_CHECKING
 from uuid import UUID
