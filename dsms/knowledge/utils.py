@@ -10,7 +10,7 @@ import time
 import warnings
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 import oyaml as yaml
@@ -992,6 +992,7 @@ def _search(
     compact: "Optional[bool]" = False,
     contexts: "Optional[List[str]]" = None,
     attachment_extensions: "Optional[List[str]]" = None,
+    visibility: Optional[Literal["private", "internal", "public"]] = None,
 ) -> "List[SearchResult]":
     """Search for KItems in the remote backend"""
     from dsms import KItem, KItemCompactedModel
@@ -1009,6 +1010,8 @@ def _search(
     }
     if contexts is not None:
         payload["contexts"] = contexts
+    if visibility is not None:
+        payload["visibility"] = visibility
     params = {"allow_fuzzy": allow_fuzzy}
     if attachment_extensions is not None:
         params["attachment_extensions"] = attachment_extensions

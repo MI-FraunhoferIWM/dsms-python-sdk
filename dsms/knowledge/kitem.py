@@ -16,6 +16,7 @@ from pydantic import (  # isort:skip
     ValidationInfo,
     field_validator,
     field_serializer,
+    model_validator,
 )
 
 from dsms.core.logging import handler  # isort:skip
@@ -454,6 +455,42 @@ class KItem(KItemCompactedModel):
                     cls.validate_custom_property_entry(entry, ktype)
         return value
 
+    @field_validator("schema_data", mode="before")
+    @classmethod
+    def _coerce_schema_data(
+        cls,
+        value: "Optional[Any]",
+    ) -> "Optional[Any]":
+        """Accept a plain dict ``{schema_id: simplified_input}`` as shorthand."""
+        if isinstance(value, dict):
+            return [
+                {"schema_id": sid, "content": {"__simplified__": data}}
+                for sid, data in value.items()
+            ]
+        return value
+
+    @model_validator(mode="after")
+    def _resolve_schema_data_shorthands(self) -> "KItem":
+        """Immediately resolve any ``{schema_id: simplified_input}`` shorthands.
+
+        After all field validators have run, the DSMS session is available via
+        :attr:`dsms`.  Any ``schema_data`` entry whose content carries the
+        ``__simplified__`` sentinel is transformed to OO-LD here, so that
+        ``schema_data`` always contains valid OO-LD by the time the caller
+        receives the constructed object.
+        """
+        if not self.schema_data:
+            return self
+        pending = [
+            (entry.schema_id, entry.content["__simplified__"])
+            for entry in self.schema_data
+            if isinstance(entry.content, dict)
+            and "__simplified__" in entry.content
+        ]
+        for schema_id, input_data in pending:
+            self.populate_schema(schema_id, input_data)
+        return self
+
     @field_validator("contexts")
     def _validate_contexts(
         cls,
@@ -634,12 +671,12 @@ class KItem(KItemCompactedModel):
                 )
                 and entry.value is not None
             ):
-                error_message = """Value `{}` is not a valid select option.
-                Valid options are: """ + str(list(choices.keys())) + "\n"
                 if not select_options:
                     raise ValueError(
                         f"Widget of type `{entry.type}` does not have select options."
                     )
+                error_message = """Value `{}` is not a valid select option.
+                Valid options are: """ + str(list(choices.keys())) + "\n"
                 if isinstance(entry.value, str):
                     if entry.value not in choices:
                         raise ValueError(error_message.format(entry.value))
@@ -810,3 +847,77 @@ class KItem(KItemCompactedModel):
     def refresh(self) -> None:
         """Refresh the KItem"""
         _refresh_kitem(self)
+
+    def populate_schema(
+        self, schema_id: str, input_data: "Dict[str, Any]"
+    ) -> "KItem":
+        """Populate a semantic schema instance on this KItem.
+
+        Looks up *schema_id* in the k-type spec's ``resolved_semantic_schemas``
+        list, fetches the schema's ``transform.simplified.jsonata`` file (if it
+        exists), applies the transform to *input_data* to produce an OO-LD
+        document, and stores the result in :attr:`schema_data`.
+
+        For schemas **with** a ``transform.simplified.jsonata``, pass the
+        schema's simplified input format in *input_data* (e.g. ``test_name``,
+        ``specimen_iri``, ``results`` for ``characterization/tensile-test/TTO``).
+
+        For schemas **without** a transform (e.g. ``dataset/generic/DCAT``),
+        pass OO-LD directly.
+
+        Call :meth:`DSMS.add` and :meth:`DSMS.commit` afterwards to persist
+        the schema data to the platform.
+
+        Args:
+            schema_id: Schema identifier exactly matching the ``id`` field in
+                the k-type spec's ``semantic_schemas`` list, e.g.
+                ``"characterization/tensile-test/TTO"``.
+            input_data: Simplified input dict (schemas with transform) or OO-LD
+                dict (schemas without transform).
+
+        Returns:
+            ``self`` to allow method chaining.
+
+        Raises:
+            ValueError: If *schema_id* is not listed in the k-type spec, or if
+                the k-type has no v2 spec.
+            RuntimeError: If the schema cannot be fetched or the transform fails.
+        """
+        from dsms.knowledge.semantics import schema_to_oold
+
+        ktype_v2 = self.dsms.get_v2_ktype(str(self.ktype_id))
+        if not ktype_v2 or not ktype_v2.spec:
+            raise ValueError(
+                f"K-type '{self.ktype_id}' has no v2 spec. "
+                "Import or create the k-type spec before calling populate_schema()."
+            )
+
+        schemas = (
+            ktype_v2.spec.resolved_semantic_schemas
+            or ktype_v2.spec.semantic_schemas
+            or []
+        )
+        schema_ref = next((s for s in schemas if s.id == schema_id), None)
+        if schema_ref is None:
+            valid = [s.id for s in schemas]
+            raise ValueError(
+                f"Schema ID '{schema_id}' is not listed in the k-type spec for "
+                f"'{self.ktype_id}'. Available schema IDs: {valid}"
+            )
+
+        oold_doc = schema_to_oold(schema_ref.url, input_data)
+
+        new_entry = KItemSchemaData(schema_id=schema_id, content=oold_doc)
+
+        if self.schema_data is None:
+            self.schema_data = [new_entry]
+        else:
+            existing_ids = [sd.schema_id for sd in self.schema_data]
+            if schema_id in existing_ids:
+                idx = existing_ids.index(schema_id)
+                self.schema_data = list(self.schema_data)
+                self.schema_data[idx] = new_entry
+            else:
+                self.schema_data = list(self.schema_data) + [new_entry]
+
+        return self

@@ -3,7 +3,7 @@
 import os
 import warnings
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 from dotenv import load_dotenv
@@ -243,6 +243,7 @@ class DSMS:
         compact: "Optional[bool]" = False,
         contexts: "Optional[List[str]]" = None,
         attachment_extensions: "Optional[List[str]]" = None,
+        visibility: "Optional[Literal['private', 'internal', 'public']]" = None,
     ) -> "List[SearchResult]":
         """Search for KItems in the remote backend."""
         return _search(
@@ -256,6 +257,7 @@ class DSMS:
             compact,
             contexts,
             attachment_extensions,
+            visibility,
         )
 
     @property
