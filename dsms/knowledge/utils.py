@@ -818,140 +818,140 @@ def _get_ktypes_by_parent(
 # KType utilities  (api/knowledge-type/…)
 # ---------------------------------------------------------------------------
 
-_V2_BASE = "api/knowledge-type"
+_KTYPE_BASE = "api/knowledge-type"
 
 
-def _v2_list_ktypes(dsms: "DSMS") -> List[Dict[str, Any]]:
-    """GET /api/knowledge-type/ — list all v2 KTypes."""
-    response = _perform_request(dsms, f"{_V2_BASE}/", "get")
+def _list_ktypes_full(dsms: "DSMS") -> List[Dict[str, Any]]:
+    """GET /api/knowledge-type/ — list all KTypes with spec."""
+    response = _perform_request(dsms, f"{_KTYPE_BASE}/", "get")
     if not response.ok:
-        raise ValueError(f"Failed to list v2 ktypes: {response.text}")
+        raise ValueError(f"Failed to list ktypes: {response.text}")
     return response.json()
 
 
-def _v2_get_ktype(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
-    """GET /api/knowledge-type/{ktype_id} — fetch a single v2 KType."""
-    response = _perform_request(dsms, f"{_V2_BASE}/{ktype_id}", "get")
+def _get_ktype_full(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
+    """GET /api/knowledge-type/{ktype_id} — fetch a single KType with spec."""
+    response = _perform_request(dsms, f"{_KTYPE_BASE}/{ktype_id}", "get")
     if not response.ok:
         raise ValueError(
-            f"Failed to fetch v2 ktype `{ktype_id}`: {response.text}"
+            f"Failed to fetch ktype `{ktype_id}`: {response.text}"
         )
     return response.json()
 
 
-def _v2_create_ktype(dsms: "DSMS", payload: Dict[str, Any]) -> Dict[str, Any]:
-    """POST /api/knowledge-type/ — create or upgrade a v2 KType."""
-    response = _perform_request(dsms, f"{_V2_BASE}/", "post", json=payload)
+def _create_ktype(dsms: "DSMS", payload: Dict[str, Any]) -> Dict[str, Any]:
+    """POST /api/knowledge-type/ — create a KType."""
+    response = _perform_request(dsms, f"{_KTYPE_BASE}/", "post", json=payload)
     if not response.ok:
-        raise ValueError(f"Failed to create v2 ktype: {response.text}")
+        raise ValueError(f"Failed to create ktype: {response.text}")
     return response.json()
 
 
-def _v2_import_ktype(dsms: "DSMS", url: str) -> Dict[str, Any]:
+def _import_ktype(dsms: "DSMS", url: str) -> Dict[str, Any]:
     """POST /api/knowledge-type/import — import a KType spec from a GitHub URL."""
     response = _perform_request(
-        dsms, f"{_V2_BASE}/import", "post", json={"url": url}
+        dsms, f"{_KTYPE_BASE}/import", "post", json={"url": url}
     )
     if not response.ok:
         raise ValueError(
-            f"Failed to import v2 ktype from `{url}`: {response.text}"
+            f"Failed to import ktype from `{url}`: {response.text}"
         )
     return response.json()
 
 
-def _v2_update_ktype(
+def _update_ktype_spec(
     dsms: "DSMS", ktype_id: str, payload: Dict[str, Any]
 ) -> Dict[str, Any]:
     """PUT /api/knowledge-type/{ktype_id} — partial spec update."""
     response = _perform_request(
-        dsms, f"{_V2_BASE}/{ktype_id}", "put", json=payload
+        dsms, f"{_KTYPE_BASE}/{ktype_id}", "put", json=payload
     )
     if not response.ok:
         raise ValueError(
-            f"Failed to update v2 ktype `{ktype_id}`: {response.text}"
+            f"Failed to update ktype `{ktype_id}`: {response.text}"
         )
     return response.json()
 
 
-def _v2_delete_ktype(dsms: "DSMS", ktype_id: str) -> None:
-    """DELETE /api/knowledge-type/{ktype_id} — delete a v2 KType."""
-    response = _perform_request(dsms, f"{_V2_BASE}/{ktype_id}", "delete")
+def _delete_ktype_by_id(dsms: "DSMS", ktype_id: str) -> None:
+    """DELETE /api/knowledge-type/{ktype_id} — delete a KType by ID."""
+    response = _perform_request(dsms, f"{_KTYPE_BASE}/{ktype_id}", "delete")
     if not response.ok:
         raise ValueError(
-            f"Failed to delete v2 ktype `{ktype_id}`: {response.text}"
+            f"Failed to delete ktype `{ktype_id}`: {response.text}"
         )
 
 
-def _v2_restore_stash(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
+def _restore_ktype_stash(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
     """POST /api/knowledge-type/{ktype_id}/restore-stash — restore pre-import stash."""
     response = _perform_request(
-        dsms, f"{_V2_BASE}/{ktype_id}/restore-stash", "post"
+        dsms, f"{_KTYPE_BASE}/{ktype_id}/restore-stash", "post"
     )
     if not response.ok:
         raise ValueError(
-            f"Failed to restore stash for v2 ktype `{ktype_id}`: {response.text}"
+            f"Failed to restore stash for ktype `{ktype_id}`: {response.text}"
         )
     return response.json()
 
 
-def _v2_refresh_ktype(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
+def _refresh_ktype_spec(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
     """POST /api/knowledge-type/{ktype_id}/refresh — re-fetch spec from source URL."""
-    response = _perform_request(dsms, f"{_V2_BASE}/{ktype_id}/refresh", "post")
+    response = _perform_request(dsms, f"{_KTYPE_BASE}/{ktype_id}/refresh", "post")
     if not response.ok:
         raise ValueError(
-            f"Failed to refresh v2 ktype `{ktype_id}`: {response.text}"
+            f"Failed to refresh ktype `{ktype_id}`: {response.text}"
         )
     return response.json()
 
 
-def _v2_export_ktype(dsms: "DSMS", ktype_id: str) -> str:
+def _export_ktype(dsms: "DSMS", ktype_id: str) -> str:
     """GET /api/knowledge-type/{ktype_id}/export — download ktype.yaml as text."""
-    response = _perform_request(dsms, f"{_V2_BASE}/{ktype_id}/export", "get")
+    response = _perform_request(dsms, f"{_KTYPE_BASE}/{ktype_id}/export", "get")
     if not response.ok:
         raise ValueError(
-            f"Failed to export v2 ktype `{ktype_id}`: {response.text}"
+            f"Failed to export ktype `{ktype_id}`: {response.text}"
         )
     return response.text
 
 
-def _v2_list_remote_ktypes(dsms: "DSMS") -> List[Dict[str, Any]]:
+def _list_remote_ktypes(dsms: "DSMS") -> List[Dict[str, Any]]:
     """GET /api/knowledge-type/remote — list KTypes available in the remote repo."""
-    response = _perform_request(dsms, f"{_V2_BASE}/remote", "get")
+    response = _perform_request(dsms, f"{_KTYPE_BASE}/remote", "get")
     if not response.ok:
-        raise ValueError(f"Failed to list remote v2 ktypes: {response.text}")
+        raise ValueError(f"Failed to list remote ktypes: {response.text}")
     return response.json()
 
 
-def _v2_list_remote_schemas(dsms: "DSMS") -> List[Dict[str, Any]]:
+def _list_remote_schemas(dsms: "DSMS") -> List[Dict[str, Any]]:
     """GET /api/knowledge-type/remote/schemas — list semantic schemas in the remote repo."""
-    response = _perform_request(dsms, f"{_V2_BASE}/remote/schemas", "get")
+    response = _perform_request(dsms, f"{_KTYPE_BASE}/remote/schemas", "get")
     if not response.ok:
         raise ValueError(f"Failed to list remote schemas: {response.text}")
     return response.json()
 
 
-def _v2_list_remote_versions(
+def _list_remote_ktype_versions(
     dsms: "DSMS", ktype_id: str
 ) -> List[Dict[str, Any]]:
     """GET /api/knowledge-type/{ktype_id}/remote-versions — list GitHub tags for a KType."""
     response = _perform_request(
-        dsms, f"{_V2_BASE}/{ktype_id}/remote-versions", "get"
+        dsms, f"{_KTYPE_BASE}/{ktype_id}/remote-versions", "get"
     )
     if not response.ok:
         raise ValueError(
-            f"Failed to list remote versions for v2 ktype `{ktype_id}`: {response.text}"
+            f"Failed to list remote versions for ktype `{ktype_id}`: {response.text}"
         )
     return response.json()
 
 
-def _v2_remote_diff(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
+def _remote_ktype_diff(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
     """GET /api/knowledge-type/{ktype_id}/remote-diff — diff local vs latest remote spec."""
     response = _perform_request(
-        dsms, f"{_V2_BASE}/{ktype_id}/remote-diff", "get"
+        dsms, f"{_KTYPE_BASE}/{ktype_id}/remote-diff", "get"
     )
     if not response.ok:
         raise ValueError(
-            f"Failed to get remote diff for v2 ktype `{ktype_id}`: {response.text}"
+            f"Failed to get remote diff for ktype `{ktype_id}`: {response.text}"
         )
     return response.json()
 

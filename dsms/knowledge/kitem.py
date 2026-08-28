@@ -885,7 +885,7 @@ class KItem(KItemCompactedModel):
         """
         from dsms.knowledge.semantics import schema_to_oold
 
-        ktype_v2 = self.dsms.get_v2_ktype(str(self.ktype_id))
+        ktype_v2 = self.dsms.get_ktype(str(self.ktype_id))
         if not ktype_v2 or not ktype_v2.spec:
             raise ValueError(
                 f"K-type '{self.ktype_id}' has no v2 spec. "
