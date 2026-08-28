@@ -912,12 +912,12 @@ class KItem(KItemCompactedModel):
         if self.schema_data is None:
             self.schema_data = [new_entry]
         else:
-            existing_ids = [sd.schema_id for sd in self.schema_data]
+            updated = list(self.schema_data)
+            existing_ids = [sd.schema_id for sd in updated]
             if schema_id in existing_ids:
-                idx = existing_ids.index(schema_id)
-                self.schema_data = list(self.schema_data)
-                self.schema_data[idx] = new_entry
+                updated[existing_ids.index(schema_id)] = new_entry
             else:
-                self.schema_data = list(self.schema_data) + [new_entry]
+                updated.append(new_entry)
+            self.schema_data = updated
 
         return self
