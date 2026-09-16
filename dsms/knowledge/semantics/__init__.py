@@ -11,7 +11,7 @@ ontology dict produced by the JSONata transform.
 
 import logging
 from typing import Any, Dict, List, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import requests
 
@@ -171,7 +171,47 @@ def _map_widget(prop_schema: Dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _convert_scalar_value(prop_schema: Dict[str, Any], value: Any) -> Any:
+def _resolve_kitem_ref(iri: str, dsms) -> Dict[str, str]:
+    """Resolve a DSMS KItem IRI to {id, ktype_id, slug, name} via the REST API.
+
+    Parses /knowledge/{ktype_id}/{slug} from the IRI path and calls
+    GET api/knowledge/kitems/{ktype_id}/{slug}. Falls back to empty strings
+    if the IRI does not match the expected pattern or the request fails.
+    """
+    from dsms.core.utils import _perform_request  # lazy to avoid circular import
+
+    ktype_id = ""
+    slug = ""
+    try:
+        parts = urlparse(iri).path.strip("/").split("/")
+        if len(parts) >= 3 and parts[0] == "knowledge":
+            ktype_id = parts[1]
+            slug = parts[2]
+    except Exception:
+        pass
+
+    if not (ktype_id and slug):
+        return {"id": iri, "ktype_id": "", "slug": "", "name": ""}
+
+    try:
+        response = _perform_request(
+            dsms, f"api/knowledge/kitems/{ktype_id}/{slug}", "get"
+        )
+        if response.ok:
+            payload = response.json()
+            return {
+                "id": iri,
+                "ktype_id": payload.get("ktype_id", ktype_id),
+                "slug": payload.get("slug", slug),
+                "name": payload.get("name", ""),
+            }
+    except Exception:
+        pass
+
+    return {"id": iri, "ktype_id": ktype_id, "slug": slug, "name": ""}
+
+
+def _convert_scalar_value(prop_schema: Dict[str, Any], value: Any, dsms=None) -> Any:
     """Convert an OO-LD scalar/list value to the webform entry value format."""
     if value is None:
         return None
@@ -191,14 +231,15 @@ def _convert_scalar_value(prop_schema: Dict[str, Any], value: Any) -> Any:
 
     # Knowledge item → [{id, ktype_id, slug, name}]
     if widget == "Knowledge item":
+        def _to_kitem_ref(v: str) -> Dict[str, str]:
+            if dsms is not None and str(dsms.config.host_url) in v:
+                return _resolve_kitem_ref(v, dsms)
+            return {"id": v, "ktype_id": "", "slug": "", "name": ""}
+
         if isinstance(value, list):
-            return [
-                {"id": v, "ktype_id": "", "slug": "", "name": ""}
-                if isinstance(v, str) else v
-                for v in value
-            ]
+            return [_to_kitem_ref(v) if isinstance(v, str) else v for v in value]
         if isinstance(value, str):
-            return [{"id": value, "ktype_id": "", "slug": "", "name": ""}]
+            return [_to_kitem_ref(value)]
 
     return value
 
@@ -214,6 +255,7 @@ def _fill_flat_row(
     path_prefix: str,
     context: Dict[str, Any],
     prefixes: Dict[str, str],
+    dsms=None,
 ) -> Dict[str, Any]:
     """Build a flat ``{key: value}`` row from an OO-LD object.
 
@@ -230,12 +272,12 @@ def _fill_flat_row(
 
         if prop_schema.get("type") == "object":
             nested = value if isinstance(value, dict) else {}
-            row.update(_fill_flat_row(prop_schema, nested, flat_key, context, prefixes))
+            row.update(_fill_flat_row(prop_schema, nested, flat_key, context, prefixes, dsms))
         elif prop_schema.get("type") == "array" and prop_schema.get("items", {}).get("type") == "object":
             # Nested array-of-objects within an array item: too deep to flatten generically
             pass
         else:
-            converted = _convert_scalar_value(prop_schema, value)
+            converted = _convert_scalar_value(prop_schema, value, dsms)
             if converted is not None:
                 row[flat_key] = converted
     return row
@@ -248,6 +290,7 @@ def _build_array_group_entry(
     context: Dict[str, Any],
     prefixes: Dict[str, str],
     oold_value: Any,
+    dsms=None,
 ) -> Dict[str, Any]:
     """Build an ``Array group`` webform entry dict."""
     label = prop_schema.get("title", prop_name)
@@ -257,7 +300,7 @@ def _build_array_group_entry(
     if isinstance(oold_value, list):
         for oold_item in oold_value:
             if isinstance(oold_item, dict):
-                row = _fill_flat_row(item_schema, oold_item, "", context, prefixes)
+                row = _fill_flat_row(item_schema, oold_item, "", context, prefixes, dsms)
                 if row:
                     value_rows.append(row)
 
@@ -287,6 +330,7 @@ def _make_scalar_entry(
     context: Dict[str, Any],
     prefixes: Dict[str, str],
     value: Any,
+    dsms=None,
 ) -> Optional[Dict[str, Any]]:
     """Build a single scalar/kitem/select webform entry dict."""
     if prop_schema.get("readOnly"):
@@ -305,7 +349,7 @@ def _make_scalar_entry(
         "type": widget,
     }
 
-    converted = _convert_scalar_value(prop_schema, value)
+    converted = _convert_scalar_value(prop_schema, value, dsms)
     if converted is not None:
         entry["value"] = converted
 
@@ -322,6 +366,7 @@ def _flatten_object_to_entries(
     context: Dict[str, Any],
     prefixes: Dict[str, str],
     oold_values: Dict[str, Any],
+    dsms=None,
 ) -> List[Dict[str, Any]]:
     """Flatten a nested object schema into webform entries (for doubly-nested objects)."""
     entries: List[Dict[str, Any]] = []
@@ -334,13 +379,13 @@ def _flatten_object_to_entries(
         if prop_schema.get("type") == "object":
             nested_values = value if isinstance(value, dict) else {}
             entries.extend(
-                _flatten_object_to_entries(prop_schema, entry_id, context, prefixes, nested_values)
+                _flatten_object_to_entries(prop_schema, entry_id, context, prefixes, nested_values, dsms)
             )
         elif prop_schema.get("type") == "array" and prop_schema.get("items", {}).get("type") == "object":
-            arr_entry = _build_array_group_entry(prop_name, prop_schema, entry_id, context, prefixes, value)
+            arr_entry = _build_array_group_entry(prop_name, prop_schema, entry_id, context, prefixes, value, dsms)
             entries.append(arr_entry)
         else:
-            e = _make_scalar_entry(entry_id, prop_name, prop_schema, context, prefixes, value)
+            e = _make_scalar_entry(entry_id, prop_name, prop_schema, context, prefixes, value, dsms)
             if e:
                 entries.append(e)
     return entries
@@ -404,7 +449,7 @@ def _resolve_schema_refs(
 
 
 def _parse_oold_schema_to_webform(
-    schema: Dict[str, Any], oold_doc: Dict[str, Any]
+    schema: Dict[str, Any], oold_doc: Dict[str, Any], dsms=None
 ) -> Dict[str, Any]:
     """Build the webform ``{sections: [{entries: [...]}]}`` dict.
 
@@ -450,13 +495,13 @@ def _parse_oold_schema_to_webform(
                 if child_schema.get("type") == "object":
                     nested_values = child_value if isinstance(child_value, dict) else {}
                     section_entries.extend(
-                        _flatten_object_to_entries(child_schema, child_id, context, prefixes, nested_values)
+                        _flatten_object_to_entries(child_schema, child_id, context, prefixes, nested_values, dsms)
                     )
                 elif child_schema.get("type") == "array" and child_schema.get("items", {}).get("type") == "object":
-                    arr = _build_array_group_entry(child_name, child_schema, child_id, context, prefixes, child_value)
+                    arr = _build_array_group_entry(child_name, child_schema, child_id, context, prefixes, child_value, dsms)
                     section_entries.append(arr)
                 else:
-                    e = _make_scalar_entry(child_id, child_name, child_schema, context, prefixes, child_value)
+                    e = _make_scalar_entry(child_id, child_name, child_schema, context, prefixes, child_value, dsms)
                     if e:
                         section_entries.append(e)
 
@@ -470,12 +515,12 @@ def _parse_oold_schema_to_webform(
             # ── Top-level array-of-objects → ArrayGroup in main section ──────
             if prop_schema.get("readOnly"):
                 continue
-            arr = _build_array_group_entry(prop_name, prop_schema, entry_id, context, prefixes, oold_value)
+            arr = _build_array_group_entry(prop_name, prop_schema, entry_id, context, prefixes, oold_value, dsms)
             main_entries.append(arr)
 
         else:
             # ── Scalar / kitem / select / etc. → main section ────────────────
-            e = _make_scalar_entry(entry_id, prop_name, prop_schema, context, prefixes, oold_value)
+            e = _make_scalar_entry(entry_id, prop_name, prop_schema, context, prefixes, oold_value, dsms)
             if e:
                 main_entries.append(e)
 
@@ -550,7 +595,7 @@ def schema_to_oold(
 
 
 def schema_to_webform(
-    schema_url: str, input_data: Dict[str, Any]
+    schema_url: str, input_data: Dict[str, Any], dsms=None
 ) -> Dict[str, Any]:
     """Convert a simplified input dict to the DSMS frontend webform format.
 
@@ -599,4 +644,4 @@ def schema_to_webform(
     # Get OO-LD values (keys aligned with schema property names)
     oold_doc = schema_to_oold(schema_url, input_data)
 
-    return _parse_oold_schema_to_webform(schema, oold_doc)
+    return _parse_oold_schema_to_webform(schema, oold_doc, dsms)

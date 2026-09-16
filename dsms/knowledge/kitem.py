@@ -905,7 +905,7 @@ class KItem(KItemCompactedModel):
                 f"'{self.ktype_id}'. Available schema IDs: {valid}"
             )
 
-        oold_doc = schema_to_webform(schema_ref.url, input_data)
+        oold_doc = schema_to_webform(schema_ref.url, input_data, dsms=self.dsms)
 
         new_entry = KItemSchemaData(schema_id=schema_id, content=oold_doc)
 
