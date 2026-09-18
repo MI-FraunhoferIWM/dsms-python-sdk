@@ -257,6 +257,9 @@ class Input(BaseWebformModel):
     placeholder: Optional[str] = Field(
         None, description="Placeholder for the input"
     )
+    vocabulary_url: Optional[str] = Field(
+        None, description="URL of the curated vocabulary to populate select options"
+    )
 
     def __str__(self) -> str:
         """Pretty print the model fields"""
