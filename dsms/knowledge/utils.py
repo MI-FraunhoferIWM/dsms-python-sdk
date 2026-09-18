@@ -50,6 +50,7 @@ FIELDTYPE_TO_XSD = {
     "Checkbox": "bool",
     "Knowledge item": "anyURI",
     "VocabularyTerm": "anyURI",
+    "Vocabulary select": "anyURI",
 }
 
 
@@ -1499,7 +1500,7 @@ def generate_mapping(ktype_id: str, webform: dict):
                     else:
                         object_type = map_fieldtype_to_xsd(widget)
 
-                    if widget == "Knowledge item":
+                    if widget in ("Knowledge item", "Vocabulary select"):
                         object_type = "anyURI"
                         rel_type = "object_property"
 
