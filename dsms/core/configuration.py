@@ -1,5 +1,6 @@
 """General config for the DSMS Python SDK"""
 
+import base64
 import logging
 import urllib
 import warnings
@@ -296,7 +297,11 @@ class Configuration(BaseConfiguration):
             )
         elif username and passwd:
             url = urllib.parse.urljoin(str(host_url), "api/users/token")
-            authorization = f"Basic {username.get_secret_value()}:{passwd.get_secret_value()}"  # pylint: disable=no-member
+            # FastAPI HTTPBasic requires base64-encoded credentials; old Flask endpoint accepted raw
+            _credentials = base64.b64encode(
+                f"{username.get_secret_value()}:{passwd.get_secret_value()}".encode()  # pylint: disable=no-member
+            ).decode()
+            authorization = f"Basic {_credentials}"
             logger.debug("Sending get request to %s", url)
             response = requests.get(
                 url,

@@ -2,7 +2,7 @@
 
 import logging
 import warnings
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
 
@@ -433,7 +433,7 @@ class KItem(KItemCompactedModel):
                     Will be transformed into `KItemCustomPropertiesModel`."""
                 )
                 value = _transform_custom_properties_schema(
-                    value, ktype.webform_schema
+                    value, ktype.custom_properties
                 )
             value = KItemCustomPropertiesModel(**value)
         elif not isinstance(value, (KItemCustomPropertiesModel, type(None))):
@@ -552,21 +552,17 @@ class KItem(KItemCompactedModel):
                         specification or if the entry's value is invalid.
         """
 
-        spec: "List[Input]" = []
-        if ktype.webform_schema:  # pylint: disable=no-member
-            for (
-                section
-            ) in (
-                ktype.webform_schema.spec.sections
-            ):  # pylint: disable=no-member
-                for inp in section.inputs:
-                    if inp.id == entry.id:
+        spec: list = []
+        if ktype.custom_properties:  # pylint: disable=no-member
+            for section in ktype.custom_properties.get("sections", []):  # pylint: disable=no-member
+                for inp in section.get("inputs", []):
+                    if inp.get("id") == entry.id:
                         spec.append(inp)
 
         logger.debug("Entry label: %s", entry.label)
         logger.debug("Entry value: %s", entry.value)
 
-        # in this case we assume that a webform was defined for
+        # in this case we assume that custom_properties was defined for
         # the knowledge type for this specific entry
         if spec:
             logger.debug("Found input spec for entry: %s", entry.label)
@@ -579,15 +575,12 @@ class KItem(KItemCompactedModel):
                     f"Found multiple input specs for entry {entry.label}"
                 )
             spec = spec.pop()
-            entry.type = spec.widget
-            default_value = spec.value
-            select_options = spec.select_options
-            range_options = spec.range_options
-            knowledge_type = spec.knowledge_type
-            if range_options:
-                is_list = range_options.range
-            else:
-                is_list = False
+            entry.type = spec.get("widget")
+            default_value = None
+            select_options = []
+            range_options = None
+            knowledge_type = None
+            is_list = False
             dtype = None
             logger.debug("Widget type from spec: %s", entry.type)
         # in this case we assume that a webform was not defined
@@ -620,7 +613,7 @@ class KItem(KItemCompactedModel):
 
         choices = {
             choice.label: choice.model_dump() for choice in select_options
-        } or None
+        }
         logger.debug("Entry choices: %s", choices)
 
         # if the widget not is guessed from the data type,
@@ -637,6 +630,10 @@ class KItem(KItemCompactedModel):
                 dtype = (int, float)
             elif entry.type == Widget.CHECKBOX.value:
                 dtype = bool
+            elif entry.type == Widget.DATE.value:
+                dtype = (str, date)
+            elif entry.type == Widget.DATETIME.value:
+                dtype = (str, datetime)
             elif entry.type in (
                 Widget.SELECT.value,
                 Widget.RADIO.value,
@@ -886,9 +883,9 @@ class KItem(KItemCompactedModel):
                 the k-type has no v2 spec.
             RuntimeError: If the schema cannot be fetched or the transform fails.
         """
-        from dsms.knowledge.semantics import schema_to_oold
+        from dsms.knowledge.semantics import schema_to_webform
 
-        ktype_v2 = self.dsms.get_v2_ktype(str(self.ktype_id))
+        ktype_v2 = self.dsms.get_ktype(str(self.ktype_id))
         if not ktype_v2 or not ktype_v2.spec:
             raise ValueError(
                 f"K-type '{self.ktype_id}' has no v2 spec. "
@@ -908,19 +905,19 @@ class KItem(KItemCompactedModel):
                 f"'{self.ktype_id}'. Available schema IDs: {valid}"
             )
 
-        oold_doc = schema_to_oold(schema_ref.url, input_data)
+        oold_doc = schema_to_webform(schema_ref.url, input_data, dsms=self.dsms)
 
         new_entry = KItemSchemaData(schema_id=schema_id, content=oold_doc)
 
         if self.schema_data is None:
             self.schema_data = [new_entry]
         else:
-            existing_ids = [sd.schema_id for sd in self.schema_data]
+            updated = list(self.schema_data)
+            existing_ids = [sd.schema_id for sd in updated]
             if schema_id in existing_ids:
-                idx = existing_ids.index(schema_id)
-                self.schema_data = list(self.schema_data)
-                self.schema_data[idx] = new_entry
+                updated[existing_ids.index(schema_id)] = new_entry
             else:
-                self.schema_data = list(self.schema_data) + [new_entry]
+                updated.append(new_entry)
+            self.schema_data = updated
 
         return self
