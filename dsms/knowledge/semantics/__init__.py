@@ -297,6 +297,10 @@ def _build_array_group_entry(
     item_schema = prop_schema.get("items", {})
 
     value_rows: List[Dict[str, Any]] = []
+    # JSONata $map() returns a bare dict (not list) when the input has exactly
+    # one element — normalise to list so single-row array groups are not lost.
+    if isinstance(oold_value, dict):
+        oold_value = [oold_value]
     if isinstance(oold_value, list):
         for oold_item in oold_value:
             if isinstance(oold_item, dict):
