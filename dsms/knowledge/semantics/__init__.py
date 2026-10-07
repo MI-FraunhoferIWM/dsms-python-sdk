@@ -167,6 +167,67 @@ def _map_widget(prop_schema: Dict[str, Any]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Vocabulary service resolution
+# ---------------------------------------------------------------------------
+
+_VOCAB_CACHE: Dict[str, List[dict]] = {}
+
+
+def _fetch_vocab_terms(vocab_url: str) -> List[dict]:
+    """Fetch and cache term list from a vocabulary service endpoint."""
+    if vocab_url in _VOCAB_CACHE:
+        return _VOCAB_CACHE[vocab_url]
+    try:
+        resp = requests.get(vocab_url, timeout=15)
+        if resp.ok:
+            _VOCAB_CACHE[vocab_url] = resp.json()
+            return _VOCAB_CACHE[vocab_url]
+    except Exception as exc:
+        logger.debug("Vocabulary fetch failed for %s: %s", vocab_url, exc)
+    return []
+
+
+def _make_vocab_object(iri: str, label: str) -> Dict[str, Any]:
+    return {"key": iri, "label": label, "disabled": False, "classMapping": iri, "value": iri}
+
+
+def _resolve_vocab_value(value: Any, vocab_url: str) -> Any:
+    """Resolve a plain string (label or full IRI) to a vocab object via the vocabulary service.
+
+    Falls back to a minimal ``{key, label, value}`` object when the term is not found.
+    """
+    if isinstance(value, dict):
+        return value  # already enriched
+
+    if isinstance(value, list):
+        return [_resolve_vocab_value(v, vocab_url) for v in value]
+
+    if not isinstance(value, str):
+        return value
+
+    terms = _fetch_vocab_terms(vocab_url)
+
+    # Full IRI match
+    for term in terms:
+        if term.get("iri") == value:
+            return _make_vocab_object(term["iri"], term.get("label", value))
+
+    # Label match (case-insensitive)
+    value_lower = value.lower()
+    for term in terms:
+        if term.get("label", "").lower() == value_lower:
+            return _make_vocab_object(term["iri"], term["label"])
+
+    # id/key match
+    for term in terms:
+        if term.get("id") == value or term.get("key") == value:
+            return _make_vocab_object(term.get("iri", value), term.get("label", value))
+
+    logger.debug("Vocabulary term not found for %r in %s", value, vocab_url)
+    return {"key": value, "label": value, "disabled": False, "value": value}
+
+
+# ---------------------------------------------------------------------------
 # Value conversion: OO-LD ontology value → webform entry value
 # ---------------------------------------------------------------------------
 
@@ -218,9 +279,13 @@ def _convert_scalar_value(prop_schema: Dict[str, Any], value: Any, dsms=None) ->
 
     widget = _map_widget(prop_schema)
 
-    # Vocabulary / enum selects → {key, label, value} objects
-    if widget in ("Select", "Multi-select", "Radio", "Star rating") or \
-            prop_schema.get("x-vocabulary") or prop_schema.get("enum"):
+    # x-vocabulary fields → resolve label/IRI via vocabulary service
+    vocab_url = prop_schema.get("x-vocabulary")
+    if vocab_url:
+        return _resolve_vocab_value(value, vocab_url)
+
+    # Plain enum selects → {key, label, value} objects (no IRI lookup needed)
+    if widget in ("Select", "Multi-select", "Radio", "Star rating") or prop_schema.get("enum"):
         if isinstance(value, str):
             return {"key": value, "label": value, "value": value}
         if isinstance(value, list):
