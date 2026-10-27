@@ -59,6 +59,13 @@ class Widget(Enum):
     URL = "URL"
     VOCABULARY_SELECT = "Vocabulary select"
 
+    @classmethod
+    def _missing_(cls, value):
+        _aliases = {
+            "Datetime": cls.DATETIME,
+        }
+        return _aliases.get(value)
+
 
 class RelationMappingType(Enum):
     """
@@ -249,6 +256,9 @@ class Input(BaseWebformModel):
     )
     placeholder: Optional[str] = Field(
         None, description="Placeholder for the input"
+    )
+    vocabulary_url: Optional[str] = Field(
+        None, description="URL of the curated vocabulary to populate select options"
     )
 
     def __str__(self) -> str:

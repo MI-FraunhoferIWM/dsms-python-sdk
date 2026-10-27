@@ -89,9 +89,19 @@ class KItemCompactedModel(KItemBaseModel):
         if isinstance(value, str):
             ktype = Session.ktypes.get(value)
             if not ktype:
-                raise TypeError(
-                    f"KType for `ktype_id={value}` does not exist."
-                )
+                # KType not in local cache (backend may have >100 KTypes).
+                # Fetch on demand and cache for the rest of this session.
+                from dsms.knowledge.utils import _get_ktype_full
+                from dsms.knowledge.kitem import KType as KTypeModel
+                try:
+                    ktype_data = _get_ktype_full(Session.dsms, value)
+                    fetched = KTypeModel(**ktype_data)
+                    Session.ktypes[value] = fetched
+                    ktype = fetched
+                except Exception:
+                    raise TypeError(
+                        f"KType for `ktype_id={value}` does not exist."
+                    )
             value = ktype
         if not hasattr(value, "id"):
             raise TypeError(

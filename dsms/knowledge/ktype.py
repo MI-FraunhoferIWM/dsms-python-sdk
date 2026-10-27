@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 from dsms.core.logging import handler
 from dsms.core.session import Session
 from dsms.knowledge.utils import _refresh_ktype, print_ktype, print_model
-from dsms.knowledge.webform import BaseWebformModel, Webform
+from dsms.knowledge.webform import BaseWebformModel
 
 if TYPE_CHECKING:
     from dsms import DSMS
@@ -47,6 +47,12 @@ class ProcessSchemaSpec(BaseWebformModel):
     children: List[Optional["ProcessSchemaSpec"]] = Field(
         [], description="Nested child ProcessSchemaSpecs"
     )
+    required: bool = Field(
+        False, description="Whether this step is mandatory"
+    )
+    cardinality: Literal["one", "many"] = Field(
+        "one", description="'one' = at most one KItem per step; 'many' = unlimited KItems per step"
+    )
 
     @field_validator("id")
     @classmethod
@@ -70,7 +76,6 @@ class ProcessSchema(BaseModel):
     updated_at: Optional[datetime] = Field(
         None, description="Time and date when the process schema was updated."
     )
-
     def refresh(self) -> None:
         """Refresh the process schema"""
         new = self.session.dsms.process_schemas.get(self.id)
@@ -112,25 +117,6 @@ class ProcessSchema(BaseModel):
         return str(value)
 
 
-class WebformSchema(BaseWebformModel):
-    """Schema for a webform."""
-
-    id: Union[str, UUID] = Field(..., description="ID of the Webform.")
-    name: str = Field(..., description="Name of the Webform.")
-    spec: Webform = Field(..., description="Specification of the Webform.")
-    created_at: Optional[Union[str, datetime]] = Field(
-        None, description="Time and date when the Webform was created."
-    )
-    updated_at: Optional[Union[str, datetime]] = Field(
-        None, description="Time and date when the Webform was updated."
-    )
-
-    @field_validator("id")
-    @classmethod
-    def _validate_uuid(cls, value: Union[str, UUID]) -> str:
-        return str(value)
-
-
 class KType(BaseModel):
     """Knowledge type of the knowledge item."""
 
@@ -140,12 +126,8 @@ class KType(BaseModel):
     name: Optional[str] = Field(
         None, description="Human readable name of the KType.", max_length=50
     )
-    webform_schema_id: Optional[str] = Field(
-        None,
-        description="ID of the webform schema that is used to create a form for this KType.",
-    )
-    webform_schema: Optional[WebformSchema] = Field(
-        None, description="Form data of the KType."
+    custom_properties: Optional[Dict[str, Any]] = Field(
+        None, description="Custom properties spec (camelCase dict) for this KType."
     )
     process_schema_id: Optional[str] = Field(
         None,
@@ -272,8 +254,8 @@ class KTypeSpec(BaseModel):
         description="Semantic schema references including inherited entries.",
     )
     relations: Optional[List[RelationSpec]] = Field(None)
-    dynamic_properties: Optional[Dict[str, Any]] = Field(
-        None, description="Raw webform spec dict (camelCase)."
+    custom_properties: Optional[Dict[str, Any]] = Field(
+        None, description="Custom properties spec dict (camelCase)."
     )
     tags: Optional[List[str]] = Field(None)
     source_url: Optional[str] = Field(
@@ -307,7 +289,7 @@ class KTypeV2(KType):
 
 
 class CreateKTypeRequest(BaseModel):
-    """Request body for POST /v2/ktypes/ — create or upgrade a KType."""
+    """Request body for POST /api/knowledge-type/ — create or upgrade a KType."""
 
     id: str = Field(
         ...,
@@ -328,18 +310,18 @@ class CreateKTypeRequest(BaseModel):
     ontology_classes: Optional[List[OntologyClassSpec]] = Field(None)
     semantic_schemas: Optional[List[SemanticSchemaRef]] = Field(None)
     relations: Optional[List[RelationSpec]] = Field(None)
-    dynamic_properties: Optional[Dict[str, Any]] = Field(None)
+    custom_properties: Optional[Dict[str, Any]] = Field(None)
     tags: Optional[List[str]] = Field(None)
 
 
 class ImportFromUrlRequest(BaseModel):
-    """Request body for POST /v2/ktypes/import — import a spec from a GitHub URL."""
+    """Request body for POST /api/knowledge-type/import — import a spec from a GitHub URL."""
 
     url: str = Field(..., description="URL to the raw ktype.yaml on GitHub.")
 
 
 class KTypeSpecPayload(BaseModel):
-    """Request body for PUT /v2/ktypes/{ktype_id} — partial spec update."""
+    """Request body for PUT /api/knowledge-type/{ktype_id} — partial spec update."""
 
     name: Optional[str] = Field(None, min_length=2, max_length=100)
     version: Optional[str] = Field(None)
@@ -352,7 +334,7 @@ class KTypeSpecPayload(BaseModel):
     ontology_classes: Optional[List[OntologyClassSpec]] = Field(None)
     semantic_schemas: Optional[List[SemanticSchemaRef]] = Field(None)
     relations: Optional[List[RelationSpec]] = Field(None)
-    dynamic_properties: Optional[Dict[str, Any]] = Field(None)
+    custom_properties: Optional[Dict[str, Any]] = Field(None)
     tags: Optional[List[str]] = Field(None)
 
 
