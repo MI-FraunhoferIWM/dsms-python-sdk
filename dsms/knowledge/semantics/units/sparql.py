@@ -1,7 +1,7 @@
 """Semantic units for a custom property of a KItem in DSMS"""
 
 from typing import TYPE_CHECKING
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 from dsms.knowledge.semantics.units.base import BaseUnitSparqlQuery
 
@@ -19,7 +19,14 @@ class UnitSparqlQuery(BaseUnitSparqlQuery):
     # OVERRIDE
     @property
     def query(self) -> str:
-        """Construct sparql query for getting unit for dataframe column"""
+        """Construct sparql query for getting unit of a dataframe column or custom property.
+
+        Supports two KG representations via UNION:
+        - New format: csvw:Column nodes identified by csvw:name (column subject IRI is
+          auto-generated and not derivable from the column name).
+        - Old format: property nodes identified by IRI <kitem_url/PropertyName> with
+          qudt:hasUnit as either an IRI or xsd:anyURI literal.
+        """
         kitem_id = self.kwargs.get("kitem_id")
         property_name = self.kwargs.get("property_name")
         if not kitem_id:
@@ -27,20 +34,25 @@ class UnitSparqlQuery(BaseUnitSparqlQuery):
         if not property_name:
             raise ValueError("Property name must be defined.")
         url = urljoin(str(self.dsms.config.host_url), str(kitem_id))
+        # URL-encode for the old-format IRI branch: spaces/parens in property names
+        # produce invalid SPARQL IRIs and cause the entire query to be rejected.
+        encoded_name = quote(str(property_name), safe="")
 
         return f"""prefix csvw: <http://www.w3.org/ns/csvw#>
-            prefix dcat: <http://www.w3.org/ns/dcat#>
             prefix qudt: <http://qudt.org/schema/qudt/>
-            prefix xsd: <http://www.w3.org/2001/XMLSchema#>
-            prefix fileid: <{url}/>
             select distinct ?iri
             where {{
-                bind(
-                    <{url}> as ?g
-                    )
+                bind(<{url}> as ?g)
                 {{
                     graph ?g {{
-                        fileid:{property_name} qudt:hasUnit ?iri .
+                        {{
+                            ?col csvw:name "{property_name}" ;
+                                 qudt:hasUnit ?iri .
+                        }}
+                        UNION
+                        {{
+                            <{url}/{encoded_name}> qudt:hasUnit ?iri .
+                        }}
                     }}
                 }}
         }}"""
