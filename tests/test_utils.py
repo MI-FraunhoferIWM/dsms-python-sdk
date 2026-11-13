@@ -202,8 +202,7 @@ def test_kitem_diffs_access_properties(get_mock_kitem_ids, custom_address):
         "apps": [],
         "access_properties": {
             "visibility": "restricted",
-            "user_access": [{"user_id": user_id, "role": "owner"}],
-            "group_access": [],
+            "grants": [{"id": user_id, "type": "user", "role": "owner"}],
         },
     }
 
@@ -214,7 +213,7 @@ def test_kitem_diffs_access_properties(get_mock_kitem_ids, custom_address):
         ktype_id=dsms.ktypes.Organization,
         access_properties=KItemAccessProperties(
             visibility="internal",
-            user_access=[{"user_id": user_id, "role": Role.OWNER}],
+            grants=[{"id": user_id, "type": "user", "role": Role.OWNER}],
         ),
     )
 
@@ -249,8 +248,7 @@ def test_kitem_diffs_visibility_unchanged(get_mock_kitem_ids, custom_address):
         "apps": [],
         "access_properties": {
             "visibility": "internal",
-            "user_access": [{"user_id": user_id, "role": "owner"}],
-            "group_access": [],
+            "grants": [{"id": user_id, "type": "user", "role": "owner"}],
         },
     }
 
@@ -261,9 +259,9 @@ def test_kitem_diffs_visibility_unchanged(get_mock_kitem_ids, custom_address):
         ktype_id=dsms.ktypes.Organization,
         access_properties=KItemAccessProperties(
             visibility="internal",
-            user_access=[
-                {"user_id": user_id, "role": Role.OWNER},
-                {"user_id": other_user_id, "role": Role.MEMBER},
+            grants=[
+                {"id": user_id, "type": "user", "role": Role.OWNER},
+                {"id": other_user_id, "type": "user", "role": Role.MEMBER},
             ],
         ),
     )
@@ -272,6 +270,53 @@ def test_kitem_diffs_visibility_unchanged(get_mock_kitem_ids, custom_address):
 
     assert "visibility" not in diffs
     assert "visibility" not in diffs["access_properties"]
+
+
+@responses.activate
+def test_kitem_diffs_visibility_only_keeps_grants(
+    get_mock_kitem_ids, custom_address
+):
+    """A fresh access object with only a visibility must not send a grant list.
+
+    The backend replaces grants whenever they are sent and rejects an empty
+    list (at least one owner is required), so sending ``grants: []`` would
+    turn a visibility change into an error.
+    """
+    import pytest
+
+    from dsms.core.dsms import DSMS
+    from dsms.knowledge.kitem import KItem
+    from dsms.knowledge.properties.access import KItemAccessProperties
+    from dsms.knowledge.utils import _get_kitems_diffs
+
+    with pytest.warns(UserWarning, match="No authentication details"):
+        dsms = DSMS(host_url=custom_address)
+
+    kitem_old = {
+        "id": get_mock_kitem_ids[0],
+        "name": "foo",
+        "ktype_id": dsms.ktypes.Organization.value,
+        "annotations": [],
+        "linked_kitems": [],
+        "apps": [],
+        "access_properties": {
+            "visibility": "restricted",
+            "grants": [{"id": "abc-123", "type": "user", "role": "owner"}],
+        },
+    }
+
+    kitem_new = KItem(
+        id=get_mock_kitem_ids[0],
+        name="foo-item",
+        slug="foo-item",
+        ktype_id=dsms.ktypes.Organization,
+        access_properties=KItemAccessProperties(visibility="public"),
+    )
+
+    diffs = _get_kitems_diffs(kitem_old, kitem_new)
+
+    assert diffs["visibility"] == "public"
+    assert "grants" not in diffs.get("access_properties", {})
 
 
 @responses.activate

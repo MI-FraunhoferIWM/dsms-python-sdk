@@ -623,8 +623,11 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     # visibility is a top-level field on the backend update model, so it must
     # be sent separately rather than nested inside access_properties.
     old_access = kitem_old.get("access_properties")
+    # Only fields that were actually set: a fresh KItemAccessProperties with just
+    # a visibility must not send an empty grant list, which the backend would
+    # treat as "remove all grants" and reject (at least one owner is required).
     new_access = (
-        kitem_new.access_properties.model_dump(mode="json")
+        kitem_new.access_properties.model_dump(mode="json", exclude_unset=True)
         if kitem_new.access_properties is not None
         else None
     )
@@ -634,7 +637,8 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
             old_visibility = (old_access or {}).get("visibility")
             if visibility != old_visibility:
                 differences["visibility"] = visibility
-        differences["access_properties"] = new_access
+        if new_access:
+            differences["access_properties"] = new_access
     # merge with previously found differences
     differences.update(**linked_kitems, **apps, **context_kitems)
     return differences
