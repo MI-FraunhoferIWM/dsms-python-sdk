@@ -333,7 +333,7 @@ def _create_new_kitem(kitem: "KItem") -> "Dict[str, Any]":
     }
     if kitem.access_properties is not None:
         access = kitem.access_properties.model_dump(mode="json")
-        payload["visibility"] = access.pop("visibility", "private")
+        payload["visibility"] = access.pop("visibility", "restricted")
         payload["access_properties"] = access
     logger.debug("Create new KItem with payload: %s", payload)
     response = _perform_request(
@@ -898,7 +898,9 @@ def _restore_ktype_stash(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
 
 def _refresh_ktype_spec(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
     """POST /api/knowledge-type/{ktype_id}/refresh — re-fetch spec from source URL."""
-    response = _perform_request(dsms, f"{_KTYPE_BASE}/{ktype_id}/refresh", "post")
+    response = _perform_request(
+        dsms, f"{_KTYPE_BASE}/{ktype_id}/refresh", "post"
+    )
     if not response.ok:
         raise ValueError(
             f"Failed to refresh ktype `{ktype_id}`: {response.text}"
@@ -908,7 +910,9 @@ def _refresh_ktype_spec(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
 
 def _export_ktype(dsms: "DSMS", ktype_id: str) -> str:
     """GET /api/knowledge-type/{ktype_id}/export — download ktype.yaml as text."""
-    response = _perform_request(dsms, f"{_KTYPE_BASE}/{ktype_id}/export", "get")
+    response = _perform_request(
+        dsms, f"{_KTYPE_BASE}/{ktype_id}/export", "get"
+    )
     if not response.ok:
         raise ValueError(
             f"Failed to export ktype `{ktype_id}`: {response.text}"
@@ -994,7 +998,7 @@ def _search(
     compact: "Optional[bool]" = False,
     contexts: "Optional[List[str]]" = None,
     attachment_extensions: "Optional[List[str]]" = None,
-    visibility: Optional[Literal["private", "internal", "public"]] = None,
+    visibility: Optional[Literal["restricted", "internal", "public"]] = None,
 ) -> "List[SearchResult]":
     """Search for KItems in the remote backend"""
     from dsms import KItem, KItemCompactedModel
@@ -1229,7 +1233,9 @@ def _delete_app_spec(obj: "AppConfig") -> None:
     return response.text
 
 
-def _transform_custom_properties_schema(custom_properties: Any, ktype_custom_properties: Any):
+def _transform_custom_properties_schema(
+    custom_properties: Any, ktype_custom_properties: Any
+):
     if ktype_custom_properties and isinstance(ktype_custom_properties, dict):
         copy_properties = custom_properties.copy()
         transformed_sections = {}
@@ -1453,7 +1459,7 @@ def to_kebab_case(name: str):
     Replaces all non-alphanumeric characters with underscores so the result
     can be used as a JSON key and JSONPath dot-notation path segment.
     """
-    sentence = re.sub(r'[^a-z0-9]+', '_', name.lower()).strip('_')
+    sentence = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
     return sentence
 
 

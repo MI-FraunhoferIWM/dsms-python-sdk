@@ -201,7 +201,7 @@ def test_kitem_diffs_access_properties(get_mock_kitem_ids, custom_address):
         "linked_kitems": [],
         "apps": [],
         "access_properties": {
-            "visibility": "private",
+            "visibility": "restricted",
             "user_access": [{"user_id": user_id, "role": "owner"}],
             "group_access": [],
         },

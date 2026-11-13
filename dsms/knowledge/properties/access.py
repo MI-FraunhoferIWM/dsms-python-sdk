@@ -133,10 +133,10 @@ class AccessGrant(BaseModel):
 class KItemAccessProperties(BaseModel):
     """KItem Access Properties Model"""
 
-    visibility: Literal["private", "internal", "public"] = Field(
-        "private",
+    visibility: Literal["restricted", "internal", "public"] = Field(
+        "restricted",
         description=(
-            "Visibility level: private (explicit access only), "
+            "Visibility level: restricted (explicit access only), "
             "internal (all authenticated users), public (everyone)."
         ),
     )

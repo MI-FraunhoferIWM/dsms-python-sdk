@@ -243,7 +243,7 @@ class DSMS:
         compact: "Optional[bool]" = False,
         contexts: "Optional[List[str]]" = None,
         attachment_extensions: "Optional[List[str]]" = None,
-        visibility: "Optional[Literal['private', 'internal', 'public']]" = None,
+        visibility: "Optional[Literal['restricted', 'internal', 'public']]" = None,
     ) -> "List[SearchResult]":
         """Search for KItems in the remote backend."""
         return _search(
@@ -614,9 +614,7 @@ class DSMS:
 
     def list_remote_ktypes(self) -> List[RemoteKTypeSummary]:
         """List KTypes available in the remote GitHub repository."""
-        return [
-            RemoteKTypeSummary(**kt) for kt in _list_remote_ktypes(self)
-        ]
+        return [RemoteKTypeSummary(**kt) for kt in _list_remote_ktypes(self)]
 
     def list_remote_schemas(self) -> List[RemoteSchemaInfo]:
         """List semantic schemas available in the remote GitHub repository."""
