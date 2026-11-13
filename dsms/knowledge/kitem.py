@@ -64,7 +64,6 @@ from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
 
 from dsms.knowledge.webform import (  # isort:skip
     Entry,
-    Input,
     KItemCustomPropertiesModel,
     KnowledgeItemReference,
     WebformSelectOption,
@@ -554,7 +553,9 @@ class KItem(KItemCompactedModel):
 
         spec: list = []
         if ktype.custom_properties:  # pylint: disable=no-member
-            for section in ktype.custom_properties.get("sections", []):  # pylint: disable=no-member
+            for section in ktype.custom_properties.get(
+                "sections", []
+            ):  # pylint: disable=no-member
                 for inp in section.get("inputs", []):
                     if inp.get("id") == entry.id:
                         spec.append(inp)
@@ -578,7 +579,6 @@ class KItem(KItemCompactedModel):
             entry.type = spec.get("widget")
             default_value = None
             select_options = []
-            range_options = None
             knowledge_type = None
             is_list = False
             dtype = None
@@ -784,9 +784,13 @@ class KItem(KItemCompactedModel):
                             slug=val.slug,
                         )
                         is_updated = True
+                    # knowledge_type is never set since the spec format change,
+                    # so this check is inactive. To be restored, see
+                    # https://gitlab-ee.fraunhofer.de/fraunhofer-institutes/iwm/dsms/issue-board/-/work_items/24
                     if (
                         knowledge_type is not None
-                        and val.ktype_id not in knowledge_type
+                        and val.ktype_id
+                        not in knowledge_type  # pylint: disable=unsupported-membership-test
                     ):
                         raise ValueError(
                             f"Knowledge item `{val.name}` is not of type {knowledge_type}."
@@ -905,7 +909,9 @@ class KItem(KItemCompactedModel):
                 f"'{self.ktype_id}'. Available schema IDs: {valid}"
             )
 
-        oold_doc = schema_to_webform(schema_ref.url, input_data, dsms=self.dsms)
+        oold_doc = schema_to_webform(
+            schema_ref.url, input_data, dsms=self.dsms
+        )
 
         new_entry = KItemSchemaData(schema_id=schema_id, content=oold_doc)
 

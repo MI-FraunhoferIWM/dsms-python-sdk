@@ -91,7 +91,7 @@ def _expand_iri(iri: str, prefixes: Dict[str, str]) -> str:
     if colon == -1:
         return iri
     prefix = iri[:colon]
-    local = iri[colon + 1:]
+    local = iri[colon + 1 :]
     return prefixes.get(prefix, prefix + ":") + local
 
 
@@ -111,8 +111,17 @@ def _resolve_relation_mapping(
         }
     if isinstance(entry, dict) and "@id" in entry:
         iri = _expand_iri(entry["@id"], prefixes)
-        prop_type = "object_property" if entry.get("@type") == "@id" else "data_property"
-        return {"iri": iri, "type": prop_type, "label": prop_name, "inverse": False}
+        prop_type = (
+            "object_property"
+            if entry.get("@type") == "@id"
+            else "data_property"
+        )
+        return {
+            "iri": iri,
+            "type": prop_type,
+            "label": prop_name,
+            "inverse": False,
+        }
     return None
 
 
@@ -121,7 +130,9 @@ def _resolve_relation_mapping(
 # ---------------------------------------------------------------------------
 
 
-def _map_widget(prop_schema: Dict[str, Any]) -> str:
+def _map_widget(  # pylint: disable=too-many-return-statements
+    prop_schema: Dict[str, Any],
+) -> str:
     """Return the DSMS widget type string for a JSON Schema property definition."""
     prop_type = prop_schema.get("type", "string")
     prop_format = prop_schema.get("format", "")
@@ -148,7 +159,10 @@ def _map_widget(prop_schema: Dict[str, Any]) -> str:
         return "URL"
     if prop_type == "array" and prop_schema.get("items", {}).get("enum"):
         return "Multi-select"
-    if prop_type == "array" and prop_schema.get("items", {}).get("format") == "uri":
+    if (
+        prop_type == "array"
+        and prop_schema.get("items", {}).get("format") == "uri"
+    ):
         return "Knowledge item"
     if prop_schema.get("enum"):
         fmt = (prop_format or "").lower()
@@ -188,10 +202,18 @@ def _fetch_vocab_terms(vocab_url: str) -> List[dict]:
 
 
 def _make_vocab_object(iri: str, label: str) -> Dict[str, Any]:
-    return {"key": iri, "label": label, "disabled": False, "classMapping": iri, "value": iri}
+    return {
+        "key": iri,
+        "label": label,
+        "disabled": False,
+        "classMapping": iri,
+        "value": iri,
+    }
 
 
-def _resolve_vocab_value(value: Any, vocab_url: str) -> Any:
+def _resolve_vocab_value(  # pylint: disable=too-many-return-statements
+    value: Any, vocab_url: str
+) -> Any:
     """Resolve a plain string (label or full IRI) to a vocab object via the vocabulary service.
 
     Falls back to a minimal ``{key, label, value}`` object when the term is not found.
@@ -221,7 +243,9 @@ def _resolve_vocab_value(value: Any, vocab_url: str) -> Any:
     # id/key match
     for term in terms:
         if term.get("id") == value or term.get("key") == value:
-            return _make_vocab_object(term.get("iri", value), term.get("label", value))
+            return _make_vocab_object(
+                term.get("iri", value), term.get("label", value)
+            )
 
     logger.debug("Vocabulary term not found for %r in %s", value, vocab_url)
     return {"key": value, "label": value, "disabled": False, "value": value}
@@ -239,7 +263,9 @@ def _resolve_kitem_ref(iri: str, dsms) -> Dict[str, str]:
     GET api/knowledge/kitems/{ktype_id}/{slug}. Falls back to empty strings
     if the IRI does not match the expected pattern or the request fails.
     """
-    from dsms.core.utils import _perform_request  # lazy to avoid circular import
+    from dsms.core.utils import (
+        _perform_request,  # lazy to avoid circular import
+    )
 
     ktype_id = ""
     slug = ""
@@ -248,8 +274,8 @@ def _resolve_kitem_ref(iri: str, dsms) -> Dict[str, str]:
         if len(parts) >= 3 and parts[0] == "knowledge":
             ktype_id = parts[1]
             slug = parts[2]
-    except Exception:
-        pass
+    except Exception as exc:  # malformed IRI: fall back to returning it as is
+        logger.debug("Could not parse kitem IRI %s: %s", iri, exc)
 
     if not (ktype_id and slug):
         return {"id": iri, "ktype_id": "", "slug": "", "name": ""}
@@ -266,13 +292,15 @@ def _resolve_kitem_ref(iri: str, dsms) -> Dict[str, str]:
                 "slug": payload.get("slug", slug),
                 "name": payload.get("name", ""),
             }
-    except Exception:
-        pass
+    except Exception as exc:  # backend unreachable: fall back to the IRI parts
+        logger.debug("Could not resolve kitem %s: %s", iri, exc)
 
     return {"id": iri, "ktype_id": ktype_id, "slug": slug, "name": ""}
 
 
-def _convert_scalar_value(prop_schema: Dict[str, Any], value: Any, dsms=None) -> Any:
+def _convert_scalar_value(  # pylint: disable=too-many-return-statements
+    prop_schema: Dict[str, Any], value: Any, dsms=None
+) -> Any:
     """Convert an OO-LD scalar/list value to the webform entry value format."""
     if value is None:
         return None
@@ -285,7 +313,12 @@ def _convert_scalar_value(prop_schema: Dict[str, Any], value: Any, dsms=None) ->
         return _resolve_vocab_value(value, vocab_url)
 
     # Plain enum selects → {key, label, value} objects (no IRI lookup needed)
-    if widget in ("Select", "Multi-select", "Radio", "Star rating") or prop_schema.get("enum"):
+    if widget in (
+        "Select",
+        "Multi-select",
+        "Radio",
+        "Star rating",
+    ) or prop_schema.get("enum"):
         if isinstance(value, str):
             return {"key": value, "label": value, "value": value}
         if isinstance(value, list):
@@ -296,13 +329,16 @@ def _convert_scalar_value(prop_schema: Dict[str, Any], value: Any, dsms=None) ->
 
     # Knowledge item → [{id, ktype_id, slug, name}]
     if widget == "Knowledge item":
+
         def _to_kitem_ref(v: str) -> Dict[str, str]:
             if dsms is not None and str(dsms.config.host_url) in v:
                 return _resolve_kitem_ref(v, dsms)
             return {"id": v, "ktype_id": "", "slug": "", "name": ""}
 
         if isinstance(value, list):
-            return [_to_kitem_ref(v) if isinstance(v, str) else v for v in value]
+            return [
+                _to_kitem_ref(v) if isinstance(v, str) else v for v in value
+            ]
         if isinstance(value, str):
             return [_to_kitem_ref(value)]
 
@@ -333,12 +369,21 @@ def _fill_flat_row(
         if prop_schema.get("readOnly"):
             continue
         flat_key = f"{path_prefix}_{prop_name}" if path_prefix else prop_name
-        value = oold_item.get(prop_name) if isinstance(oold_item, dict) else None
+        value = (
+            oold_item.get(prop_name) if isinstance(oold_item, dict) else None
+        )
 
         if prop_schema.get("type") == "object":
             nested = value if isinstance(value, dict) else {}
-            row.update(_fill_flat_row(prop_schema, nested, flat_key, context, prefixes, dsms))
-        elif prop_schema.get("type") == "array" and prop_schema.get("items", {}).get("type") == "object":
+            row.update(
+                _fill_flat_row(
+                    prop_schema, nested, flat_key, context, prefixes, dsms
+                )
+            )
+        elif (
+            prop_schema.get("type") == "array"
+            and prop_schema.get("items", {}).get("type") == "object"
+        ):
             # Nested array-of-objects within an array item: too deep to flatten generically
             pass
         else:
@@ -369,7 +414,9 @@ def _build_array_group_entry(
     if isinstance(oold_value, list):
         for oold_item in oold_value:
             if isinstance(oold_item, dict):
-                row = _fill_flat_row(item_schema, oold_item, "", context, prefixes, dsms)
+                row = _fill_flat_row(
+                    item_schema, oold_item, "", context, prefixes, dsms
+                )
                 if row:
                     value_rows.append(row)
 
@@ -406,7 +453,10 @@ def _make_scalar_entry(
         return None
     if prop_schema.get("type") == "object":
         return None
-    if prop_schema.get("type") == "array" and prop_schema.get("items", {}).get("type") == "object":
+    if (
+        prop_schema.get("type") == "array"
+        and prop_schema.get("items", {}).get("type") == "object"
+    ):
         return None
 
     widget = _map_widget(prop_schema)
@@ -441,20 +491,50 @@ def _flatten_object_to_entries(
     entries: List[Dict[str, Any]] = []
     for prop_name, prop_schema in obj_schema.get("properties", {}).items():
         entry_id = f"{path_prefix}_{prop_name}" if path_prefix else prop_name
-        value = oold_values.get(prop_name) if isinstance(oold_values, dict) else None
+        value = (
+            oold_values.get(prop_name)
+            if isinstance(oold_values, dict)
+            else None
+        )
 
         if prop_schema.get("readOnly"):
             continue
         if prop_schema.get("type") == "object":
             nested_values = value if isinstance(value, dict) else {}
             entries.extend(
-                _flatten_object_to_entries(prop_schema, entry_id, context, prefixes, nested_values, dsms)
+                _flatten_object_to_entries(
+                    prop_schema,
+                    entry_id,
+                    context,
+                    prefixes,
+                    nested_values,
+                    dsms,
+                )
             )
-        elif prop_schema.get("type") == "array" and prop_schema.get("items", {}).get("type") == "object":
-            arr_entry = _build_array_group_entry(prop_name, prop_schema, entry_id, context, prefixes, value, dsms)
+        elif (
+            prop_schema.get("type") == "array"
+            and prop_schema.get("items", {}).get("type") == "object"
+        ):
+            arr_entry = _build_array_group_entry(
+                prop_name,
+                prop_schema,
+                entry_id,
+                context,
+                prefixes,
+                value,
+                dsms,
+            )
             entries.append(arr_entry)
         else:
-            e = _make_scalar_entry(entry_id, prop_name, prop_schema, context, prefixes, value, dsms)
+            e = _make_scalar_entry(
+                entry_id,
+                prop_name,
+                prop_schema,
+                context,
+                prefixes,
+                value,
+                dsms,
+            )
             if e:
                 entries.append(e)
     return entries
@@ -503,8 +583,14 @@ def _resolve_schema_refs(
         base = _resolve_schema_refs(base, resolved_url)
 
         # Merge: base provides defaults, extending schema wins per-key
-        merged["@context"] = {**base.get("@context", {}), **merged.get("@context", {})}
-        merged["properties"] = {**base.get("properties", {}), **merged.get("properties", {})}
+        merged["@context"] = {
+            **base.get("@context", {}),
+            **merged.get("@context", {}),
+        }
+        merged["properties"] = {
+            **base.get("properties", {}),
+            **merged.get("properties", {}),
+        }
         merged["required"] = list(
             set(base.get("required", []) + merged.get("required", []))
         )
@@ -555,62 +641,119 @@ def _parse_oold_schema_to_webform(
             obj_oold = oold_value if isinstance(oold_value, dict) else {}
             section_entries: List[Dict[str, Any]] = []
 
-            for child_name, child_schema in prop_schema.get("properties", {}).items():
+            for child_name, child_schema in prop_schema.get(
+                "properties", {}
+            ).items():
                 child_id = f"oold_{prop_name}_{child_name}"
                 child_value = obj_oold.get(child_name)
 
                 if child_schema.get("readOnly"):
                     continue
                 if child_schema.get("type") == "object":
-                    nested_values = child_value if isinstance(child_value, dict) else {}
-                    section_entries.extend(
-                        _flatten_object_to_entries(child_schema, child_id, context, prefixes, nested_values, dsms)
+                    nested_values = (
+                        child_value if isinstance(child_value, dict) else {}
                     )
-                elif child_schema.get("type") == "array" and child_schema.get("items", {}).get("type") == "object":
-                    arr = _build_array_group_entry(child_name, child_schema, child_id, context, prefixes, child_value, dsms)
+                    section_entries.extend(
+                        _flatten_object_to_entries(
+                            child_schema,
+                            child_id,
+                            context,
+                            prefixes,
+                            nested_values,
+                            dsms,
+                        )
+                    )
+                elif (
+                    child_schema.get("type") == "array"
+                    and child_schema.get("items", {}).get("type") == "object"
+                ):
+                    arr = _build_array_group_entry(
+                        child_name,
+                        child_schema,
+                        child_id,
+                        context,
+                        prefixes,
+                        child_value,
+                        dsms,
+                    )
                     section_entries.append(arr)
                 else:
-                    e = _make_scalar_entry(child_id, child_name, child_schema, context, prefixes, child_value, dsms)
+                    e = _make_scalar_entry(
+                        child_id,
+                        child_name,
+                        child_schema,
+                        context,
+                        prefixes,
+                        child_value,
+                        dsms,
+                    )
                     if e:
                         section_entries.append(e)
 
-            sections.append({
-                "id": f"oold_section_{prop_name}",
-                "name": prop_schema.get("title", prop_name),
-                "entries": section_entries,
-            })
+            sections.append(
+                {
+                    "id": f"oold_section_{prop_name}",
+                    "name": prop_schema.get("title", prop_name),
+                    "entries": section_entries,
+                }
+            )
 
-        elif prop_schema.get("type") == "array" and prop_schema.get("items", {}).get("type") == "object":
+        elif (
+            prop_schema.get("type") == "array"
+            and prop_schema.get("items", {}).get("type") == "object"
+        ):
             # ── Top-level array-of-objects → ArrayGroup in main section ──────
             if prop_schema.get("readOnly"):
                 continue
-            arr = _build_array_group_entry(prop_name, prop_schema, entry_id, context, prefixes, oold_value, dsms)
+            arr = _build_array_group_entry(
+                prop_name,
+                prop_schema,
+                entry_id,
+                context,
+                prefixes,
+                oold_value,
+                dsms,
+            )
             main_entries.append(arr)
 
         else:
             # ── Scalar / kitem / select / etc. → main section ────────────────
-            e = _make_scalar_entry(entry_id, prop_name, prop_schema, context, prefixes, oold_value, dsms)
+            e = _make_scalar_entry(
+                entry_id,
+                prop_name,
+                prop_schema,
+                context,
+                prefixes,
+                oold_value,
+                dsms,
+            )
             if e:
                 main_entries.append(e)
 
     # Always prepend the main section so it appears first
     if main_entries or not sections:
-        sections.insert(0, {
-            "id": "oold_section_0",
-            "name": schema.get("title", "Details"),
-            "entries": main_entries,
-        })
+        sections.insert(
+            0,
+            {
+                "id": "oold_section_0",
+                "name": schema.get("title", "Details"),
+                "entries": main_entries,
+            },
+        )
 
     # x-transformers → inject a File upload entry at the top of the first section
     transformers = schema.get("x-transformers", [])
     if isinstance(transformers, str):
         transformers = [transformers]
     if transformers and sections:
-        sections[0]["entries"].insert(0, {
-            "id": "oold_file_upload",
-            "label": "Instrument File",
-            "type": "File",
-        })
+        sections[0]["entries"].insert(
+            0,
+            {
+                "id": "oold_file_upload",
+                "label": "Instrument File",
+                "type": "File",
+            },
+        )
 
     return {"sections": sections}
 
@@ -655,7 +798,8 @@ def schema_to_oold(
 
     if response.status_code == 404:
         logger.debug(
-            "No simplified transform at %s — passing input through", transform_url
+            "No simplified transform at %s — passing input through",
+            transform_url,
         )
         return input_data
 

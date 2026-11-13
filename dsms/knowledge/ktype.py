@@ -47,11 +47,10 @@ class ProcessSchemaSpec(BaseWebformModel):
     children: List[Optional["ProcessSchemaSpec"]] = Field(
         [], description="Nested child ProcessSchemaSpecs"
     )
-    required: bool = Field(
-        False, description="Whether this step is mandatory"
-    )
+    required: bool = Field(False, description="Whether this step is mandatory")
     cardinality: Literal["one", "many"] = Field(
-        "one", description="'one' = at most one KItem per step; 'many' = unlimited KItems per step"
+        "one",
+        description="'one' = at most one KItem per step; 'many' = unlimited KItems per step",
     )
 
     @field_validator("id")
@@ -76,6 +75,7 @@ class ProcessSchema(BaseModel):
     updated_at: Optional[datetime] = Field(
         None, description="Time and date when the process schema was updated."
     )
+
     def refresh(self) -> None:
         """Refresh the process schema"""
         new = self.session.dsms.process_schemas.get(self.id)
@@ -127,7 +127,8 @@ class KType(BaseModel):
         None, description="Human readable name of the KType.", max_length=50
     )
     custom_properties: Optional[Dict[str, Any]] = Field(
-        None, description="Custom properties spec (camelCase dict) for this KType."
+        None,
+        description="Custom properties spec (camelCase dict) for this KType.",
     )
     process_schema_id: Optional[str] = Field(
         None,
