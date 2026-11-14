@@ -1826,3 +1826,144 @@ def _update_schema_data(kitem: "KItem", old_kitem: Dict[str, Any]) -> None:
     for schema_id in old_entries:
         if schema_id not in new_entries:
             _delete_schema_data(kitem.dsms, str(kitem.id), schema_id)
+
+
+# ---------------------------------------------------------------------------
+# DSMS archives (export and import of kitems)
+# ---------------------------------------------------------------------------
+
+_ARCHIVE_TIMEOUT = 3600
+
+
+def _archive_request(
+    dsms: "DSMS",
+    route: str,
+    timeout: Optional[float],
+    open_body=None,
+    retry: bool = True,
+    **kwargs,
+) -> Response:
+    """Request for the archive routes.
+
+    Unlike `_perform_request`, the body is not read for debug logging, so a
+    streamed export is not loaded into memory. `open_body` returns fresh
+    request kwargs (e.g. a reopened upload file), so a retry after
+    re-authentication sends the body again.
+    """
+    from urllib.parse import urljoin
+
+    import requests
+
+    body = open_body() if open_body else {}
+    try:
+        response = requests.post(
+            urljoin(str(dsms.config.host_url), route),
+            headers=dsms.headers,
+            verify=dsms.config.ssl_verify,
+            timeout=timeout,
+            **body,
+            **kwargs,
+        )
+    finally:
+        for value in body.get("files", {}).values():
+            value[1].close()
+    if (
+        response.status_code == 401
+        and dsms.config.enable_auto_reauth
+        and retry
+    ):
+        logger.info("Token expired. Will re-authenticate.")
+        response.close()
+        dsms.config = dsms.config.model_validate(dsms.config)
+        return _archive_request(
+            dsms, route, timeout, open_body=open_body, retry=False, **kwargs
+        )
+    return response
+
+
+def _archive_filename(response: Response) -> Optional[str]:
+    disposition = response.headers.get("Content-Disposition", "")
+    match = re.search(r'filename\*?=(?:UTF-8\'\')?"?([^";]+)"?', disposition)
+    return Path(match.group(1)).name if match else None
+
+
+def _export_archive(
+    dsms: "DSMS",
+    kitem_ids: List[str],
+    path: Optional[Union[str, Path]] = None,
+    include_context_members: bool = False,
+    include_linked: bool = False,
+    timeout: Optional[float] = _ARCHIVE_TIMEOUT,
+) -> Path:
+    """POST /api/knowledge/kitems/export, streamed into a file."""
+    payload = {
+        "kitem_ids": kitem_ids,
+        "include_context_members": include_context_members,
+        "include_linked": include_linked,
+    }
+    if path is not None and not Path(path).is_dir():
+        payload["filename"] = Path(path).name.split(".")[0]
+    response = _archive_request(
+        dsms,
+        "api/knowledge/kitems/export",
+        json=payload,
+        stream=True,
+        timeout=timeout,
+    )
+    with response:
+        if not response.ok:
+            raise ValueError(
+                f"Failed to export kitems {kitem_ids}: {response.text}"
+            )
+        name = _archive_filename(response) or "dsms-archive.dsms.zip"
+        if path is None:
+            target = Path.cwd() / name
+        elif Path(path).is_dir():
+            target = Path(path) / name
+        else:
+            target = Path(path)
+        omitted = response.headers.get("X-DSMS-Omitted")
+        if omitted:
+            warnings.warn(
+                "These kitems are linked or in an exported context but were "
+                f"left out because you cannot read them: {omitted}"
+            )
+        with open(target, "wb") as fh:
+            for chunk in response.iter_content(chunk_size=1 << 20):
+                fh.write(chunk)
+    return target
+
+
+def _import_archive(
+    dsms: "DSMS",
+    path: Union[str, Path],
+    on_conflict: str = "fail",
+    dry_run: bool = False,
+    timeout: Optional[float] = _ARCHIVE_TIMEOUT,
+) -> Dict[str, Any]:
+    """POST /api/knowledge/kitems/import. Returns the import report.
+
+    A report with ok=False (status 422) is returned, not raised, so callers
+    can inspect the per-kitem errors.
+    """
+    path = Path(path)
+
+    def open_body():
+        return {
+            "files": {"file": (path.name, open(path, "rb"), "application/zip")}
+        }
+
+    response = _archive_request(
+        dsms,
+        "api/knowledge/kitems/import",
+        open_body=open_body,
+        params={"on_conflict": on_conflict, "dry_run": str(dry_run).lower()},
+        timeout=timeout,
+    )
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    if isinstance(body, dict) and "kitems" in body:
+        return body
+    raise ValueError(f"Failed to import archive `{path}`: {response.text}")

@@ -50,7 +50,9 @@ from dsms.knowledge.utils import (  # isort:skip
     _update_group,
     _create_ktype,
     _delete_ktype_by_id,
+    _export_archive,
     _export_ktype,
+    _import_archive,
     _get_ktype_full,
     _import_ktype,
     _list_ktypes_full,
@@ -65,7 +67,10 @@ from dsms.knowledge.utils import (  # isort:skip
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from dsms.core.session import Buffers
+    from dsms.knowledge.archive import ArchiveImportReport, OnConflict
     from dsms.knowledge.groups import Group, GroupList, User
     from dsms.knowledge.properties.schema_data import KItemSchemaData
     from dsms.knowledge.search import KItemListModel, SearchResult
@@ -607,6 +612,82 @@ class DSMS:
     def export_ktype(self, ktype_id: str) -> str:
         """Download a KType spec as YAML text."""
         return _export_ktype(self, ktype_id)
+
+    # ------------------------------------------------------------------
+    # DSMS archives (see dsms.knowledge.archive)
+    # ------------------------------------------------------------------
+
+    def export_kitems(
+        self,
+        kitem_ids: "Union[str, KItem, List[Union[str, KItem]]]",
+        path: "Optional[Union[str, Path]]" = None,
+        include_context_members: bool = False,
+        include_linked: bool = False,
+        timeout: "Optional[float]" = 3600,
+    ) -> "Path":
+        """Export kitems as a DSMS archive (.dsms.zip) and return its path.
+
+        Args:
+            kitem_ids: Kitems or kitem ids to export. You need read access
+                to each of them.
+            path: Target file, or a directory to save the archive under the
+                name chosen by the server. Defaults to the current directory.
+            include_context_members: Also export the members of exported
+                context kitems, following nested contexts.
+            include_linked: Also export kitems linked to the exported ones
+                (one hop, both directions).
+            timeout: Seconds to wait for the server.
+
+        Kitems added by the include options are left out when you cannot
+        read them; a warning lists their ids.
+        """
+        if not isinstance(kitem_ids, list):
+            kitem_ids = [kitem_ids]
+        ids = [str(getattr(k, "id", k)) for k in kitem_ids]
+        return _export_archive(
+            self,
+            ids,
+            path=path,
+            include_context_members=include_context_members,
+            include_linked=include_linked,
+            timeout=timeout,
+        )
+
+    def import_kitems(
+        self,
+        path: "Union[str, Path]",
+        on_conflict: "OnConflict" = "fail",
+        dry_run: bool = False,
+        timeout: "Optional[float]" = 3600,
+    ) -> "ArchiveImportReport":
+        """Import a DSMS archive (.dsms.zip).
+
+        The archive is checked as a whole first. If any kitem has an error,
+        nothing is written and the returned report has ``ok=False``;
+        ``report.all_errors`` lists the reasons.
+
+        Args:
+            path: The archive file.
+            on_conflict: What to do with kitems whose id already exists:
+                ``"fail"`` the import, ``"skip"`` them, or ``"replace"`` them
+                completely (needs the OWNER role on them).
+            dry_run: Only check the archive and report what would happen.
+            timeout: Seconds to wait for the server.
+
+        New kitems are owned by you. Replaced kitems keep their current
+        access rights and visibility.
+        """
+        from dsms.knowledge.archive import ArchiveImportReport
+
+        return ArchiveImportReport(
+            **_import_archive(
+                self,
+                path,
+                on_conflict=on_conflict,
+                dry_run=dry_run,
+                timeout=timeout,
+            )
+        )
 
     def get_ktype_spec(self, ktype_id: str) -> Optional[KTypeSpec]:
         """Return the KTypeSpec for a KType, or None if no spec is set."""
