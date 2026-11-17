@@ -217,4 +217,4 @@ def test_empty_grants_default():
     """Default grants must be an empty list."""
     props = KItemAccessProperties()
     assert props.grants == []
-    assert props.visibility == "private"
+    assert props.visibility == "restricted"

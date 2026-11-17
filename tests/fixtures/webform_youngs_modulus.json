@@ -1,0 +1,156 @@
+{
+  "classMapping": "https://w3id.org/my-vocab/material",
+  "sections": [
+    {
+      "hidden": false,
+      "id": "ida240dc61e61a7",
+      "inputs": [
+        {
+          "hidden": false,
+          "hint": "E.g., 316L",
+          "id": "id837205b481bcd",
+          "ignore": false,
+          "immutable": false,
+          "knowledgeType": null,
+          "label": "Material name",
+          "multipleSelection": false,
+          "placeholder": "Name of the material",
+          "relationMapping": {
+            "iri": "https://w3id.org/steel/ProcessOntology/hasMaterialIdentifier",
+            "type": "data_property"
+          },
+          "required": false,
+          "value": "Test",
+          "widget": "Text"
+        },
+        {
+          "hidden": false,
+          "hint": "Material number according to standard: e.g. 1.4404",
+          "id": "ide2ac19165d2c7",
+          "ignore": false,
+          "immutable": true,
+          "knowledgeType": null,
+          "label": "Material number",
+          "measurementUnit": null,
+          "multipleSelection": false,
+          "required": false,
+          "value": "",
+          "widget": "Text"
+        },
+        {
+          "hidden": false,
+          "hint": "Material short name: e.g. X2CrNiMo17-12-2",
+          "id": "id4cb73a5ad22c5",
+          "ignore": false,
+          "immutable": false,
+          "knowledgeType": null,
+          "label": "Material short name",
+          "measurementUnit": null,
+          "multipleSelection": false,
+          "required": false,
+          "value": "",
+          "widget": "Text"
+        },
+        {
+          "hidden": false,
+          "hint": null,
+          "id": "id50fc879393b84",
+          "ignore": false,
+          "immutable": false,
+          "knowledgeType": null,
+          "label": "Notes",
+          "measurementUnit": null,
+          "multipleSelection": false,
+          "required": false,
+          "value": "",
+          "widget": "Textarea"
+        },
+        {
+          "hidden": false,
+          "hint": null,
+          "id": "id62f5289c6fca",
+          "ignore": false,
+          "immutable": false,
+          "knowledgeType": "organization",
+          "label": "Manufacturer",
+          "measurementUnit": null,
+          "multipleSelection": false,
+          "relationMapping": null,
+          "required": false,
+          "value": null,
+          "widget": "Knowledge item"
+        }
+      ],
+      "name": "Material specification"
+    },
+    {
+      "hidden": false,
+      "id": "id46c61194a6964",
+      "inputs": [
+        {
+          "hidden": false,
+          "hint": "Minimum tensile strength according to a standard",
+          "id": "id88fb0abab341a",
+          "ignore": false,
+          "immutable": false,
+          "label": "Minimum tensile strength",
+          "measurementUnit": {
+            "iri": "http://qudt.org/vocab/unit/MegaPA",
+            "label": "Megapascal",
+            "namespace": "qudt",
+            "symbol": "MPa"
+          },
+          "multipleSelection": false,
+          "required": false,
+          "value": "234",
+          "widget": "Text"
+        },
+        {
+          "hidden": false,
+          "hint": "Youngs Modulus",
+          "id": "id75ffd8202dee8",
+          "ignore": false,
+          "immutable": false,
+          "label": "Youngs Modulus",
+          "measurementUnit": {
+            "iri": "http://qudt.org/vocab/unit/MegaPA",
+            "label": "Megapascal",
+            "namespace": "qudt",
+            "symbol": "MPa"
+          },
+          "multipleSelection": false,
+          "placeholder": "",
+          "rangeOptions": {
+            "max": 1,
+            "min": 0,
+            "range": false,
+            "step": 0.1
+          },
+          "relationMapping": {
+            "classIri": "https://w3id.org/steel/ProcessOntology/ModulusOfElasticity",
+            "iri": "https://w3id.org/steel/ProcessOntology/hasModulusOfElasticity_Object",
+            "type": "object_property"
+          },
+          "required": false,
+          "value": 18000,
+          "widget": "Number"
+        }
+      ],
+      "name": "Mechanical properties"
+    },
+    {
+      "hidden": false,
+      "id": "idabc1db88a70a1",
+      "inputs": [],
+      "name": "Therma properties"
+    },
+    {
+      "hidden": false,
+      "id": "id1ce3bb5333b3e",
+      "inputs": [],
+      "name": "Electrical properties"
+    }
+  ],
+  "sectionsEnabled": true,
+  "semanticsEnabled": true
+}
