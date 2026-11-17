@@ -78,8 +78,6 @@ logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.propagate = False
 
-DATETIME_FRMT = "%Y-%m-%dT%H:%M:%S.%f"
-
 
 class KItem(KItemCompactedModel):
     """
@@ -108,9 +106,9 @@ class KItem(KItemCompactedModel):
             Whether the KItem holds an avatar or not.
         contacts (List[ContactInfo]):
             Contact information related to the KItem.
-        created_at (Optional[Union[str, datetime]]):
+        created_at (Optional[datetime]):
             Time and date when the KItem was created.
-        updated_at (Optional[Union[str, datetime]]):
+        updated_at (Optional[datetime]):
             Time and date when the KItem was updated.
         external_links (List[ExternalLink]):
             External links related to the KItem.
@@ -153,10 +151,10 @@ class KItem(KItemCompactedModel):
         [],
         description="Whether the KItem holds any contact information.",
     )
-    created_at: Optional[Union[str, datetime]] = Field(
+    created_at: Optional[datetime] = Field(
         None, description="Time and date when the KItem was created."
     )
-    updated_at: Optional[Union[str, datetime]] = Field(
+    updated_at: Optional[datetime] = Field(
         None, description="Time and date when the KItem was updated."
     )
     external_links: List[ExternalLink] = Field(
@@ -347,24 +345,6 @@ class KItem(KItemCompactedModel):
     ) -> LinkedKItemsList:
         """Validate the list out of linked KItems"""
         return LinkedKItemsList(value)
-
-    @field_validator("created_at")
-    @classmethod
-    def validate_created(cls, value: str) -> Any:
-        """Convert the str for `created_at` in to a `datetime`-object"""
-
-        if isinstance(value, str):
-            value = datetime.strptime(value, DATETIME_FRMT)
-        return value
-
-    @field_validator("updated_at")
-    @classmethod
-    def validate_updated(cls, value: str) -> Any:
-        """Convert the str for `created_at` in to a `datetime`-object"""
-
-        if isinstance(value, str):
-            value = datetime.strptime(value, DATETIME_FRMT)
-        return value
 
     @field_validator("summary")
     @classmethod
