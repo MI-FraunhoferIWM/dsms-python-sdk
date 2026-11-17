@@ -3,7 +3,6 @@
 from dsms.knowledge.kitem import KItem, KItemCompactedModel
 from dsms.knowledge.ktype import (
     CreateKTypeRequest,
-    ImportFromUrlRequest,
     KType,
     KTypeSpec,
     KTypeSpecPayload,
@@ -11,13 +10,7 @@ from dsms.knowledge.ktype import (
     OntologyClassSpec,
     ProcessSchema,
     RelationSpec,
-    RemoteDiffOut,
-    RemoteKTypeSummary,
-    RemoteKTypeVersion,
-    RemoteSchemaInfo,
-    RemoteSchemaVersionInfo,
     SemanticSchemaRef,
-    SpecDiffField,
 )
 from dsms.knowledge.properties.schema_data import (
     KItemSchemaData,
@@ -34,15 +27,8 @@ __all__ = [
     "KTypeSpecPayload",
     "KTypeV2",
     "CreateKTypeRequest",
-    "ImportFromUrlRequest",
     "OntologyClassSpec",
     "ProcessSchema",
     "RelationSpec",
-    "RemoteDiffOut",
-    "RemoteKTypeSummary",
-    "RemoteKTypeVersion",
-    "RemoteSchemaInfo",
-    "RemoteSchemaVersionInfo",
     "SemanticSchemaRef",
-    "SpecDiffField",
 ]

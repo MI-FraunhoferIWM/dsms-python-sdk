@@ -64,6 +64,7 @@ from dsms.knowledge.sparql_interface.utils import _get_subgraph  # isort:skip
 
 from dsms.knowledge.webform import (  # isort:skip
     Entry,
+    Input,
     KItemCustomPropertiesModel,
     KnowledgeItemReference,
     WebformSelectOption,
@@ -555,12 +556,16 @@ class KItem(KItemCompactedModel):
                 raise ValueError(
                     f"Found multiple input specs for entry {entry.label}"
                 )
-            spec = spec.pop()
-            entry.type = spec.get("widget")
-            default_value = None
-            select_options = []
-            knowledge_type = None
-            is_list = False
+            # the k-type stores its form as a camelCase dict
+            spec = Input.model_validate(spec.pop())
+            entry.type = getattr(spec.widget, "value", spec.widget)
+            default_value = spec.value
+            select_options = spec.select_options
+            knowledge_type = spec.knowledge_type
+            range_options = spec.range_options
+            is_list = bool(range_options and range_options.range) or bool(
+                spec.multiple_selection
+            )
             dtype = None
             logger.debug("Widget type from spec: %s", entry.type)
         # in this case we assume that a webform was not defined
@@ -625,9 +630,27 @@ class KItem(KItemCompactedModel):
             elif entry.type == Widget.KNOWLEDGE_ITEM.value:
                 dtype = (type(cls), KnowledgeItemReference, dict)
                 is_list = True
-            else:
+            elif entry.type in (Widget.URL.value, Widget.LATEX.value):
+                dtype = str
+            elif entry.type == Widget.STAR_RATING.value:
+                dtype = (int, float)
+            elif entry.type == Widget.VOCABULARY_SELECT.value:
+                # a term object, or its IRI
+                dtype = (dict, str)
+                is_list = is_list or isinstance(entry.value, list)
+            elif entry.type == Widget.KEY_VALUE_PAIRS.value:
+                dtype = (dict, list)
+            elif entry.type == Widget.ARRAY_GROUP.value:
+                # rows of sub-entries
+                dtype = (list, dict)
+            elif Session.dsms.config.strict_validation:
                 raise ValueError(
                     f"Widget type is not mapped to a data type: {entry.type}"
+                )
+            else:
+                logger.warning(
+                    "Unknown widget type `%s`; its value isn't validated.",
+                    entry.type,
                 )
 
             logger.debug("Guessed data type: %s", dtype)

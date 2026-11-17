@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from dsms.knowledge import KItem, KType, ProcessSchema
     from dsms.knowledge.groups import User
     from dsms.knowledge.properties import Attachment
+    from dsms.knowledge.properties.access import KItemAccessProperties
 
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
@@ -368,6 +369,8 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "access_url",
             "contexts",
             "schema_data",
+            # decided by _get_kitems_diffs: grants only when they changed
+            "access_properties",
         },
         exclude_defaults=True,
         mode="json",
@@ -591,6 +594,41 @@ def _get_attachment_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     }
 
 
+def _grant_set(grants: "Optional[List[Dict[str, Any]]]") -> set:
+    """Grants as comparable (id, type, role) tuples, ignoring their order."""
+    return {
+        (g.get("id"), g.get("type"), str(g.get("role")).lower())
+        for g in grants or []
+    }
+
+
+def _access_changes(
+    old_access: "Dict[str, Any]", new_access: "KItemAccessProperties"
+) -> "Dict[str, Any]":
+    """The access fields that differ from the stored ones, as JSON.
+
+    Only fields that were set count, so a fresh `KItemAccessProperties` with
+    just a visibility doesn't send an empty grant list (which the backend
+    would treat as "remove all grants"). Grants appended in place to such an
+    object aren't marked as set, so non-empty grants always count.
+    """
+    new = new_access.model_dump(mode="json", exclude_unset=True)
+    if "grants" not in new and new_access.grants:
+        new["grants"] = new_access.model_dump(mode="json", include={"grants"})[
+            "grants"
+        ]
+    changes = {}
+    if "visibility" in new and new["visibility"] != old_access.get(
+        "visibility"
+    ):
+        changes["visibility"] = new["visibility"]
+    if "grants" in new and _grant_set(new["grants"]) != _grant_set(
+        old_access.get("grants")
+    ):
+        changes["grants"] = new["grants"]
+    return changes
+
+
 def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     """Get the differences in the attributes between two kitems"""
     differences = {}
@@ -619,26 +657,18 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     context_kitems = _get_kitem_contexts(kitem_old, kitem_new)
     # same holds for kitem apps
     apps = _get_apps_diff(kitem_old, kitem_new)
-    # access_properties: include as full replacement when changed.
-    # visibility is a top-level field on the backend update model, so it must
-    # be sent separately rather than nested inside access_properties.
-    old_access = kitem_old.get("access_properties")
-    # Only fields that were actually set: a fresh KItemAccessProperties with just
-    # a visibility must not send an empty grant list, which the backend would
-    # treat as "remove all grants" and reject (at least one owner is required).
-    new_access = (
-        kitem_new.access_properties.model_dump(mode="json", exclude_unset=True)
-        if kitem_new.access_properties is not None
-        else None
-    )
-    if new_access != old_access and new_access is not None:
-        visibility = new_access.pop("visibility", None)
-        if visibility is not None:
-            old_visibility = (old_access or {}).get("visibility")
-            if visibility != old_visibility:
-                differences["visibility"] = visibility
-        if new_access:
-            differences["access_properties"] = new_access
+    # Access: visibility is a top-level field of the backend update model, and
+    # sending grants replaces all of them (which needs the manage permission),
+    # so each is sent only when it actually changed.
+    if kitem_new.access_properties is not None:
+        access_changes = _access_changes(
+            kitem_old.get("access_properties") or {},
+            kitem_new.access_properties,
+        )
+        if "visibility" in access_changes:
+            differences["visibility"] = access_changes.pop("visibility")
+        if access_changes:
+            differences["access_properties"] = access_changes
     # merge with previously found differences
     differences.update(**linked_kitems, **apps, **context_kitems)
     return differences
@@ -853,18 +883,6 @@ def _create_ktype(dsms: "DSMS", payload: Dict[str, Any]) -> Dict[str, Any]:
     return response.json()
 
 
-def _import_ktype(dsms: "DSMS", url: str) -> Dict[str, Any]:
-    """POST /api/knowledge-type/import — import a KType spec from a GitHub URL."""
-    response = _perform_request(
-        dsms, f"{_KTYPE_BASE}/import", "post", json={"url": url}
-    )
-    if not response.ok:
-        raise ValueError(
-            f"Failed to import ktype from `{url}`: {response.text}"
-        )
-    return response.json()
-
-
 def _update_ktype_spec(
     dsms: "DSMS", ktype_id: str, payload: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -900,18 +918,6 @@ def _restore_ktype_stash(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
     return response.json()
 
 
-def _refresh_ktype_spec(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
-    """POST /api/knowledge-type/{ktype_id}/refresh — re-fetch spec from source URL."""
-    response = _perform_request(
-        dsms, f"{_KTYPE_BASE}/{ktype_id}/refresh", "post"
-    )
-    if not response.ok:
-        raise ValueError(
-            f"Failed to refresh ktype `{ktype_id}`: {response.text}"
-        )
-    return response.json()
-
-
 def _export_ktype(dsms: "DSMS", ktype_id: str) -> str:
     """GET /api/knowledge-type/{ktype_id}/export — download ktype.yaml as text."""
     response = _perform_request(
@@ -924,51 +930,15 @@ def _export_ktype(dsms: "DSMS", ktype_id: str) -> str:
     return response.text
 
 
-def _list_remote_ktypes(dsms: "DSMS") -> List[Dict[str, Any]]:
-    """GET /api/knowledge-type/remote — list KTypes available in the remote repo."""
-    response = _perform_request(dsms, f"{_KTYPE_BASE}/remote", "get")
-    if not response.ok:
-        raise ValueError(f"Failed to list remote ktypes: {response.text}")
-    return response.json()
-
-
-def _list_remote_schemas(dsms: "DSMS") -> List[Dict[str, Any]]:
-    """GET /api/knowledge-type/remote/schemas — list semantic schemas in the remote repo."""
-    response = _perform_request(dsms, f"{_KTYPE_BASE}/remote/schemas", "get")
-    if not response.ok:
-        raise ValueError(f"Failed to list remote schemas: {response.text}")
-    return response.json()
-
-
-def _list_remote_ktype_versions(
-    dsms: "DSMS", ktype_id: str
-) -> List[Dict[str, Any]]:
-    """GET /api/knowledge-type/{ktype_id}/remote-versions — list GitHub tags for a KType."""
-    response = _perform_request(
-        dsms, f"{_KTYPE_BASE}/{ktype_id}/remote-versions", "get"
-    )
-    if not response.ok:
-        raise ValueError(
-            f"Failed to list remote versions for ktype `{ktype_id}`: {response.text}"
-        )
-    return response.json()
-
-
-def _remote_ktype_diff(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
-    """GET /api/knowledge-type/{ktype_id}/remote-diff — diff local vs latest remote spec."""
-    response = _perform_request(
-        dsms, f"{_KTYPE_BASE}/{ktype_id}/remote-diff", "get"
-    )
-    if not response.ok:
-        raise ValueError(
-            f"Failed to get remote diff for ktype `{ktype_id}`: {response.text}"
-        )
-    return response.json()
-
-
 def _refresh_ktype(ktype: "KType") -> None:
-    """Refresh the KItem"""
-    for key, value in _get_ktype(ktype.dsms, ktype.id, as_json=True).items():
+    """Refresh the KType from the backend."""
+    fetched = type(ktype).model_validate(
+        _get_ktype(ktype.dsms, ktype.id, as_json=True)
+    )
+    # only the model's fields: the API returns keys (e.g. `spec`) that plain
+    # KType doesn't have, and setting those raises
+    for key in type(ktype).model_fields:
+        value = getattr(fetched, key)
         logger.debug(
             "Set updated property `%s` for KType with id `%s` after commiting: %s",
             key,
@@ -1251,7 +1221,7 @@ def _transform_custom_properties_schema(
                         "id": input_def.get("id"),
                         "label": label,
                         "value": copy_properties.pop(label),
-                        "measurement_unit": None,
+                        "measurement_unit": input_def.get("measurementUnit"),
                         "type": input_def.get("widget"),
                         "relationMapping": input_def.get("relationMapping"),
                     }

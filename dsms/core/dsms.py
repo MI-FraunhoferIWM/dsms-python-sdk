@@ -21,10 +21,6 @@ from dsms.knowledge.ktype import (
     KTypeSpecPayload,
     KTypeV2,
     ProcessSchema,
-    RemoteDiffOut,
-    RemoteKTypeSummary,
-    RemoteKTypeVersion,
-    RemoteSchemaInfo,
 )
 from dsms.knowledge.sparql_interface import SparqlInterface
 from dsms.knowledge.utils import _search
@@ -54,13 +50,7 @@ from dsms.knowledge.utils import (  # isort:skip
     _export_ktype,
     _import_archive,
     _get_ktype_full,
-    _import_ktype,
     _list_ktypes_full,
-    _list_remote_ktypes,
-    _list_remote_schemas,
-    _list_remote_ktype_versions,
-    _refresh_ktype_spec,
-    _remote_ktype_diff,
     _restore_ktype_stash,
     _update_ktype_spec,
     get_user_by_id,
@@ -347,19 +337,20 @@ class DSMS:
 
     def get_kitems(
         self,
-        user_id: Optional[str] = None,
         limit=10,
         offset=0,
+        *,
+        user_id: Optional[str] = None,
         name: Optional[str] = None,
     ) -> "KItemListModel":
         """
         Get all available KItems from the remote backend.
 
         Args:
-            user_id (str, optional): Filter by user ID.
             limit (int): The amount of KItems to be returned. Defaults to 10.
             offset (int): The offset in the list of KItems. Defaults to 0.
-            name (str, optional): Filter by KItem name.
+            user_id (str, optional): Filter by user ID (keyword only).
+            name (str, optional): Filter by KItem name (keyword only).
 
         """
         return _get_kitem_list(
@@ -583,10 +574,6 @@ class DSMS:
             **_create_ktype(self, request.model_dump(exclude_none=True))
         )
 
-    def import_ktype(self, url: str) -> KTypeV2:
-        """Import a KType spec from a GitHub URL."""
-        return KTypeV2(**_import_ktype(self, url))
-
     def update_ktype_spec(
         self, ktype_id: str, payload: KTypeSpecPayload
     ) -> KTypeV2:
@@ -604,10 +591,6 @@ class DSMS:
     def restore_ktype_stash(self, ktype_id: str) -> KTypeV2:
         """Restore the pre-import stash for a KType."""
         return KTypeV2(**_restore_ktype_stash(self, ktype_id))
-
-    def refresh_ktype_spec(self, ktype_id: str) -> KTypeV2:
-        """Re-fetch a KType spec from its stored source URL."""
-        return KTypeV2(**_refresh_ktype_spec(self, ktype_id))
 
     def export_ktype(self, ktype_id: str) -> str:
         """Download a KType spec as YAML text."""
@@ -692,27 +675,6 @@ class DSMS:
     def get_ktype_spec(self, ktype_id: str) -> Optional[KTypeSpec]:
         """Return the KTypeSpec for a KType, or None if no spec is set."""
         return self.get_ktype(ktype_id).spec
-
-    def list_remote_ktypes(self) -> List[RemoteKTypeSummary]:
-        """List KTypes available in the remote GitHub repository."""
-        return [RemoteKTypeSummary(**kt) for kt in _list_remote_ktypes(self)]
-
-    def list_remote_schemas(self) -> List[RemoteSchemaInfo]:
-        """List semantic schemas available in the remote GitHub repository."""
-        return [RemoteSchemaInfo(**s) for s in _list_remote_schemas(self)]
-
-    def list_remote_ktype_versions(
-        self, ktype_id: str
-    ) -> List[RemoteKTypeVersion]:
-        """List all GitHub-tagged versions of a KType."""
-        return [
-            RemoteKTypeVersion(**v)
-            for v in _list_remote_ktype_versions(self, ktype_id)
-        ]
-
-    def get_ktype_remote_diff(self, ktype_id: str) -> RemoteDiffOut:
-        """Compare the local KType spec against the latest remote version."""
-        return RemoteDiffOut(**_remote_ktype_diff(self, ktype_id))
 
     @classmethod
     def __get_pydantic_core_schema__(cls):

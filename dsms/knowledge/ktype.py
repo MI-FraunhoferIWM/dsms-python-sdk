@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from dsms.core.logging import handler
 from dsms.core.session import Session
@@ -121,10 +121,10 @@ class KType(BaseModel):
     """Knowledge type of the knowledge item."""
 
     id: Union[UUID, str] = Field(
-        ..., description="ID of the KType.", max_length=50
+        ..., description="ID of the KType.", max_length=100
     )
     name: Optional[str] = Field(
-        None, description="Human readable name of the KType.", max_length=50
+        None, description="Human readable name of the KType.", max_length=100
     )
     custom_properties: Optional[Dict[str, Any]] = Field(
         None,
@@ -143,6 +143,21 @@ class KType(BaseModel):
     updated_at: Optional[Union[str, datetime]] = Field(
         None, description="Time and date when the KType was updated."
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _process_schema_id_from_schema(cls, data: Any) -> Any:
+        """The API returns the process schema without a separate ID field."""
+        if isinstance(data, dict) and not data.get("process_schema_id"):
+            schema = data.get("process_schema")
+            schema_id = (
+                schema.get("id")
+                if isinstance(schema, dict)
+                else getattr(schema, "id", None)
+            )
+            if schema_id:
+                data = {**data, "process_schema_id": schema_id}
+        return data
 
     def __hash__(self) -> int:
         return hash(str(self))
@@ -315,12 +330,6 @@ class CreateKTypeRequest(BaseModel):
     tags: Optional[List[str]] = Field(None)
 
 
-class ImportFromUrlRequest(BaseModel):
-    """Request body for POST /api/knowledge-type/import — import a spec from a GitHub URL."""
-
-    url: str = Field(..., description="URL to the raw ktype.yaml on GitHub.")
-
-
 class KTypeSpecPayload(BaseModel):
     """Request body for PUT /api/knowledge-type/{ktype_id} — partial spec update."""
 
@@ -337,61 +346,3 @@ class KTypeSpecPayload(BaseModel):
     relations: Optional[List[RelationSpec]] = Field(None)
     custom_properties: Optional[Dict[str, Any]] = Field(None)
     tags: Optional[List[str]] = Field(None)
-
-
-# ---------------------------------------------------------------------------
-# KType v2 — response models
-# ---------------------------------------------------------------------------
-
-
-class RemoteKTypeSummary(BaseModel):
-    """Summary of a KType available in the remote GitHub repository."""
-
-    id: str
-    name: str
-    remote_version: str
-    url: str
-    status: str = Field(
-        ...,
-        description="One of: 'not_imported', 'up_to_date', 'update_available'.",
-    )
-    db_version: Optional[str] = Field(None)
-
-
-class RemoteKTypeVersion(BaseModel):
-    """A tagged version of a KType in the remote repository."""
-
-    tag: str
-    version: str
-    url: str
-
-
-class RemoteSchemaVersionInfo(BaseModel):
-    """Version entry for a remote semantic schema."""
-
-    version: str
-    url: str
-
-
-class RemoteSchemaInfo(BaseModel):
-    """A semantic schema available in the remote repository."""
-
-    id: str
-    versions: List[RemoteSchemaVersionInfo] = Field([])
-
-
-class SpecDiffField(BaseModel):
-    """One changed field in a remote-diff result."""
-
-    field: str
-    local: Any
-    remote: Any
-
-
-class RemoteDiffOut(BaseModel):
-    """Result of comparing a local KType spec against the latest remote version."""
-
-    remote_version: str
-    remote_url: str
-    changed_fields: List[SpecDiffField] = Field([])
-    identical: bool
