@@ -2,7 +2,7 @@
 
 import logging
 import warnings
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
 
@@ -79,8 +79,6 @@ logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.propagate = False
 
-DATETIME_FRMT = "%Y-%m-%dT%H:%M:%S.%f"
-
 
 class KItem(KItemCompactedModel):
     """
@@ -109,9 +107,9 @@ class KItem(KItemCompactedModel):
             Whether the KItem holds an avatar or not.
         contacts (List[ContactInfo]):
             Contact information related to the KItem.
-        created_at (Optional[Union[str, datetime]]):
+        created_at (Optional[datetime]):
             Time and date when the KItem was created.
-        updated_at (Optional[Union[str, datetime]]):
+        updated_at (Optional[datetime]):
             Time and date when the KItem was updated.
         external_links (List[ExternalLink]):
             External links related to the KItem.
@@ -154,10 +152,10 @@ class KItem(KItemCompactedModel):
         [],
         description="Whether the KItem holds any contact information.",
     )
-    created_at: Optional[Union[str, datetime]] = Field(
+    created_at: Optional[datetime] = Field(
         None, description="Time and date when the KItem was created."
     )
-    updated_at: Optional[Union[str, datetime]] = Field(
+    updated_at: Optional[datetime] = Field(
         None, description="Time and date when the KItem was updated."
     )
     external_links: List[ExternalLink] = Field(
@@ -349,24 +347,6 @@ class KItem(KItemCompactedModel):
         """Validate the list out of linked KItems"""
         return LinkedKItemsList(value)
 
-    @field_validator("created_at")
-    @classmethod
-    def validate_created(cls, value: str) -> Any:
-        """Convert the str for `created_at` in to a `datetime`-object"""
-
-        if isinstance(value, str):
-            value = datetime.strptime(value, DATETIME_FRMT)
-        return value
-
-    @field_validator("updated_at")
-    @classmethod
-    def validate_updated(cls, value: str) -> Any:
-        """Convert the str for `created_at` in to a `datetime`-object"""
-
-        if isinstance(value, str):
-            value = datetime.strptime(value, DATETIME_FRMT)
-        return value
-
     @field_validator("summary")
     @classmethod
     def validate_summary(cls, value: Union[str, Summary]) -> Summary:
@@ -433,7 +413,7 @@ class KItem(KItemCompactedModel):
                     Will be transformed into `KItemCustomPropertiesModel`."""
                 )
                 value = _transform_custom_properties_schema(
-                    value, ktype.webform_schema
+                    value, ktype.custom_properties
                 )
             value = KItemCustomPropertiesModel(**value)
         elif not isinstance(value, (KItemCustomPropertiesModel, type(None))):
@@ -552,21 +532,19 @@ class KItem(KItemCompactedModel):
                         specification or if the entry's value is invalid.
         """
 
-        spec: "List[Input]" = []
-        if ktype.webform_schema:  # pylint: disable=no-member
-            for (
-                section
-            ) in (
-                ktype.webform_schema.spec.sections
+        spec: list = []
+        if ktype.custom_properties:  # pylint: disable=no-member
+            for section in ktype.custom_properties.get(
+                "sections", []
             ):  # pylint: disable=no-member
-                for inp in section.inputs:
-                    if inp.id == entry.id:
+                for inp in section.get("inputs", []):
+                    if inp.get("id") == entry.id:
                         spec.append(inp)
 
         logger.debug("Entry label: %s", entry.label)
         logger.debug("Entry value: %s", entry.value)
 
-        # in this case we assume that a webform was defined for
+        # in this case we assume that custom_properties was defined for
         # the knowledge type for this specific entry
         if spec:
             logger.debug("Found input spec for entry: %s", entry.label)
@@ -578,16 +556,16 @@ class KItem(KItemCompactedModel):
                 raise ValueError(
                     f"Found multiple input specs for entry {entry.label}"
                 )
-            spec = spec.pop()
-            entry.type = spec.widget
+            # the k-type stores its form as a camelCase dict
+            spec = Input.model_validate(spec.pop())
+            entry.type = getattr(spec.widget, "value", spec.widget)
             default_value = spec.value
             select_options = spec.select_options
-            range_options = spec.range_options
             knowledge_type = spec.knowledge_type
-            if range_options:
-                is_list = range_options.range
-            else:
-                is_list = False
+            range_options = spec.range_options
+            is_list = bool(range_options and range_options.range) or bool(
+                spec.multiple_selection
+            )
             dtype = None
             logger.debug("Widget type from spec: %s", entry.type)
         # in this case we assume that a webform was not defined
@@ -620,7 +598,7 @@ class KItem(KItemCompactedModel):
 
         choices = {
             choice.label: choice.model_dump() for choice in select_options
-        } or None
+        }
         logger.debug("Entry choices: %s", choices)
 
         # if the widget not is guessed from the data type,
@@ -637,6 +615,10 @@ class KItem(KItemCompactedModel):
                 dtype = (int, float)
             elif entry.type == Widget.CHECKBOX.value:
                 dtype = bool
+            elif entry.type == Widget.DATE.value:
+                dtype = (str, date)
+            elif entry.type == Widget.DATETIME.value:
+                dtype = (str, datetime)
             elif entry.type in (
                 Widget.SELECT.value,
                 Widget.RADIO.value,
@@ -648,9 +630,27 @@ class KItem(KItemCompactedModel):
             elif entry.type == Widget.KNOWLEDGE_ITEM.value:
                 dtype = (type(cls), KnowledgeItemReference, dict)
                 is_list = True
-            else:
+            elif entry.type in (Widget.URL.value, Widget.LATEX.value):
+                dtype = str
+            elif entry.type == Widget.STAR_RATING.value:
+                dtype = (int, float)
+            elif entry.type == Widget.VOCABULARY_SELECT.value:
+                # a term object, or its IRI
+                dtype = (dict, str)
+                is_list = is_list or isinstance(entry.value, list)
+            elif entry.type == Widget.KEY_VALUE_PAIRS.value:
+                dtype = (dict, list)
+            elif entry.type == Widget.ARRAY_GROUP.value:
+                # rows of sub-entries
+                dtype = (list, dict)
+            elif Session.dsms.config.strict_validation:
                 raise ValueError(
                     f"Widget type is not mapped to a data type: {entry.type}"
+                )
+            else:
+                logger.warning(
+                    "Unknown widget type `%s`; its value isn't validated.",
+                    entry.type,
                 )
 
             logger.debug("Guessed data type: %s", dtype)
@@ -787,9 +787,13 @@ class KItem(KItemCompactedModel):
                             slug=val.slug,
                         )
                         is_updated = True
+                    # knowledge_type is never set since the spec format change,
+                    # so this check is inactive. To be restored, see
+                    # https://gitlab-ee.fraunhofer.de/fraunhofer-institutes/iwm/dsms/issue-board/-/work_items/24
                     if (
                         knowledge_type is not None
-                        and val.ktype_id not in knowledge_type
+                        and val.ktype_id
+                        not in knowledge_type  # pylint: disable=unsupported-membership-test
                     ):
                         raise ValueError(
                             f"Knowledge item `{val.name}` is not of type {knowledge_type}."
@@ -886,9 +890,9 @@ class KItem(KItemCompactedModel):
                 the k-type has no v2 spec.
             RuntimeError: If the schema cannot be fetched or the transform fails.
         """
-        from dsms.knowledge.semantics import schema_to_oold
+        from dsms.knowledge.semantics import schema_to_webform
 
-        ktype_v2 = self.dsms.get_v2_ktype(str(self.ktype_id))
+        ktype_v2 = self.dsms.get_ktype(str(self.ktype_id))
         if not ktype_v2 or not ktype_v2.spec:
             raise ValueError(
                 f"K-type '{self.ktype_id}' has no v2 spec. "
@@ -908,19 +912,21 @@ class KItem(KItemCompactedModel):
                 f"'{self.ktype_id}'. Available schema IDs: {valid}"
             )
 
-        oold_doc = schema_to_oold(schema_ref.url, input_data)
+        oold_doc = schema_to_webform(
+            schema_ref.url, input_data, dsms=self.dsms
+        )
 
         new_entry = KItemSchemaData(schema_id=schema_id, content=oold_doc)
 
         if self.schema_data is None:
             self.schema_data = [new_entry]
         else:
-            existing_ids = [sd.schema_id for sd in self.schema_data]
+            updated = list(self.schema_data)
+            existing_ids = [sd.schema_id for sd in updated]
             if schema_id in existing_ids:
-                idx = existing_ids.index(schema_id)
-                self.schema_data = list(self.schema_data)
-                self.schema_data[idx] = new_entry
+                updated[existing_ids.index(schema_id)] = new_entry
             else:
-                self.schema_data = list(self.schema_data) + [new_entry]
+                updated.append(new_entry)
+            self.schema_data = updated
 
         return self

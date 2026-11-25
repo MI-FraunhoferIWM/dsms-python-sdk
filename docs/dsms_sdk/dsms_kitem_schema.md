@@ -302,7 +302,7 @@ sample_kitem.user_groups = [
 
 | Value       | Who can read                                      |
 |:-----------:|:-------------------------------------------------:|
-| `private`   | Only users and groups listed in access properties |
+| `restricted` | Only users and groups listed in access properties |
 | `internal`  | All authenticated users                           |
 | `public`    | Everyone (no login required)                      |
 
@@ -318,7 +318,7 @@ sample_kitem.user_groups = [
 
 | Field Name    | Description                                       | Type                             | Default     | Property Namespace | Required/Optional |
 |:-------------:|:-------------------------------------------------:|:--------------------------------:|:-----------:|:------------------:|:-----------------:|
-| Visibility    | Broad read-access level                           | `"private"` \| `"internal"` \| `"public"` | `"private"` | `visibility` | Optional |
+| Visibility    | Broad read-access level                           | `"restricted"` \| `"internal"` \| `"public"` | `"restricted"` | `visibility` | Optional |
 | User Access   | Per-user role assignments                         | List[[UserAccessProperty](#useraccessproperty-fields)] | `[]` | `user_access` | Optional |
 | Group Access  | Per-group role assignments (special visibility groups excluded) | List[[GroupAccessProperty](#groupaccessproperty-fields)] | `[]` | `group_access` | Optional |
 
@@ -348,7 +348,7 @@ item.access_properties = KItemAccessProperties(
 
 # Grant a specific group contributor access on a private item
 item.access_properties = KItemAccessProperties(
-    visibility="private",
+    visibility="restricted",
     user_access=[{"user_id": "abc-123", "role": Role.OWNER}],
     group_access=[{"group_id": "g-456", "role": Role.CONTRIBUTOR}],
 )

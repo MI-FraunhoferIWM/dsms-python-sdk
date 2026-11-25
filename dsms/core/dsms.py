@@ -21,10 +21,6 @@ from dsms.knowledge.ktype import (
     KTypeSpecPayload,
     KTypeV2,
     ProcessSchema,
-    RemoteDiffOut,
-    RemoteKTypeSummary,
-    RemoteKTypeVersion,
-    RemoteSchemaInfo,
 )
 from dsms.knowledge.sparql_interface import SparqlInterface
 from dsms.knowledge.utils import _search
@@ -42,31 +38,29 @@ from dsms.knowledge.utils import (  # isort:skip
     _get_ktypes_by_parent,
     _get_remote_ktypes,
     _get_process_schemas,
-    _get_webform_schemas,
     _get_schema_data,
     _get_user_groups,
     _get_user_list,
     _remove_group_from_group,
     _remove_group_member,
     _update_group,
-    _v2_create_ktype,
-    _v2_delete_ktype,
-    _v2_export_ktype,
-    _v2_get_ktype,
-    _v2_import_ktype,
-    _v2_list_ktypes,
-    _v2_list_remote_ktypes,
-    _v2_list_remote_schemas,
-    _v2_list_remote_versions,
-    _v2_refresh_ktype,
-    _v2_remote_diff,
-    _v2_restore_stash,
-    _v2_update_ktype,
+    _create_ktype,
+    _delete_ktype_by_id,
+    _export_archive,
+    _export_ktype,
+    _import_archive,
+    _get_ktype_full,
+    _list_ktypes_full,
+    _restore_ktype_stash,
+    _update_ktype_spec,
     get_user_by_id,
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from dsms.core.session import Buffers
+    from dsms.knowledge.archive import ArchiveImportReport, OnConflict
     from dsms.knowledge.groups import Group, GroupList, User
     from dsms.knowledge.properties.schema_data import KItemSchemaData
     from dsms.knowledge.search import KItemListModel, SearchResult
@@ -244,7 +238,7 @@ class DSMS:
         compact: "Optional[bool]" = False,
         contexts: "Optional[List[str]]" = None,
         attachment_extensions: "Optional[List[str]]" = None,
-        visibility: "Optional[Literal['private', 'internal', 'public']]" = None,
+        visibility: "Optional[Literal['restricted', 'internal', 'public']]" = None,
     ) -> "List[SearchResult]":
         """Search for KItems in the remote backend."""
         return _search(
@@ -270,11 +264,6 @@ class DSMS:
     def process_schemas(self) -> "Dict[UUID, ProcessSchema]":
         """Process schemas interface of the DSMS instance."""
         return _get_process_schemas(self)
-
-    @property
-    def webform_schemas(self) -> "Dict[UUID, ProcessSchema]":
-        """Process schemas interface of the DSMS instance."""
-        return _get_webform_schemas(self)
 
     @property
     def ktypes(self) -> "Enum":
@@ -348,19 +337,20 @@ class DSMS:
 
     def get_kitems(
         self,
-        user_id: Optional[str] = None,
         limit=10,
         offset=0,
+        *,
+        user_id: Optional[str] = None,
         name: Optional[str] = None,
     ) -> "KItemListModel":
         """
         Get all available KItems from the remote backend.
 
         Args:
-            user_id (str, optional): Filter by user ID.
             limit (int): The amount of KItems to be returned. Defaults to 10.
             offset (int): The offset in the list of KItems. Defaults to 0.
-            name (str, optional): Filter by KItem name.
+            user_id (str, optional): Filter by user ID (keyword only).
+            name (str, optional): Filter by KItem name (keyword only).
 
         """
         return _get_kitem_list(
@@ -567,79 +557,124 @@ class DSMS:
         return [KType(**kt) for kt in _get_ktypes_by_parent(self, parent_id)]
 
     # ------------------------------------------------------------------
-    # KType v2 API
+    # KType spec API
     # ------------------------------------------------------------------
 
-    def get_v2_ktypes(self) -> List[KTypeV2]:
-        """List all v2 KTypes (spec=None for v1-only types)."""
-        return [KTypeV2(**kt) for kt in _v2_list_ktypes(self)]
+    def list_ktypes(self) -> List[KTypeV2]:
+        """List all KTypes with their semantic spec."""
+        return [KTypeV2(**kt) for kt in _list_ktypes_full(self)]
 
-    def get_v2_ktype(self, ktype_id: str) -> KTypeV2:
-        """Fetch a single v2 KType by ID."""
-        return KTypeV2(**_v2_get_ktype(self, ktype_id))
+    def get_ktype(self, ktype_id: str) -> KTypeV2:
+        """Fetch a single KType by ID (includes semantic spec)."""
+        return KTypeV2(**_get_ktype_full(self, ktype_id))
 
-    def create_v2_ktype(self, request: CreateKTypeRequest) -> KTypeV2:
-        """Create or upgrade a KType to v2."""
+    def create_ktype(self, request: CreateKTypeRequest) -> KTypeV2:
+        """Create a KType."""
         return KTypeV2(
-            **_v2_create_ktype(self, request.model_dump(exclude_none=True))
+            **_create_ktype(self, request.model_dump(exclude_none=True))
         )
 
-    def import_v2_ktype(self, url: str) -> KTypeV2:
-        """Import a KType spec from a GitHub URL."""
-        return KTypeV2(**_v2_import_ktype(self, url))
-
-    def update_v2_ktype(
+    def update_ktype_spec(
         self, ktype_id: str, payload: KTypeSpecPayload
     ) -> KTypeV2:
-        """Partially update a v2 KType spec."""
+        """Partially update a KType spec."""
         return KTypeV2(
-            **_v2_update_ktype(
+            **_update_ktype_spec(
                 self, ktype_id, payload.model_dump(exclude_none=True)
             )
         )
 
-    def delete_v2_ktype(self, ktype_id: str) -> None:
-        """Delete a v2 KType (blocked if KItems exist)."""
-        _v2_delete_ktype(self, ktype_id)
+    def delete_ktype(self, ktype_id: str) -> None:
+        """Delete a KType (blocked if KItems exist)."""
+        _delete_ktype_by_id(self, ktype_id)
 
-    def restore_v2_ktype_stash(self, ktype_id: str) -> KTypeV2:
-        """Restore the pre-import stash for a v2 KType."""
-        return KTypeV2(**_v2_restore_stash(self, ktype_id))
+    def restore_ktype_stash(self, ktype_id: str) -> KTypeV2:
+        """Restore the pre-import stash for a KType."""
+        return KTypeV2(**_restore_ktype_stash(self, ktype_id))
 
-    def refresh_v2_ktype(self, ktype_id: str) -> KTypeV2:
-        """Re-fetch a v2 KType spec from its stored source URL."""
-        return KTypeV2(**_v2_refresh_ktype(self, ktype_id))
+    def export_ktype(self, ktype_id: str) -> str:
+        """Download a KType spec as YAML text."""
+        return _export_ktype(self, ktype_id)
 
-    def export_v2_ktype(self, ktype_id: str) -> str:
-        """Download a v2 KType spec as YAML text."""
-        return _v2_export_ktype(self, ktype_id)
+    # ------------------------------------------------------------------
+    # DSMS archives (see dsms.knowledge.archive)
+    # ------------------------------------------------------------------
 
-    def get_v2_ktype_spec(self, ktype_id: str) -> Optional[KTypeSpec]:
-        """Return the KTypeSpec for a v2 KType, or None if not a v2 type."""
-        return self.get_v2_ktype(ktype_id).spec
+    def export_kitems(
+        self,
+        kitem_ids: "Union[str, KItem, List[Union[str, KItem]]]",
+        path: "Optional[Union[str, Path]]" = None,
+        include_context_members: bool = False,
+        include_linked: bool = False,
+        timeout: "Optional[float]" = 3600,
+    ) -> "Path":
+        """Export kitems as a DSMS archive (.dsms.zip) and return its path.
 
-    def list_remote_v2_ktypes(self) -> List[RemoteKTypeSummary]:
-        """List KTypes available in the remote GitHub repository."""
-        return [
-            RemoteKTypeSummary(**kt) for kt in _v2_list_remote_ktypes(self)
-        ]
+        Args:
+            kitem_ids: Kitems or kitem ids to export. You need read access
+                to each of them.
+            path: Target file, or a directory to save the archive under the
+                name chosen by the server. Defaults to the current directory.
+            include_context_members: Also export the members of exported
+                context kitems, following nested contexts.
+            include_linked: Also export kitems linked to the exported ones
+                (one hop, both directions).
+            timeout: Seconds to wait for the server.
 
-    def list_remote_schemas(self) -> List[RemoteSchemaInfo]:
-        """List semantic schemas available in the remote GitHub repository."""
-        return [RemoteSchemaInfo(**s) for s in _v2_list_remote_schemas(self)]
+        Kitems added by the include options are left out when you cannot
+        read them; a warning lists their ids.
+        """
+        if not isinstance(kitem_ids, list):
+            kitem_ids = [kitem_ids]
+        ids = [str(getattr(k, "id", k)) for k in kitem_ids]
+        return _export_archive(
+            self,
+            ids,
+            path=path,
+            include_context_members=include_context_members,
+            include_linked=include_linked,
+            timeout=timeout,
+        )
 
-    def list_remote_ktype_versions(
-        self, ktype_id: str
-    ) -> List[RemoteKTypeVersion]:
-        """List all GitHub-tagged versions of a v2 KType."""
-        return [
-            RemoteKTypeVersion(**v)
-            for v in _v2_list_remote_versions(self, ktype_id)
-        ]
+    def import_kitems(
+        self,
+        path: "Union[str, Path]",
+        on_conflict: "OnConflict" = "fail",
+        dry_run: bool = False,
+        timeout: "Optional[float]" = 3600,
+    ) -> "ArchiveImportReport":
+        """Import a DSMS archive (.dsms.zip).
 
-    def get_v2_ktype_remote_diff(self, ktype_id: str) -> RemoteDiffOut:
-        """Compare the local v2 KType spec against the latest remote version."""
-        return RemoteDiffOut(**_v2_remote_diff(self, ktype_id))
+        The archive is checked as a whole first. If any kitem has an error,
+        nothing is written and the returned report has ``ok=False``;
+        ``report.all_errors`` lists the reasons.
+
+        Args:
+            path: The archive file.
+            on_conflict: What to do with kitems whose id already exists:
+                ``"fail"`` the import, ``"skip"`` them, or ``"replace"`` them
+                completely (needs the OWNER role on them).
+            dry_run: Only check the archive and report what would happen.
+            timeout: Seconds to wait for the server.
+
+        New kitems are owned by you. Replaced kitems keep their current
+        access rights and visibility.
+        """
+        from dsms.knowledge.archive import ArchiveImportReport
+
+        return ArchiveImportReport(
+            **_import_archive(
+                self,
+                path,
+                on_conflict=on_conflict,
+                dry_run=dry_run,
+                timeout=timeout,
+            )
+        )
+
+    def get_ktype_spec(self, ktype_id: str) -> Optional[KTypeSpec]:
+        """Return the KTypeSpec for a KType, or None if no spec is set."""
+        return self.get_ktype(ktype_id).spec
 
     @classmethod
     def __get_pydantic_core_schema__(cls):

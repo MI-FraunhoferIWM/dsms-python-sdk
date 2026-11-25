@@ -216,7 +216,7 @@ def test_model_creation_with_defaults():
     props = KItemAccessProperties()
 
     assert props.grants == []
-    assert props.visibility == "private"
+    assert props.visibility == "restricted"
     assert props.by_id == {}
     assert props.by_role == {}
     assert props.operation_by_principal == {}
