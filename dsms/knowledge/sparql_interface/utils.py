@@ -1,4 +1,5 @@
 """Sparql interface utilities for the DSMS"""
+
 import io
 from typing import TYPE_CHECKING
 
@@ -139,6 +140,54 @@ def _update_subgraph(
     """Update the subgraph in the remote backend"""
     _delete_subgraph(dsms, graph.identifier, repository)
     _create_subgraph(dsms, graph, encoding, repository)
+
+
+def _sparql_query_context(
+    dsms: "DSMS", context_id: str, query: str
+) -> "Dict[str, Any]":
+    """Submit a SPARQL query scoped to a context KItem."""
+    response = _perform_request(
+        dsms,
+        "api/knowledge/sparql/context",
+        "post",
+        data={"query": query},
+        params={"context_id": context_id},
+    )
+    if not response.ok:
+        raise RuntimeError(
+            f"Context SPARQL query was not successful: {response.text}"
+        )
+    try:
+        response = response.json()
+    except Exception as excep:
+        raise RuntimeError(
+            f"Something went wrong parsing context SPARQL response: `{query}`"
+        ) from excep
+    return response
+
+
+def _graph_query_context(
+    dsms: "DSMS", context_id: str, query: str
+) -> "Dict[str, Any]":
+    """Submit a graph query scoped to a context KItem."""
+    response = _perform_request(
+        dsms,
+        "api/knowledge/graph/context",
+        "post",
+        json={"query": query},
+        params={"context_id": context_id},
+    )
+    if not response.ok:
+        raise RuntimeError(
+            f"Context graph query was not successful: {response.text}"
+        )
+    try:
+        response = response.json()
+    except Exception as excep:
+        raise RuntimeError(
+            f"Something went wrong parsing context graph response: `{query}`"
+        ) from excep
+    return response
 
 
 def _get_subgraph(

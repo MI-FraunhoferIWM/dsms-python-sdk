@@ -18,15 +18,17 @@ pip install dsms-sdk
 ... and start connecting to your central DSMS instance remotely, e.g. by integrating it into your own Python scripts and packages
 
 The SDK functionalities are listed below:
-1. Managing Knowledge-Items.
-2. Creating, updating and deleting meta data and properties, e.g. date, operator, material response data for a conducted tensile test.
-3. Administrating authorship, contact information and supplementary information.
-4. Semantic annotation of K-Items.
-5. Conduct simple free-text searches and SPARQL queries.
-6. Linking K-Items to other K-Items.
-7. Linking Apps to K-Items, triggered, for example, during a file upload.
-8. Performing simple file upload and download of file attachments.
-9. Export of a knowledge (sub) graph into TTL/JSON-LD.
+1. Managing Knowledge Items (KItems) — create, update and delete metadata and properties.
+2. Contact information and supplementary information for KItems.
+3. Semantic annotation of KItems.
+4. Attaching semantic schema data (ontology-class instance data) to KItems.
+5. Managing Knowledge Types (KTypes), including the v2 semantic-spec subsystem.
+6. Role-based access control (RBAC) per KItem: assign users and groups to roles (`MEMBER`, `CONTRIBUTOR`, `OWNER`).
+7. Free-text search with filters (KType, annotation, context membership, attachment extension) and a full SPARQL interface including context-scoped queries.
+8. Linking KItems to other KItems, and grouping them via context KItems.
+9. Linking Apps to KItems, triggered, for example, during a file upload.
+10. Performing simple file upload and download of file attachments.
+11. Export of a knowledge (sub)graph into TTL/JSON-LD.
 
 
 Click on the link to go to the Github repository of the Python based DSMS-SDK : [Git repo](https://github.com/MI-FraunhoferIWM/dsms-python-sdk)
@@ -60,7 +62,8 @@ Please take the compability of the SDK version with the DSMS version into accoun
 | >=3.0.4, <3.1.0 | >=3.0.5, <3.1.0 |
 | >=3.1.0, <3.2.2 | >=3.1.0, <3.2.1 |
 | >=3.2.2 | >=3.2.1, <4.0.0 |
-| >=4.0.0 | >=4.0.0 |
+| >=4.0.0, <5.0.0 | >=4.0.0, <5.0.0 |
+| >=5.0.0 | >=5.0.0 |
 
 
 #### Method 1: Via PyPI

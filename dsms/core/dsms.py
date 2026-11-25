@@ -3,7 +3,7 @@
 import os
 import warnings
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 from dotenv import load_dotenv
@@ -14,23 +14,55 @@ from dsms.core.configuration import Configuration
 from dsms.core.session import Session
 from dsms.core.utils import _ping_backend
 from dsms.knowledge.kitem import KItem
-from dsms.knowledge.ktype import KType, ProcessSchema
+from dsms.knowledge.ktype import (
+    CreateKTypeRequest,
+    KType,
+    KTypeSpec,
+    KTypeSpecPayload,
+    KTypeV2,
+    ProcessSchema,
+)
 from dsms.knowledge.sparql_interface import SparqlInterface
 from dsms.knowledge.utils import _search
 
 from dsms.knowledge.utils import (  # isort:skip
+    _add_group_member,
+    _add_group_to_group,
     _commit,
+    _create_group,
+    _delete_group,
+    _get_group_members,
+    _get_group_subgroups,
     _get_kitem,
     _get_kitem_list,
+    _get_ktypes_by_parent,
     _get_remote_ktypes,
     _get_process_schemas,
-    _get_webform_schemas,
+    _get_schema_data,
+    _get_user_groups,
+    _get_user_list,
+    _remove_group_from_group,
+    _remove_group_member,
+    _update_group,
+    _create_ktype,
+    _delete_ktype_by_id,
+    _export_archive,
+    _export_ktype,
+    _import_archive,
+    _get_ktype_full,
+    _list_ktypes_full,
+    _restore_ktype_stash,
+    _update_ktype_spec,
+    get_user_by_id,
 )
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from pathlib import Path
 
     from dsms.core.session import Buffers
+    from dsms.knowledge.archive import ArchiveImportReport, OnConflict
+    from dsms.knowledge.groups import Group, GroupList, User
+    from dsms.knowledge.properties.schema_data import KItemSchemaData
     from dsms.knowledge.search import KItemListModel, SearchResult
 
 
@@ -80,6 +112,8 @@ class DSMS:
 
         self._config = None
         self._ktypes = None
+        self._user_groups = None
+        self._users = None
         self._session.dsms = self
 
         if env:
@@ -94,12 +128,10 @@ class DSMS:
         elif config is None:
             self.config = Configuration(**kwargs)
         else:
-            raise ValueError(
-                """`config`-keyword is defined among others.
+            raise ValueError("""`config`-keyword is defined among others.
                 The `config`-keyword is reserved for passing a config-object directly.
                 Please specify kwargs for to be passed to the `Configuration`-object _OR_
-                an instance of this `Configuration`-object directly."""
-            )
+                an instance of this `Configuration`-object directly.""")
 
         self._sparql_interface = SparqlInterface(self)
         if self.config.auto_fetch_ktypes:
@@ -204,6 +236,9 @@ class DSMS:
         offset: int = 0,
         allow_fuzzy: "Optional[bool]" = True,
         compact: "Optional[bool]" = False,
+        contexts: "Optional[List[str]]" = None,
+        attachment_extensions: "Optional[List[str]]" = None,
+        visibility: "Optional[Literal['restricted', 'internal', 'public']]" = None,
     ) -> "List[SearchResult]":
         """Search for KItems in the remote backend."""
         return _search(
@@ -215,6 +250,9 @@ class DSMS:
             offset,
             allow_fuzzy,
             compact,
+            contexts,
+            attachment_extensions,
+            visibility,
         )
 
     @property
@@ -226,11 +264,6 @@ class DSMS:
     def process_schemas(self) -> "Dict[UUID, ProcessSchema]":
         """Process schemas interface of the DSMS instance."""
         return _get_process_schemas(self)
-
-    @property
-    def webform_schemas(self) -> "Dict[UUID, ProcessSchema]":
-        """Process schemas interface of the DSMS instance."""
-        return _get_webform_schemas(self)
 
     @property
     def ktypes(self) -> "Enum":
@@ -302,16 +335,27 @@ class DSMS:
         warnings.warn(message, DeprecationWarning)
         return _get_kitem_list(self)
 
-    def get_kitems(self, limit=10, offset=0) -> "KItemListModel":
+    def get_kitems(
+        self,
+        limit=10,
+        offset=0,
+        *,
+        user_id: Optional[str] = None,
+        name: Optional[str] = None,
+    ) -> "KItemListModel":
         """
         Get all available KItems from the remote backend.
 
         Args:
             limit (int): The amount of KItems to be returned. Defaults to 10.
             offset (int): The offset in the list of KItems. Defaults to 0.
+            user_id (str, optional): Filter by user ID (keyword only).
+            name (str, optional): Filter by KItem name (keyword only).
 
         """
-        return _get_kitem_list(self, limit=limit, offset=offset)
+        return _get_kitem_list(
+            self, user_id=user_id, limit=limit, offset=offset, name=name
+        )
 
     @property
     def app_configs(self) -> "List[AppConfig]":
@@ -331,6 +375,307 @@ class DSMS:
         """Return DSMS session"""
         return self._session
 
+    @property
+    def user_groups(self) -> "List[Group]":
+        """Return user groups, fetching from the backend on first access.
+
+        Results are cached for the lifetime of this DSMS instance.
+        Call refresh_user_groups() to force a re-fetch.
+        """
+        if self._user_groups is None:
+            self._user_groups = _get_user_groups(self)
+        return self._user_groups
+
+    def refresh_user_groups(self) -> None:
+        """Re-fetch user groups from the backend and update the local cache."""
+        self._user_groups = _get_user_groups(self)
+
+    @property
+    def users(self) -> "List[User]":
+        """Return all users, fetching from the backend on first access.
+
+        Results are cached for the lifetime of this DSMS instance.
+        Call refresh_users() to force a re-fetch.
+        """
+        if self._users is None:
+            self._users = _get_user_list(self)
+        return self._users
+
+    def refresh_users(self) -> None:
+        """Re-fetch users from the backend and update the local cache."""
+        self._users = _get_user_list(self)
+
+    def get_user(self, user_id: str) -> "User":
+        """Fetch a single user by ID from the backend.
+
+        Args:
+            user_id: The unique identifier of the user.
+
+        Returns:
+            User object for the given ID.
+        """
+        return get_user_by_id(self, user_id)
+
+    def get_group_members(self, group_id: str) -> "List[User]":
+        """Fetch the members of a group (including subgroup members).
+
+        Args:
+            group_id: The unique identifier of the group.
+
+        Returns:
+            List of User objects belonging to the group.
+        """
+        return _get_group_members(self, group_id)
+
+    def create_group(
+        self,
+        name: str,
+        description: str = "",
+        parent_id: Optional[str] = None,
+    ) -> "Group":
+        """Create a new group.
+
+        Args:
+            name: Name of the group.
+            description: Optional description.
+            parent_id: ID of the parent group. If None, creates a top-level group.
+
+        Returns:
+            The created Group object.
+        """
+        from dsms.knowledge.groups import Group  # noqa: F401
+
+        group = _create_group(self, name, description, parent_id)
+        self._user_groups = None  # invalidate cache
+        return group
+
+    def update_group(
+        self,
+        group_id: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> "Group":
+        """Update the name or description of an existing group.
+
+        Args:
+            group_id: The unique identifier of the group.
+            name: New name. Pass None to leave unchanged.
+            description: New description. Pass None to leave unchanged.
+
+        Returns:
+            The updated Group object.
+        """
+        from dsms.knowledge.groups import Group  # noqa: F401
+
+        group = _update_group(self, group_id, name, description)
+        self._user_groups = None  # invalidate cache
+        return group
+
+    def delete_group(self, group_id: str) -> None:
+        """Delete a group.
+
+        Args:
+            group_id: The unique identifier of the group to delete.
+        """
+        _delete_group(self, group_id)
+        self._user_groups = None  # invalidate cache
+
+    def add_group_member(self, group_id: str, user_id: str) -> None:
+        """Add a user to a group.
+
+        Args:
+            group_id: The unique identifier of the group.
+            user_id: The unique identifier of the user to add.
+        """
+        _add_group_member(self, group_id, user_id)
+
+    def remove_group_member(self, group_id: str, user_id: str) -> None:
+        """Remove a user from a group.
+        Args:
+            group_id: The unique identifier of the group.
+            user_id: The unique identifier of the user to remove.
+        """
+        _remove_group_member(self, group_id, user_id)
+
+    def get_group_subgroups(self, group_id: str) -> "GroupList":
+        """Return the direct child groups of a group.
+
+        Args:
+            group_id: The unique identifier of the parent group.
+
+        Returns:
+            GroupList of direct child groups.
+        """
+        return _get_group_subgroups(self, group_id)
+
+    def add_group_to_group(self, parent_id: str, child_id: str) -> None:
+        """Link an existing group as a direct child of another group.
+
+        The child group is moved in the hierarchy; its members and any of its
+        own subgroups are preserved. Members of the child group are resolved
+        recursively when listing the parent group's members.
+
+        Args:
+            parent_id: The unique identifier of the parent group.
+            child_id: The unique identifier of the group to nest as a child.
+        """
+        _add_group_to_group(self, parent_id, child_id)
+        self._user_groups = None
+
+    def remove_group_from_group(self, parent_id: str, child_id: str) -> None:
+        """Detach a child group from its parent and promote it back to top-level.
+
+        Args:
+            parent_id: The unique identifier of the parent group.
+            child_id: The unique identifier of the child group to detach.
+        """
+        _remove_group_from_group(self, parent_id, child_id)
+        self._user_groups = None
+
+    def get_schema_data(self, kitem_id: str) -> "List[KItemSchemaData]":
+        """Fetch all schema-data entries for a KItem from the remote backend.
+
+        Args:
+            kitem_id: The unique identifier of the KItem.
+
+        Returns:
+            List of KItemSchemaData entries.
+        """
+        from dsms.knowledge.properties.schema_data import KItemSchemaData
+
+        return [
+            KItemSchemaData(**entry)
+            for entry in _get_schema_data(self, kitem_id)
+        ]
+
+    # ------------------------------------------------------------------
+    # KType helpers
+    # ------------------------------------------------------------------
+
+    def get_ktypes_by_parent(self, parent_id: str) -> List[KType]:
+        """Return KTypes whose extends chain contains parent_id."""
+        return [KType(**kt) for kt in _get_ktypes_by_parent(self, parent_id)]
+
+    # ------------------------------------------------------------------
+    # KType spec API
+    # ------------------------------------------------------------------
+
+    def list_ktypes(self) -> List[KTypeV2]:
+        """List all KTypes with their semantic spec."""
+        return [KTypeV2(**kt) for kt in _list_ktypes_full(self)]
+
+    def get_ktype(self, ktype_id: str) -> KTypeV2:
+        """Fetch a single KType by ID (includes semantic spec)."""
+        return KTypeV2(**_get_ktype_full(self, ktype_id))
+
+    def create_ktype(self, request: CreateKTypeRequest) -> KTypeV2:
+        """Create a KType."""
+        return KTypeV2(
+            **_create_ktype(self, request.model_dump(exclude_none=True))
+        )
+
+    def update_ktype_spec(
+        self, ktype_id: str, payload: KTypeSpecPayload
+    ) -> KTypeV2:
+        """Partially update a KType spec."""
+        return KTypeV2(
+            **_update_ktype_spec(
+                self, ktype_id, payload.model_dump(exclude_none=True)
+            )
+        )
+
+    def delete_ktype(self, ktype_id: str) -> None:
+        """Delete a KType (blocked if KItems exist)."""
+        _delete_ktype_by_id(self, ktype_id)
+
+    def restore_ktype_stash(self, ktype_id: str) -> KTypeV2:
+        """Restore the pre-import stash for a KType."""
+        return KTypeV2(**_restore_ktype_stash(self, ktype_id))
+
+    def export_ktype(self, ktype_id: str) -> str:
+        """Download a KType spec as YAML text."""
+        return _export_ktype(self, ktype_id)
+
+    # ------------------------------------------------------------------
+    # DSMS archives (see dsms.knowledge.archive)
+    # ------------------------------------------------------------------
+
+    def export_kitems(
+        self,
+        kitem_ids: "Union[str, KItem, List[Union[str, KItem]]]",
+        path: "Optional[Union[str, Path]]" = None,
+        include_context_members: bool = False,
+        include_linked: bool = False,
+        timeout: "Optional[float]" = 3600,
+    ) -> "Path":
+        """Export kitems as a DSMS archive (.dsms.zip) and return its path.
+
+        Args:
+            kitem_ids: Kitems or kitem ids to export. You need read access
+                to each of them.
+            path: Target file, or a directory to save the archive under the
+                name chosen by the server. Defaults to the current directory.
+            include_context_members: Also export the members of exported
+                context kitems, following nested contexts.
+            include_linked: Also export kitems linked to the exported ones
+                (one hop, both directions).
+            timeout: Seconds to wait for the server.
+
+        Kitems added by the include options are left out when you cannot
+        read them; a warning lists their ids.
+        """
+        if not isinstance(kitem_ids, list):
+            kitem_ids = [kitem_ids]
+        ids = [str(getattr(k, "id", k)) for k in kitem_ids]
+        return _export_archive(
+            self,
+            ids,
+            path=path,
+            include_context_members=include_context_members,
+            include_linked=include_linked,
+            timeout=timeout,
+        )
+
+    def import_kitems(
+        self,
+        path: "Union[str, Path]",
+        on_conflict: "OnConflict" = "fail",
+        dry_run: bool = False,
+        timeout: "Optional[float]" = 3600,
+    ) -> "ArchiveImportReport":
+        """Import a DSMS archive (.dsms.zip).
+
+        The archive is checked as a whole first. If any kitem has an error,
+        nothing is written and the returned report has ``ok=False``;
+        ``report.all_errors`` lists the reasons.
+
+        Args:
+            path: The archive file.
+            on_conflict: What to do with kitems whose id already exists:
+                ``"fail"`` the import, ``"skip"`` them, or ``"replace"`` them
+                completely (needs the OWNER role on them).
+            dry_run: Only check the archive and report what would happen.
+            timeout: Seconds to wait for the server.
+
+        New kitems are owned by you. Replaced kitems keep their current
+        access rights and visibility.
+        """
+        from dsms.knowledge.archive import ArchiveImportReport
+
+        return ArchiveImportReport(
+            **_import_archive(
+                self,
+                path,
+                on_conflict=on_conflict,
+                dry_run=dry_run,
+                timeout=timeout,
+            )
+        )
+
+    def get_ktype_spec(self, ktype_id: str) -> Optional[KTypeSpec]:
+        """Return the KTypeSpec for a KType, or None if no spec is set."""
+        return self.get_ktype(ktype_id).spec
+
     @classmethod
     def __get_pydantic_core_schema__(cls):
         """Get validator of the DSMS-object."""
@@ -340,10 +685,8 @@ class DSMS:
 def verify_connection(dsms: DSMS) -> None:
     """Check if DSMS is valid."""
     if not isinstance(dsms, DSMS):
-        raise TypeError(
-            f"""The passed object for the dsms-connection
-                is not of type {DSMS}."""
-        )
+        raise TypeError(f"""The passed object for the dsms-connection
+                is not of type {DSMS}.""")
     if dsms.config.ping_backend:
         try:
             response = _ping_backend(dsms)

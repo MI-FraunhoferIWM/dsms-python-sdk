@@ -1,4 +1,5 @@
 """Pytest for basic KItem connection properties"""
+
 import pytest
 import responses
 

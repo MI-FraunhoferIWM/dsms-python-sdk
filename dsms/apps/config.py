@@ -1,4 +1,5 @@
 """DSMS app models"""
+
 import logging
 import urllib.parse
 import warnings
@@ -19,7 +20,6 @@ from dsms.knowledge.utils import print_model  # isort:skip
 from dsms.core.logging import handler  # isort:skip
 
 from dsms.core.session import Session  # isort:skip
-
 
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)

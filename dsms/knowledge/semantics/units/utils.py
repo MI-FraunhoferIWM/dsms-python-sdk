@@ -116,15 +116,11 @@ def get_property_unit(
                 f"Something went wrong catching the unit for property `{property_name}`."
             ) from error
         if len(query.results) == 0:
-            raise ValueError(
-                f"""Property `{property_name}` does not own any
-                unit with respect to the semantics applied."""
-            )
+            raise ValueError(f"""Property `{property_name}` does not own any
+                unit with respect to the semantics applied.""")
         if len(query.results) > 1:
-            raise ValueError(
-                f"""Property `{property_name}` owns more than one
-                unit with respect to the semantics applied."""
-            )
+            raise ValueError(f"""Property `{property_name}` owns more than one
+                unit with respect to the semantics applied.""")
         unit = query.results.pop()
     else:
         unit = measurement_unit.model_dump()

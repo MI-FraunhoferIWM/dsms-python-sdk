@@ -1,4 +1,5 @@
 """DSMS knowledge utilities"""
+
 import base64
 import io
 import logging
@@ -9,7 +10,7 @@ import time
 import warnings
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 import oyaml as yaml
@@ -30,8 +31,10 @@ if TYPE_CHECKING:
     from dsms import DSMS
     from dsms.apps import AppConfig
     from dsms.core.session import Buffers
-    from dsms.knowledge import KItem, KType, ProcessSchema, WebformSchema
+    from dsms.knowledge import KItem, KType, ProcessSchema
+    from dsms.knowledge.groups import User
     from dsms.knowledge.properties import Attachment
+    from dsms.knowledge.properties.access import KItemAccessProperties
 
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
@@ -48,6 +51,7 @@ FIELDTYPE_TO_XSD = {
     "Checkbox": "bool",
     "Knowledge item": "anyURI",
     "VocabularyTerm": "anyURI",
+    "Vocabulary select": "anyURI",
 }
 
 
@@ -93,15 +97,9 @@ def dump_model(self, exclude_extra: set = set()) -> Dict[str, Any]:
         Dict[str, Any]: A dictionary of the model fields with specified exclusions.
     """
     exclude = self.model_config.get("exclude", set()) | exclude_extra
-    dumped = self.model_dump(
-        exclude_none=True,
-        exclude_unset=True,
-        exclude=exclude,
+    return self.model_dump(
+        exclude_none=True, exclude_unset=True, exclude=exclude, mode="python"
     )
-    return {
-        key: (str(value) if isinstance(value, UUID) else value)
-        for key, value in dumped.items()
-    }
 
 
 def print_ktype(self) -> str:
@@ -206,10 +204,8 @@ def _get_ktype(
 
     response = _perform_request(dsms, f"api/knowledge-type/{ktype_id}", "get")
     if response.status_code == 404 and raise_error:
-        raise ValueError(
-            f"""KType with the id `{ktype_id}` does not exist in
-            DSMS-instance `{dsms.config.host_url}`"""
-        )
+        raise ValueError(f"""KType with the id `{ktype_id}` does not exist in
+            DSMS-instance `{dsms.config.host_url}`""")
     if not response.ok and raise_error:
         raise ValueError(
             f"""An error occured fetching the KType with id `{ktype_id}`:
@@ -232,7 +228,6 @@ def _update_ktype(dsms: "DSMS", ktype: "KType") -> Response:
         exclude={
             "created_at",
             "updated_at",
-            "webform_schema",
             "process_schema",
         },
     )
@@ -262,18 +257,24 @@ def _delete_ktype(ktype: "KType") -> None:
     _get_remote_ktypes(ktype.dsms)
 
 
-def _get_kitem_list(dsms: "DSMS", limit=10, offset=0) -> "KItemListModel":
+def _get_kitem_list(
+    dsms: "DSMS",
+    user_id: Optional[str] = None,
+    limit=10,
+    offset=0,
+    name: Optional[str] = None,
+) -> "KItemListModel":
     """Get all available KItems from the remote backend."""
     from dsms.knowledge.kitem import KItem  # isort:skip
 
+    params = {"user_id": user_id, "limit": limit, "offset": offset}
+    if name is not None:
+        params["name"] = name
     response = _perform_request(
         dsms,
         "api/knowledge/kitems",
         "get",
-        params={
-            "limit": limit,
-            "offset": offset,
-        },
+        params=params,
     )
     if not response.ok:
         raise ValueError(
@@ -307,10 +308,8 @@ def _get_kitem(
 
     response = _perform_request(dsms, f"api/knowledge/kitems/{uuid}", "get")
     if response.status_code == 404 and raise_error:
-        raise ValueError(
-            f"""KItem with uuid `{uuid}` does not exist in
-            DSMS-instance `{dsms.config.host_url}`"""
-        )
+        raise ValueError(f"""KItem with uuid `{uuid}` does not exist in
+            DSMS-instance `{dsms.config.host_url}`""")
     if not response.ok and raise_error:
         raise ValueError(
             f"""An error occured fetching the KItem with uuid `{uuid}`:
@@ -333,6 +332,10 @@ def _create_new_kitem(kitem: "KItem") -> "Dict[str, Any]":
         "slug": kitem.slug,
         "ktype_id": kitem.ktype.id,
     }
+    if kitem.access_properties is not None:
+        access = kitem.access_properties.model_dump(mode="json")
+        payload["visibility"] = access.pop("visibility", "restricted")
+        payload["access_properties"] = access
     logger.debug("Create new KItem with payload: %s", payload)
     response = _perform_request(
         kitem.dsms, "api/knowledge/kitems", "post", json=payload
@@ -357,7 +360,6 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "rdf_exists",
             "in_backend",
             "avatar_exists",
-            "user_groups",
             "ktype_id",
             "attachments",
             "id",
@@ -366,8 +368,12 @@ def _update_kitem(new_kitem: "KItem", old_kitem: "Dict[str, Any]") -> Response:
             "dataframe",
             "access_url",
             "contexts",
+            "schema_data",
+            # decided by _get_kitems_diffs: grants only when they changed
+            "access_properties",
         },
         exclude_defaults=True,
+        mode="json",
     )
     payload.update(
         **differences,
@@ -442,10 +448,8 @@ def _upload_attachments(kitem: "KItem", attachment: "Attachment") -> None:
         elif isinstance(attachment.content, bytes):
             file = io.BytesIO(attachment.content)
         else:
-            raise TypeError(
-                f"""Invalid content type of attachment with name
-                `{attachment.name}`: {type(attachment.content)}"""
-            )
+            raise TypeError(f"""Invalid content type of attachment with name
+                `{attachment.name}`: {type(attachment.content)}""")
         file.name = attachment.name
         upload_file = {"dataFile": file}
         response = _perform_request(
@@ -590,16 +594,48 @@ def _get_attachment_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     }
 
 
+def _grant_set(grants: "Optional[List[Dict[str, Any]]]") -> set:
+    """Grants as comparable (id, type, role) tuples, ignoring their order."""
+    return {
+        (g.get("id"), g.get("type"), str(g.get("role")).lower())
+        for g in grants or []
+    }
+
+
+def _access_changes(
+    old_access: "Dict[str, Any]", new_access: "KItemAccessProperties"
+) -> "Dict[str, Any]":
+    """The access fields that differ from the stored ones, as JSON.
+
+    Only fields that were set count, so a fresh `KItemAccessProperties` with
+    just a visibility doesn't send an empty grant list (which the backend
+    would treat as "remove all grants"). Grants appended in place to such an
+    object aren't marked as set, so non-empty grants always count.
+    """
+    new = new_access.model_dump(mode="json", exclude_unset=True)
+    if "grants" not in new and new_access.grants:
+        new["grants"] = new_access.model_dump(mode="json", include={"grants"})[
+            "grants"
+        ]
+    changes = {}
+    if "visibility" in new and new["visibility"] != old_access.get(
+        "visibility"
+    ):
+        changes["visibility"] = new["visibility"]
+    if "grants" in new and _grant_set(new["grants"]) != _grant_set(
+        old_access.get("grants")
+    ):
+        changes["grants"] = new["grants"]
+    return changes
+
+
 def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     """Get the differences in the attributes between two kitems"""
     differences = {}
     attributes = [
         ("annotations", ("annotations", "link", "unlink")),
-        ("user_groups", ("user_groups", "add", "remove")),
     ]
-    to_compare = kitem_new.model_dump(
-        include={"annotations", "user_groups", "contexts"}
-    )
+    to_compare = kitem_new.model_dump(include={"annotations", "contexts"})
     for name, terms in attributes:
         to_add_name = terms[0] + "_to_" + terms[1]
         to_remove_name = terms[0] + "_to_" + terms[2]
@@ -621,6 +657,18 @@ def _get_kitems_diffs(kitem_old: "Dict[str, Any]", kitem_new: "KItem"):
     context_kitems = _get_kitem_contexts(kitem_old, kitem_new)
     # same holds for kitem apps
     apps = _get_apps_diff(kitem_old, kitem_new)
+    # Access: visibility is a top-level field of the backend update model, and
+    # sending grants replaces all of them (which needs the manage permission),
+    # so each is sent only when it actually changed.
+    if kitem_new.access_properties is not None:
+        access_changes = _access_changes(
+            kitem_old.get("access_properties") or {},
+            kitem_new.access_properties,
+        )
+        if "visibility" in access_changes:
+            differences["visibility"] = access_changes.pop("visibility")
+        if access_changes:
+            differences["access_properties"] = access_changes
     # merge with previously found differences
     differences.update(**linked_kitems, **apps, **context_kitems)
     return differences
@@ -649,7 +697,7 @@ def _get_kitem_contexts(
 def _commit(buffers: "Buffers") -> None:
     """Commit the buffers for the
     created, updated and deleted buffers"""
-    from dsms import AppConfig, KItem, KType, ProcessSchema, WebformSchema
+    from dsms import AppConfig, KItem, KType, ProcessSchema
 
     logger.debug("Committing KItems in buffers. Current buffers:")
     logger.debug("Current Added-buffer: %s", buffers.added)
@@ -682,16 +730,13 @@ def _commit(buffers: "Buffers") -> None:
                 _delete_dataframe(obj.id)
             _update_kitem(obj, old_kitem)
             _update_attachments(obj, old_kitem)
+            if obj.schema_data is not None:
+                _update_schema_data(obj, old_kitem)
             if obj.avatar.file or obj.avatar.encode_qr:
                 _commit_avatar(obj)
         elif isinstance(obj, KType) or (
             isinstance(obj, Enum) and isinstance(obj.value, KType)
         ):
-            if obj.webform_schema:
-                if obj.webform_schema_id not in obj.dsms.webform_schemas:
-                    _create_webform_schema(obj.dsms, obj.webform_schema)
-                else:
-                    _update_webform_schema(obj.dsms, obj.webform_schema)
             if obj.process_schema:
                 if obj.process_schema_id not in obj.dsms.process_schemas:
                     _create_process_schema(obj.dsms, obj.process_schema)
@@ -713,11 +758,6 @@ def _commit(buffers: "Buffers") -> None:
             else:
                 _update_process_schema(obj.dsms, obj)
 
-        elif isinstance(obj, WebformSchema):
-            if obj.id not in obj.dsms.webform_schemas:
-                _create_webform_schema(obj.dsms, obj)
-            else:
-                _update_webform_schema(obj.dsms, obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed."
@@ -737,8 +777,6 @@ def _commit(buffers: "Buffers") -> None:
             had_ktypes = True
         elif isinstance(obj, ProcessSchema):
             _delete_process_schema(obj)
-        elif isinstance(obj, WebformSchema):
-            _delete_webform_schema(obj)
         else:
             raise TypeError(
                 f"Object `{obj}` of type {type(obj)} cannot be committed or deleted."
@@ -746,75 +784,6 @@ def _commit(buffers: "Buffers") -> None:
     if Session.dsms.config.auto_refresh and had_ktypes:
         Session.dsms.refresh_ktypes()
     logger.debug("Committing successful, clearing buffers.")
-
-
-def _create_webform_schema(
-    dsms: "DSMS", webform_schema: "WebformSchema"
-) -> None:
-    """Create a new webform schema in the remote backend"""
-    response = _perform_request(
-        dsms,
-        "api/knowledge-type/webform-schemas/",
-        "post",
-        json=webform_schema.model_dump(
-            include={"name", "id", "spec"}, by_alias=True
-        ),
-    )
-    if not response.ok:
-        raise ConnectionError(
-            f"Failed to create process schema: {response.text}"
-        )
-    for key, value in response.json().items():
-        setattr(webform_schema, key, value)
-
-
-def _update_webform_schema(
-    dsms: "DSMS", webform_schema: "WebformSchema"
-) -> None:
-    """Update an existing webform schema in the remote backend"""
-    response = _perform_request(
-        dsms,
-        f"api/knowledge-type/webform-schemas/{webform_schema.id}",
-        "put",
-        json=webform_schema.model_dump(include={"name", "spec"}),
-    )
-    if not response.ok:
-        raise ConnectionError(
-            f"Failed to update webform schema: {response.text}"
-        )
-    for key, value in response.json().items():
-        setattr(webform_schema, key, value)
-
-
-def _get_webform_schemas(dsms: "DSMS"):
-    from dsms.knowledge.ktype import WebformSchema
-
-    response = _perform_request(
-        dsms,
-        "api/knowledge-type/webform-schemas/",
-        "get",
-    )
-    if not response.ok:
-        raise ConnectionError(
-            f"Failed to fetch webform schemas: {response.text}"
-        )
-    schemas = {
-        schema["id"]: WebformSchema(**schema) for schema in response.json()
-    }
-    return schemas
-
-
-def _delete_webform_schema(dsms: "DSMS", webform_schema_id: str) -> None:
-    """Delete an existing webform schema in the remote backend"""
-    response = _perform_request(
-        dsms,
-        f"api/knowledge-type/webform-schemas/{webform_schema_id}",
-        "delete",
-    )
-    if not response.ok:
-        raise ConnectionError(
-            f"Failed to delete webform schema: {response.text}"
-        )
 
 
 def _create_process_schema(
@@ -867,9 +836,109 @@ def _refresh_kitem(kitem: "KItem") -> None:
         kitem.dataframe = [{"id": kitem.id, **column} for column in dataframe]
 
 
+def _get_ktypes_by_parent(
+    dsms: "DSMS", parent_id: str
+) -> List[Dict[str, Any]]:
+    """Return KTypes whose spec.extends chain contains parent_id."""
+    response = _perform_request(
+        dsms, "api/knowledge-type/", "get", params={"parent": parent_id}
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to fetch ktypes by parent `{parent_id}`: {response.text}"
+        )
+    return response.json()
+
+
+# ---------------------------------------------------------------------------
+# KType utilities  (api/knowledge-type/…)
+# ---------------------------------------------------------------------------
+
+_KTYPE_BASE = "api/knowledge-type"
+
+
+def _list_ktypes_full(dsms: "DSMS") -> List[Dict[str, Any]]:
+    """GET /api/knowledge-type/ — list all KTypes with spec."""
+    response = _perform_request(dsms, f"{_KTYPE_BASE}/", "get")
+    if not response.ok:
+        raise ValueError(f"Failed to list ktypes: {response.text}")
+    return response.json()
+
+
+def _get_ktype_full(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
+    """GET /api/knowledge-type/{ktype_id} — fetch a single KType with spec."""
+    response = _perform_request(dsms, f"{_KTYPE_BASE}/{ktype_id}", "get")
+    if not response.ok:
+        raise ValueError(
+            f"Failed to fetch ktype `{ktype_id}`: {response.text}"
+        )
+    return response.json()
+
+
+def _create_ktype(dsms: "DSMS", payload: Dict[str, Any]) -> Dict[str, Any]:
+    """POST /api/knowledge-type/ — create a KType."""
+    response = _perform_request(dsms, f"{_KTYPE_BASE}/", "post", json=payload)
+    if not response.ok:
+        raise ValueError(f"Failed to create ktype: {response.text}")
+    return response.json()
+
+
+def _update_ktype_spec(
+    dsms: "DSMS", ktype_id: str, payload: Dict[str, Any]
+) -> Dict[str, Any]:
+    """PUT /api/knowledge-type/{ktype_id} — partial spec update."""
+    response = _perform_request(
+        dsms, f"{_KTYPE_BASE}/{ktype_id}", "put", json=payload
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to update ktype `{ktype_id}`: {response.text}"
+        )
+    return response.json()
+
+
+def _delete_ktype_by_id(dsms: "DSMS", ktype_id: str) -> None:
+    """DELETE /api/knowledge-type/{ktype_id} — delete a KType by ID."""
+    response = _perform_request(dsms, f"{_KTYPE_BASE}/{ktype_id}", "delete")
+    if not response.ok:
+        raise ValueError(
+            f"Failed to delete ktype `{ktype_id}`: {response.text}"
+        )
+
+
+def _restore_ktype_stash(dsms: "DSMS", ktype_id: str) -> Dict[str, Any]:
+    """POST /api/knowledge-type/{ktype_id}/restore-stash — restore pre-import stash."""
+    response = _perform_request(
+        dsms, f"{_KTYPE_BASE}/{ktype_id}/restore-stash", "post"
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to restore stash for ktype `{ktype_id}`: {response.text}"
+        )
+    return response.json()
+
+
+def _export_ktype(dsms: "DSMS", ktype_id: str) -> str:
+    """GET /api/knowledge-type/{ktype_id}/export — download ktype.yaml as text."""
+    response = _perform_request(
+        dsms, f"{_KTYPE_BASE}/{ktype_id}/export", "get"
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to export ktype `{ktype_id}`: {response.text}"
+        )
+    return response.text
+
+
 def _refresh_ktype(ktype: "KType") -> None:
-    """Refresh the KItem"""
-    for key, value in _get_ktype(ktype.dsms, ktype.id, as_json=True).items():
+    """Refresh the KType from the backend."""
+    fetched = type(ktype).model_validate(
+        _get_ktype(ktype.dsms, ktype.id, as_json=True)
+    )
+    # only the model's fields: the API returns keys (e.g. `spec`) that plain
+    # KType doesn't have, and setting those raises
+    for key in type(ktype).model_fields:
+        value = getattr(fetched, key)
         logger.debug(
             "Set updated property `%s` for KType with id `%s` after commiting: %s",
             key,
@@ -901,6 +970,9 @@ def _search(
     offset: "Optional[int]" = 0,
     allow_fuzzy: "Optional[bool]" = True,
     compact: "Optional[bool]" = False,
+    contexts: "Optional[List[str]]" = None,
+    attachment_extensions: "Optional[List[str]]" = None,
+    visibility: Optional[Literal["restricted", "internal", "public"]] = None,
 ) -> "List[SearchResult]":
     """Search for KItems in the remote backend"""
     from dsms import KItem, KItemCompactedModel
@@ -916,12 +988,19 @@ def _search(
         "offset": offset,
         "compact": compact,
     }
+    if contexts is not None:
+        payload["contexts"] = contexts
+    if visibility is not None:
+        payload["visibility"] = visibility
+    params = {"allow_fuzzy": allow_fuzzy}
+    if attachment_extensions is not None:
+        params["attachment_extensions"] = attachment_extensions
     response = _perform_request(
         dsms,
         "api/knowledge/kitems/search",
         "post",
         json=payload,
-        params={"allow_fuzzy": allow_fuzzy},
+        params=params,
     )
     if not response.ok:
         raise RuntimeError(
@@ -936,9 +1015,11 @@ def _search(
     return SearchResult(
         hits=[
             {
-                "kitem": KItemCompactedModel(**item.get("kitem"))
-                if compact
-                else KItem(**item.get("kitem")),
+                "kitem": (
+                    KItemCompactedModel(**item.get("kitem"))
+                    if compact
+                    else KItem(**item.get("kitem"))
+                ),
                 "fuzzy": item.get("fuzzy"),
             }
             for item in dumped.get("hits")
@@ -1089,9 +1170,9 @@ def _make_avatar(
     return avatar
 
 
-def _get_avatar(dsms: "DSMS", kitem_id: UUID) -> Image.Image:
+def _get_avatar(kitem_id: UUID) -> Image.Image:
     response = _perform_request(
-        dsms, f"api/knowledge/avatar/{kitem_id}", "get"
+        Session.dsms, f"api/knowledge/avatar/{kitem_id}", "get"
     )
     buffer = io.BytesIO(response.content)
     return Image.open(buffer)
@@ -1126,38 +1207,35 @@ def _delete_app_spec(obj: "AppConfig") -> None:
     return response.text
 
 
-def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
-    if webform:
+def _transform_custom_properties_schema(
+    custom_properties: Any, ktype_custom_properties: Any
+):
+    if ktype_custom_properties and isinstance(ktype_custom_properties, dict):
         copy_properties = custom_properties.copy()
         transformed_sections = {}
-        for section_def in webform.spec.sections:
-            for input_def in section_def.inputs:
-                if input_def.label in copy_properties:
-                    if input_def.measurement_unit:
-                        measurement_unit = (
-                            input_def.measurement_unit.model_dump()
-                        )
-                    else:
-                        measurement_unit = None
+        for section_def in ktype_custom_properties.get("sections", []):
+            for input_def in section_def.get("inputs", []):
+                label = input_def.get("label")
+                if label in copy_properties:
                     entry = {
-                        "id": input_def.id,
-                        "label": input_def.label,
-                        "value": copy_properties.pop(input_def.label),
-                        "measurement_unit": measurement_unit,
-                        "type": input_def.widget,
+                        "id": input_def.get("id"),
+                        "label": label,
+                        "value": copy_properties.pop(label),
+                        "measurement_unit": input_def.get("measurementUnit"),
+                        "type": input_def.get("widget"),
+                        "relationMapping": input_def.get("relationMapping"),
                     }
-                    section_name = section_def.name
+                    section_name = section_def.get("name")
                     if section_name not in transformed_sections:
-                        section = {
-                            "id": section_def.id,
+                        transformed_sections[section_name] = {
+                            "id": section_def.get("id"),
                             "name": section_name,
                             "entries": [],
                         }
-                        transformed_sections[section_name] = section
                     transformed_sections[section_name]["entries"].append(entry)
         if copy_properties:
             logger.info(
-                "Some custom properties were not found in the webform: %s",
+                "Some custom properties were not found in the ktype spec: %s",
                 copy_properties,
             )
             transformed_sections["General"] = _make_misc_section(
@@ -1170,7 +1248,7 @@ def _transform_custom_properties_schema(custom_properties: Any, webform: Any):
 
 
 def _transform_from_flat_schema(
-    custom_properties: Dict[str, Any]
+    custom_properties: Dict[str, Any],
 ) -> Dict[str, Any]:
     return {"sections": [_make_misc_section(custom_properties)]}
 
@@ -1350,12 +1428,12 @@ def _delete_process_schema(
 
 def to_kebab_case(name: str):
     """
-    Converts a multi word string into single string representation.
+    Converts a label string into a JSONPath-safe identifier.
 
-    :param name: the string representing multi values.
-    :return: ID representation of the given string.
+    Replaces all non-alphanumeric characters with underscores so the result
+    can be used as a JSON key and JSONPath dot-notation path segment.
     """
-    sentence = name.lower().replace(" ", "-")
+    sentence = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
     return sentence
 
 
@@ -1402,7 +1480,7 @@ def generate_mapping(ktype_id: str, webform: dict):
                     else:
                         object_type = map_fieldtype_to_xsd(widget)
 
-                    if widget == "Knowledge item":
+                    if widget in ("Knowledge item", "Vocabulary select"):
                         object_type = "anyURI"
                         rel_type = "object_property"
 
@@ -1430,16 +1508,18 @@ def generate_mapping(ktype_id: str, webform: dict):
                                 "relation_type": relation_mapping_extra.get(
                                     "type"
                                 ),
-                                "object_type": {
-                                    "suffix": "max",
-                                    "iri": relation_mapping_extra.get(
-                                        "classIri"
-                                    ),
-                                    **unit,
-                                }
-                                if relation_mapping_extra.get("type")
-                                == "object_property"
-                                else object_type,
+                                "object_type": (
+                                    {
+                                        "suffix": "max",
+                                        "iri": relation_mapping_extra.get(
+                                            "classIri"
+                                        ),
+                                        **unit,
+                                    }
+                                    if relation_mapping_extra.get("type")
+                                    == "object_property"
+                                    else object_type
+                                ),
                             }
                         )
 
@@ -1462,3 +1542,398 @@ def generate_mapping(ktype_id: str, webform: dict):
     else:
         mapping = mappings
     return mapping
+
+
+def _get_user_groups(dsms: "DSMS"):
+    """Fetch all user groups from the DSMS backend."""
+    from dsms.knowledge.groups import Group, GroupList
+
+    response = _perform_request(
+        dsms,
+        "api/users/groups",
+        "get",
+    )
+    if not response.ok:
+        raise ConnectionError(f"Failed to fetch user groups: {response.text}")
+    groups = response.json()
+    return GroupList([Group(**group) for group in groups])
+
+
+def _get_group_members(dsms: "DSMS", group_id: str) -> List[Dict[str, Any]]:
+    """Fetch members of a specific group from the DSMS backend."""
+    from dsms.knowledge.groups import User
+
+    response = _perform_request(
+        dsms,
+        f"api/users/groups/{group_id}/members",
+        "get",
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to fetch members of group {group_id}: {response.text}"
+        )
+    return [User(**u) for u in response.json()]
+
+
+def _create_group(
+    dsms: "DSMS",
+    name: str,
+    description: str = "",
+    parent_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create a new group (top-level or subgroup) in the DSMS backend."""
+    from dsms.knowledge.groups import Group
+
+    if parent_id:
+        url = f"api/users/groups/{parent_id}/subgroups"
+    else:
+        url = "api/users/groups"
+    payload = {"name": name, "description": description}
+    response = _perform_request(dsms, url, "post", json=payload)
+    if not response.ok:
+        raise ValueError(f"Failed to create group '{name}': {response.text}")
+    return Group(**response.json())
+
+
+def _update_group(
+    dsms: "DSMS",
+    group_id: str,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Update name or description of an existing group."""
+    from dsms.knowledge.groups import Group
+
+    payload = {}
+    if name is not None:
+        payload["name"] = name
+    if description is not None:
+        payload["description"] = description
+    if not payload:
+        raise ValueError(
+            "At least one of name or description must be provided."
+        )
+    response = _perform_request(
+        dsms, f"api/users/groups/{group_id}", "put", json=payload
+    )
+    if not response.ok:
+        raise ValueError(f"Failed to update group {group_id}: {response.text}")
+    return Group(**response.json())
+
+
+def _delete_group(dsms: "DSMS", group_id: str) -> None:
+    """Delete a group from the DSMS backend."""
+    response = _perform_request(dsms, f"api/users/groups/{group_id}", "delete")
+    if not response.ok:
+        raise ValueError(f"Failed to delete group {group_id}: {response.text}")
+
+
+def _add_group_member(dsms: "DSMS", group_id: str, user_id: str) -> None:
+    """Add a user to a group."""
+    response = _perform_request(
+        dsms,
+        f"api/users/groups/{group_id}/members",
+        "post",
+        json={"user_id": user_id},
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to add user {user_id} to group {group_id}: {response.text}"
+        )
+
+
+def _remove_group_member(dsms: "DSMS", group_id: str, user_id: str) -> None:
+    """Remove a user from a group."""
+    response = _perform_request(
+        dsms,
+        f"api/users/groups/{group_id}/members/{user_id}",
+        "delete",
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to remove user {user_id} from group {group_id}: {response.text}"
+        )
+
+
+def _get_group_subgroups(dsms: "DSMS", group_id: str) -> List[Any]:
+    """Fetch the direct child groups of a group."""
+    from dsms.knowledge.groups import Group, GroupList
+
+    response = _perform_request(
+        dsms,
+        f"api/users/groups/{group_id}/subgroups",
+        "get",
+    )
+    if not response.ok:
+        raise ConnectionError(
+            f"Failed to fetch subgroups of group {group_id}: {response.text}"
+        )
+    return GroupList([Group(**g) for g in response.json()])
+
+
+def _add_group_to_group(dsms: "DSMS", parent_id: str, child_id: str) -> None:
+    """Link an existing group as a subgroup of another group."""
+    response = _perform_request(
+        dsms,
+        f"api/users/groups/{parent_id}/subgroups/{child_id}",
+        "post",
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to link group {child_id} under group {parent_id}: {response.text}"
+        )
+
+
+def _remove_group_from_group(
+    dsms: "DSMS", parent_id: str, child_id: str
+) -> None:
+    """Detach a child group from its parent, promoting it back to top-level."""
+    response = _perform_request(
+        dsms,
+        f"api/users/groups/{parent_id}/subgroups/{child_id}",
+        "delete",
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to unlink group {child_id} from group {parent_id}: {response.text}"
+        )
+
+
+def _get_user_list(dsms: "DSMS"):
+    """Fetch all users from the DSMS backend."""
+    from dsms.knowledge.groups import User, UserList
+
+    response = _perform_request(
+        dsms,
+        "api/users/",
+        "get",
+    )
+    if not response.ok:
+        raise ConnectionError(f"Failed to fetch users: {response.text}")
+    users = response.json()
+    return UserList([User(**user) for user in users])
+
+
+def get_user_by_id(dsms: "DSMS", user_id: str) -> "User":
+    """Fetch a single user by ID from the DSMS backend.
+
+    Args:
+        dsms: The DSMS instance to use for the request.
+        user_id: The unique identifier of the user.
+
+    Returns:
+        User object for the given ID.
+    """
+    from dsms.knowledge.groups import User
+
+    response = _perform_request(
+        dsms,
+        f"api/users/{user_id}",
+        "get",
+    )
+    if not response.ok:
+        raise ValueError(f"Failed to fetch user {user_id}: {response.text}")
+    return User(**response.json())
+
+
+def _get_schema_data(dsms: "DSMS", kitem_id: str) -> List[Dict[str, Any]]:
+    """Fetch all schema-data entries for a KItem from the remote backend."""
+    response = _perform_request(
+        dsms, f"api/knowledge/kitems/{kitem_id}/schema-data", "get"
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to fetch schema data for kitem `{kitem_id}`: {response.text}"
+        )
+    return response.json()
+
+
+def _put_schema_data(
+    dsms: "DSMS",
+    kitem_id: str,
+    schema_id: str,
+    content: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Create or update a single schema-data entry for a KItem."""
+    response = _perform_request(
+        dsms,
+        f"api/knowledge/kitems/{kitem_id}/schema-data/{schema_id}",
+        "put",
+        json={"content": content},
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to put schema data `{schema_id}` for kitem `{kitem_id}`: {response.text}"
+        )
+    return response.json()
+
+
+def _delete_schema_data(dsms: "DSMS", kitem_id: str, schema_id: str) -> None:
+    """Delete a single schema-data entry for a KItem."""
+    response = _perform_request(
+        dsms,
+        f"api/knowledge/kitems/{kitem_id}/schema-data/{schema_id}",
+        "delete",
+    )
+    if not response.ok:
+        raise ValueError(
+            f"Failed to delete schema data `{schema_id}` for kitem `{kitem_id}`: {response.text}"
+        )
+
+
+def _update_schema_data(kitem: "KItem", old_kitem: Dict[str, Any]) -> None:
+    """Sync schema_data changes between local KItem state and the backend."""
+    old_entries = {
+        e["schema_id"]: e.get("content")
+        for e in old_kitem.get("schema_data", [])
+    }
+    new_entries = {e.schema_id: e.content for e in (kitem.schema_data or [])}
+
+    for schema_id, content in new_entries.items():
+        if schema_id not in old_entries or old_entries[schema_id] != content:
+            _put_schema_data(kitem.dsms, str(kitem.id), schema_id, content)
+
+    for schema_id in old_entries:
+        if schema_id not in new_entries:
+            _delete_schema_data(kitem.dsms, str(kitem.id), schema_id)
+
+
+# ---------------------------------------------------------------------------
+# DSMS archives (export and import of kitems)
+# ---------------------------------------------------------------------------
+
+_ARCHIVE_TIMEOUT = 3600
+
+
+def _archive_request(
+    dsms: "DSMS",
+    route: str,
+    timeout: Optional[float],
+    open_body=None,
+    retry: bool = True,
+    **kwargs,
+) -> Response:
+    """Request for the archive routes.
+
+    Unlike `_perform_request`, the body is not read for debug logging, so a
+    streamed export is not loaded into memory. `open_body` returns fresh
+    request kwargs (e.g. a reopened upload file), so a retry after
+    re-authentication sends the body again.
+    """
+    from urllib.parse import urljoin
+
+    import requests
+
+    body = open_body() if open_body else {}
+    try:
+        response = requests.post(
+            urljoin(str(dsms.config.host_url), route),
+            headers=dsms.headers,
+            verify=dsms.config.ssl_verify,
+            timeout=timeout,
+            **body,
+            **kwargs,
+        )
+    finally:
+        for value in body.get("files", {}).values():
+            value[1].close()
+    if (
+        response.status_code == 401
+        and dsms.config.enable_auto_reauth
+        and retry
+    ):
+        logger.info("Token expired. Will re-authenticate.")
+        response.close()
+        dsms.config = dsms.config.model_validate(dsms.config)
+        return _archive_request(
+            dsms, route, timeout, open_body=open_body, retry=False, **kwargs
+        )
+    return response
+
+
+def _archive_filename(response: Response) -> Optional[str]:
+    disposition = response.headers.get("Content-Disposition", "")
+    match = re.search(r'filename\*?=(?:UTF-8\'\')?"?([^";]+)"?', disposition)
+    return Path(match.group(1)).name if match else None
+
+
+def _export_archive(
+    dsms: "DSMS",
+    kitem_ids: List[str],
+    path: Optional[Union[str, Path]] = None,
+    include_context_members: bool = False,
+    include_linked: bool = False,
+    timeout: Optional[float] = _ARCHIVE_TIMEOUT,
+) -> Path:
+    """POST /api/knowledge/kitems/export, streamed into a file."""
+    payload = {
+        "kitem_ids": kitem_ids,
+        "include_context_members": include_context_members,
+        "include_linked": include_linked,
+    }
+    if path is not None and not Path(path).is_dir():
+        payload["filename"] = Path(path).name.split(".")[0]
+    response = _archive_request(
+        dsms,
+        "api/knowledge/kitems/export",
+        json=payload,
+        stream=True,
+        timeout=timeout,
+    )
+    with response:
+        if not response.ok:
+            raise ValueError(
+                f"Failed to export kitems {kitem_ids}: {response.text}"
+            )
+        name = _archive_filename(response) or "dsms-archive.dsms.zip"
+        if path is None:
+            target = Path.cwd() / name
+        elif Path(path).is_dir():
+            target = Path(path) / name
+        else:
+            target = Path(path)
+        omitted = response.headers.get("X-DSMS-Omitted")
+        if omitted:
+            warnings.warn(
+                "These kitems are linked or in an exported context but were "
+                f"left out because you cannot read them: {omitted}"
+            )
+        with open(target, "wb") as fh:
+            for chunk in response.iter_content(chunk_size=1 << 20):
+                fh.write(chunk)
+    return target
+
+
+def _import_archive(
+    dsms: "DSMS",
+    path: Union[str, Path],
+    on_conflict: str = "fail",
+    dry_run: bool = False,
+    timeout: Optional[float] = _ARCHIVE_TIMEOUT,
+) -> Dict[str, Any]:
+    """POST /api/knowledge/kitems/import. Returns the import report.
+
+    A report with ok=False (status 422) is returned, not raised, so callers
+    can inspect the per-kitem errors.
+    """
+    path = Path(path)
+
+    def open_body():
+        return {
+            "files": {"file": (path.name, open(path, "rb"), "application/zip")}
+        }
+
+    response = _archive_request(
+        dsms,
+        "api/knowledge/kitems/import",
+        open_body=open_body,
+        params={"on_conflict": on_conflict, "dry_run": str(dry_run).lower()},
+        timeout=timeout,
+    )
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    if isinstance(body, dict) and "kitems" in body:
+        return body
+    raise ValueError(f"Failed to import archive `{path}`: {response.text}")

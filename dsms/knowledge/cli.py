@@ -1,6 +1,5 @@
 """Command line interface for kitem inspection"""
 
-
 import click
 
 from dsms import DSMS

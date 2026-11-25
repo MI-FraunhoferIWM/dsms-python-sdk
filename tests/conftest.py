@@ -1,4 +1,5 @@
 """Conftest for DSMS-SDK"""
+
 import json
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin

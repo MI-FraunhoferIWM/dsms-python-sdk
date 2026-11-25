@@ -26,7 +26,6 @@ class KItemLinkedModel(KItemCompactedModel):
 
 
 class KItemRelationshipModel(BaseModel):
-
     """Data model for a relation between two linked KItems"""
 
     is_incoming: bool = Field(

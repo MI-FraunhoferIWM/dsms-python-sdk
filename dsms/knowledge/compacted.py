@@ -1,7 +1,7 @@
 """Compacted Knowledge Item implementation of the DSMS"""
 
 from enum import Enum
-from typing import Optional, Union
+from typing import List, Optional, Union
 from uuid import UUID, uuid4
 
 from pydantic import (  # isort: skip
@@ -44,6 +44,16 @@ class KItemCompactedModel(KItemBaseModel):
         min_length=4,
         max_length=1000,
     )
+    avatar_exists: Optional[bool] = Field(
+        False, description="Whether the KItem holds an avatar or not."
+    )
+    has_contexts: bool = Field(
+        False, description="Whether the KItem belongs to any context."
+    )
+    attachment_extensions: Optional[List[str]] = Field(
+        None,
+        description="Unique file extensions present in the KItem's attachments.",
+    )
 
     def __str__(self) -> str:
         """Pretty print the kitem fields"""
@@ -79,9 +89,20 @@ class KItemCompactedModel(KItemBaseModel):
         if isinstance(value, str):
             ktype = Session.ktypes.get(value)
             if not ktype:
-                raise TypeError(
-                    f"KType for `ktype_id={value}` does not exist."
-                )
+                # KType not in local cache (backend may have >100 KTypes).
+                # Fetch on demand and cache for the rest of this session.
+                from dsms.knowledge.kitem import KType as KTypeModel
+                from dsms.knowledge.utils import _get_ktype_full
+
+                try:
+                    ktype_data = _get_ktype_full(Session.dsms, value)
+                    fetched = KTypeModel(**ktype_data)
+                    Session.ktypes[value] = fetched
+                    ktype = fetched
+                except Exception as exc:
+                    raise TypeError(
+                        f"KType for `ktype_id={value}` does not exist."
+                    ) from exc
             value = ktype
         if not hasattr(value, "id"):
             raise TypeError(
